@@ -86,8 +86,8 @@ const IndexRoute = IndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const VerifyIndexRoute = VerifyIndexRouteImport.update({
-  id: '/verify/',
-  path: '/verify/',
+  id: '/verify',
+  path: '/verify',
   getParentRoute: () => rootRouteImport,
 } as any)
 const VerifySelfieRoute = VerifySelfieRouteImport.update({
@@ -189,7 +189,7 @@ export interface FileRoutesByFullPath {
   '/verify/momo': typeof VerifyMomoRoute
   '/verify/phone': typeof VerifyPhoneRoute
   '/verify/selfie': typeof VerifySelfieRoute
-  '/verify/': typeof VerifyIndexRoute
+  '/verify': typeof VerifyIndexRoute
   '/circle/$id/approvals': typeof CircleIdApprovalsRoute
   '/circle/$id/members': typeof CircleIdMembersRoute
 }
@@ -245,7 +245,7 @@ export interface FileRoutesById {
   '/verify/momo': typeof VerifyMomoRoute
   '/verify/phone': typeof VerifyPhoneRoute
   '/verify/selfie': typeof VerifySelfieRoute
-  '/verify/': typeof VerifyIndexRoute
+  '/verify': typeof VerifyIndexRoute
   '/circle/$id/approvals': typeof CircleIdApprovalsRoute
   '/circle/$id/members': typeof CircleIdMembersRoute
 }
@@ -274,7 +274,7 @@ export interface FileRouteTypes {
     | '/verify/momo'
     | '/verify/phone'
     | '/verify/selfie'
-    | '/verify/'
+    | '/verify'
     | '/circle/$id/approvals'
     | '/circle/$id/members'
   fileRoutesByTo: FileRoutesByTo
@@ -329,7 +329,7 @@ export interface FileRouteTypes {
     | '/verify/momo'
     | '/verify/phone'
     | '/verify/selfie'
-    | '/verify/'
+    | '/verify'
     | '/circle/$id/approvals'
     | '/circle/$id/members'
   fileRoutesById: FileRoutesById
@@ -428,10 +428,10 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/verify/': {
-      id: '/verify/'
+    '/verify': {
+      id: '/verify'
       path: '/verify'
-      fullPath: '/verify/'
+      fullPath: '/verify'
       preLoaderRoute: typeof VerifyIndexRouteImport
       parentRoute: typeof rootRouteImport
     }

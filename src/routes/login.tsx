@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, type FormEvent, type ChangeEventHandler, type ReactNode } from "react";
 import { Coins, Eye, EyeOff, Mail, Lock } from "lucide-react";
+import { signInWithPassword } from "@/lib/auth";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -8,7 +9,27 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const [email, setEmail] = useState("adjoa@sikacircle.app");
+  const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    const result = await signInWithPassword(email, password);
+    setLoading(false);
+
+    if (result.error) {
+      setError(result.error.message || "Unable to sign in.");
+      return;
+    }
+
+    navigate({ to: "/home" });
+  };
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background px-6 pt-12 pb-8">
@@ -25,21 +46,26 @@ function LoginPage() {
       <h1 className="font-display text-3xl font-bold tracking-tight">Welcome back</h1>
       <p className="mt-2 text-sm text-muted-foreground">Sign in to continue contributing to your circles.</p>
 
-      <form
-        className="mt-8 flex flex-col gap-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          navigate({ to: "/home" });
-        }}
-      >
-        <Field icon={<Mail className="h-4 w-4" />} label="Email" type="email" placeholder="adjoa@sikacircle.app" defaultValue="adjoa@sikacircle.app" />
+      <form className="mt-8 flex flex-col gap-4" onSubmit={handleSubmit}>
+        <Field
+          icon={<Mail className="h-4 w-4" />}
+          label="Email"
+          type="email"
+          placeholder="adjoa@sikacircle.app"
+          name="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+        />
         <div>
           <label className="text-xs font-medium text-muted-foreground">Password</label>
           <div className="mt-1.5 flex items-center gap-2 rounded-2xl border border-input bg-muted/40 px-4 py-3.5">
             <Lock className="h-4 w-4 text-muted-foreground" />
             <input
+              name="password"
               type={show ? "text" : "password"}
-              defaultValue="••••••••"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Enter your password"
               className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
             <button type="button" onClick={() => setShow((s) => !s)} className="text-muted-foreground">
@@ -53,14 +79,19 @@ function LoginPage() {
             <input type="checkbox" className="h-4 w-4 rounded border-input accent-[color:var(--primary)]" defaultChecked />
             Remember me
           </label>
-          <button type="button" className="font-medium text-primary">Forgot password?</button>
+          <Link to="/login" className="font-medium text-primary">
+            Forgot password?
+          </Link>
         </div>
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
 
         <button
           type="submit"
-          className="mt-4 rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card transition-transform active:scale-[0.99]"
+          disabled={loading}
+          className="mt-4 rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Sign In
+          {loading ? "Signing in..." : "Sign In"}
         </button>
       </form>
 
@@ -82,17 +113,38 @@ function LoginPage() {
 }
 
 export function Field({
-  icon, label, type = "text", placeholder, defaultValue, suffix,
-}: { icon?: React.ReactNode; label: string; type?: string; placeholder?: string; defaultValue?: string; suffix?: string }) {
+  icon,
+  label,
+  type = "text",
+  placeholder,
+  defaultValue,
+  value,
+  name,
+  onChange,
+  suffix,
+}: {
+  icon?: ReactNode;
+  label: string;
+  type?: string;
+  placeholder?: string;
+  defaultValue?: string;
+  value?: string;
+  name?: string;
+  onChange?: ChangeEventHandler<HTMLInputElement>;
+  suffix?: string;
+}) {
   return (
     <div>
       <label className="text-xs font-medium text-muted-foreground">{label}</label>
       <div className="mt-1.5 flex items-center gap-2 rounded-2xl border border-input bg-muted/40 px-4 py-3.5">
         {icon && <span className="text-muted-foreground">{icon}</span>}
         <input
+          name={name}
           type={type}
           placeholder={placeholder}
           defaultValue={defaultValue}
+          value={value}
+          onChange={onChange}
           className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
         {suffix && <span className="text-xs font-semibold text-muted-foreground">{suffix}</span>}

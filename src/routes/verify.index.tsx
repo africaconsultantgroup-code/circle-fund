@@ -3,7 +3,7 @@ import { ShieldCheck, Phone, IdCard, ScanFace, Smartphone, UserCheck, ArrowRight
 import { verification, verificationProgress } from "@/lib/mock-data";
 import { VerificationBadge } from "@/components/verification-badge";
 
-export const Route = createFileRoute("/verify/")({
+export const Route = createFileRoute("/verify")({
   component: VerifyWelcome,
 });
 

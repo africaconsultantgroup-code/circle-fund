@@ -1,6 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useState, type FormEvent } from "react";
 import { Coins, Mail, Lock, User as UserIcon, Phone } from "lucide-react";
 import { Field } from "./login";
+import { signUpWithEmail } from "@/lib/auth";
 
 export const Route = createFileRoute("/register")({
   component: RegisterPage,
@@ -8,6 +10,29 @@ export const Route = createFileRoute("/register")({
 
 function RegisterPage() {
   const navigate = useNavigate();
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    const result = await signUpWithEmail(email, password);
+    setLoading(false);
+
+    if (result.error) {
+      setError(result.error.message || "Unable to create an account.");
+      return;
+    }
+
+    navigate({ to: "/home" });
+  };
+
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background px-6 pt-10 pb-8">
       <div className="mb-8 flex items-center gap-3">
@@ -20,31 +45,58 @@ function RegisterPage() {
       <h1 className="font-display text-3xl font-bold tracking-tight">Create your account</h1>
       <p className="mt-2 text-sm text-muted-foreground">Start a circle or join one in less than a minute.</p>
 
-      <form
-        className="mt-8 flex flex-col gap-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          navigate({ to: "/home" });
-        }}
-      >
-        <Field icon={<UserIcon className="h-4 w-4" />} label="Full name" placeholder="Adjoa Mensah" />
-        <Field icon={<Mail className="h-4 w-4" />} label="Email" type="email" placeholder="you@email.com" />
-        <Field icon={<Phone className="h-4 w-4" />} label="Phone" placeholder="+233 24 555 0142" />
-        <Field icon={<Lock className="h-4 w-4" />} label="Password" type="password" placeholder="Create a password" />
+      <form className="mt-8 flex flex-col gap-4" onSubmit={handleSubmit}>
+        <Field
+          icon={<UserIcon className="h-4 w-4" />}
+          label="Full name"
+          placeholder="Adjoa Mensah"
+          name="name"
+          value={fullName}
+          onChange={(event) => setFullName(event.target.value)}
+        />
+        <Field
+          icon={<Mail className="h-4 w-4" />}
+          label="Email"
+          type="email"
+          placeholder="you@email.com"
+          name="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+        />
+        <Field
+          icon={<Phone className="h-4 w-4" />}
+          label="Phone"
+          placeholder="+233 24 555 0142"
+          name="phone"
+          value={phone}
+          onChange={(event) => setPhone(event.target.value)}
+        />
+        <Field
+          icon={<Lock className="h-4 w-4" />}
+          label="Password"
+          type="password"
+          placeholder="Create a password"
+          name="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+        />
 
         <label className="mt-2 flex items-start gap-2 text-xs text-muted-foreground">
           <input type="checkbox" defaultChecked className="mt-0.5 h-4 w-4 rounded border-input accent-[color:var(--primary)]" />
           <span>
-            I agree to SikaCircle's <span className="text-primary font-medium">Terms</span> and{" "}
+            I agree to SikaCircle's <span className="text-primary font-medium">Terms</span> and{' '}
             <span className="text-primary font-medium">Privacy Policy</span>.
           </span>
         </label>
 
+        {error && <p className="text-sm text-destructive">{error}</p>}
+
         <button
           type="submit"
-          className="mt-4 rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card"
+          disabled={loading}
+          className="mt-4 rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Create Account
+          {loading ? "Creating account..." : "Create Account"}
         </button>
       </form>
 
