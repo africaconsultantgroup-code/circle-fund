@@ -35,6 +35,7 @@ export async function listAdminUsers() {
 
 export async function markTestUserVerified(userId: string, adminSecret: string) {
   return invokeAdminFunction<{ status: string; providerReference: string }>("admin-mark-test-user-verified", {
+    method: "POST",
     body: { userId },
     headers: {
       "x-admin-verification-secret": adminSecret,
