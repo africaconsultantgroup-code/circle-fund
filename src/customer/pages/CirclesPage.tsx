@@ -73,8 +73,8 @@ export function CirclesPage() {
         )}
       </div>
       {!canUseCircles && gateSummary?.message && (
-        <Link to="/verify" className="mt-3 rounded-2xl border border-gold/40 bg-gold/10 p-4 text-[11px] font-medium text-[color:var(--gold-foreground)]">
-          {gateSummary.message}
+        <Link to={gateSummary.nextStep.to} className="mt-3 rounded-2xl border border-gold/40 bg-gold/10 p-4 text-[11px] font-medium text-[color:var(--gold-foreground)]">
+          {gateSummary.nextStep.label}: {gateSummary.message}
         </Link>
       )}
 

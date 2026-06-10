@@ -1,35 +1,27 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ShieldCheck, Phone, IdCard, ScanFace, ArrowRight, X, UserRound } from "lucide-react";
+import { ShieldCheck, Phone, IdCard, ScanFace, ArrowRight, X, UserRound, ListChecks } from "lucide-react";
 import { VerificationBadge } from "@/components/verification-badge";
-import { getCurrentUser } from "@/lib/auth";
-import { getProfileByUserId, getUserVerification, type Profile, type UserVerification } from "@/lib/db";
-import type { VerificationStatus } from "@/lib/supabase-types";
+import { loadVerificationFlowSummary, statusStep, type VerificationFlowSummary, type VerificationStepKey } from "@/lib/verification-flow";
 
 type Step = {
   to: string;
+  key: VerificationStepKey;
   icon: typeof Phone;
   title: string;
   desc: string;
-  status: VerificationStatus;
+  status: VerificationFlowSummary["steps"][number]["status"];
 };
 
 export function VerifyIndexPage() {
-  const [verification, setVerification] = useState<UserVerification | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [summary, setSummary] = useState<VerificationFlowSummary | null>(null);
 
   useEffect(() => {
     let isMounted = true;
 
-    getCurrentUser().then(async (user) => {
-      if (!user) return;
-      const [{ data: verificationData }, { data: profileData }] = await Promise.all([
-        getUserVerification(user.id),
-        getProfileByUserId(user.id),
-      ]);
+    loadVerificationFlowSummary().then((result) => {
       if (!isMounted) return;
-      setVerification(verificationData ?? null);
-      setProfile(profileData ?? null);
+      setSummary(result);
     });
 
     return () => {
@@ -37,14 +29,17 @@ export function VerifyIndexPage() {
     };
   }, []);
 
-  const steps: Step[] = [
-    { to: "/verify/phone", icon: Phone, title: "Phone number", desc: "Request and confirm an OTP through the secure backend", status: boolStatus(verification?.phone_verified, verification) },
-    { to: "/verify/ghana-card", icon: IdCard, title: "Ghana Card", desc: "Submit your card number to the secure provider function", status: boolStatus(verification?.ghana_card_verified, verification) },
-    { to: "/verify/selfie", icon: ScanFace, title: "Face match", desc: "Capture a selfie reference for provider face matching", status: boolStatus(verification?.face_verified, verification) },
-    { to: "/profile", icon: UserRound, title: "Profile", desc: "Complete your name and required account details", status: profile?.profile_completed ? "verified" : "not_started" },
-  ];
-  const done = steps.filter((step) => step.status === "verified").length;
-  const percent = Math.round((done / steps.length) * 100);
+  const flowSteps = summary?.steps ?? [];
+  const steps: Step[] = [...flowSteps, statusStep(Boolean(summary?.isComplete))].map((step) => ({
+    to: step.to,
+    key: step.key,
+    icon: stepIcon(step.key),
+    title: step.label,
+    desc: step.description,
+    status: step.status,
+  }));
+  const done = summary?.completedCount ?? 0;
+  const percent = summary?.percent ?? 0;
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
@@ -59,7 +54,7 @@ export function VerifyIndexPage() {
         <p className="mt-2 text-sm text-primary-foreground/75">Verification requests are processed through secure backend functions. Provider keys are never exposed in the app.</p>
         <div className="mt-5">
           <div className="flex items-center justify-between text-[11px] text-primary-foreground/70">
-            <span>{done} of {steps.length} complete</span><span>{percent}%</span>
+            <span>{done} of {flowSteps.length || 4} verified</span><span>{percent}%</span>
           </div>
           <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/15">
             <div className="h-full rounded-full bg-gradient-gold" style={{ width: `${percent}%` }} />
@@ -94,7 +89,10 @@ export function VerifyIndexPage() {
   );
 }
 
-function boolStatus(value: boolean | undefined, verification: UserVerification | null): VerificationStatus {
-  if (value) return "verified";
-  return verification?.verification_status ?? "not_started";
+function stepIcon(key: VerificationStepKey) {
+  if (key === "profile") return UserRound;
+  if (key === "phone") return Phone;
+  if (key === "ghana_card") return IdCard;
+  if (key === "selfie") return ScanFace;
+  return ListChecks;
 }

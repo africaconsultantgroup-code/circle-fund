@@ -16,6 +16,12 @@ export function VerifyPhonePage() {
   const handleRequestOtp = async () => {
     setError("");
     setMessage("");
+
+    if (phoneNumber.trim().length < 8) {
+      setError("Enter a valid phone number.");
+      return;
+    }
+
     setIsSaving(true);
     const { data, error } = await requestPhoneOtp(phoneNumber);
     setIsSaving(false);
@@ -32,6 +38,12 @@ export function VerifyPhonePage() {
   const handleVerifyOtp = async () => {
     setError("");
     setMessage("");
+
+    if (otp.join("").trim().length < 4) {
+      setError("Enter the OTP you received.");
+      return;
+    }
+
     setIsSaving(true);
     const { data, error } = await verifyPhoneOtp(phoneNumber, otp.join(""));
     setIsSaving(false);
@@ -46,7 +58,7 @@ export function VerifyPhonePage() {
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
-      <PageHeader title="Phone verification" subtitle="Step 1 of 3" back="/verify" />
+      <PageHeader title="Phone verification" subtitle="Step 2 of 5" back="/verify" />
 
       <div className="flex flex-1 flex-col gap-5 p-5">
         {step === "enter" ? (
@@ -95,6 +107,9 @@ export function VerifyPhonePage() {
             </button>
             <button onClick={() => navigate({ to: "/verify/ghana-card" })} className="rounded-2xl border border-border py-4 font-display text-base font-semibold text-primary">
               Continue to Ghana Card
+            </button>
+            <button onClick={() => navigate({ to: "/verify/status" })} className="rounded-2xl border border-border py-4 font-display text-base font-semibold text-muted-foreground">
+              View status
             </button>
           </>
         )}

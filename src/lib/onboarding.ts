@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/lib/auth";
 import { getProfileByUserId, getUserVerification, type Profile, type UserVerification } from "@/lib/db";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { buildVerificationSteps, statusStep } from "@/lib/verification-flow";
 
 export type EligibilityIssue = {
   key: "ghana_card" | "phone" | "face" | "selfie" | "profile" | "account" | "auth" | "config";
@@ -19,6 +20,11 @@ export type CircleEligibility = {
 export type VerificationGateSummary = {
   isEligible: boolean;
   message: string;
+  nextStep: {
+    to: string;
+    label: string;
+    description: string;
+  };
   statuses: {
     phone: "verified" | "not_started";
     ghanaCard: "verified" | "not_started";
@@ -83,12 +89,12 @@ export async function getCircleEligibility(): Promise<CircleEligibility> {
 export function getProfileEligibilityIssues(profile: Profile, verification: UserVerification | null): EligibilityIssue[] {
   const issues: EligibilityIssue[] = [];
 
-  if (!verification?.ghana_card_verified) {
+  if (!profile.profile_completed) {
     issues.push({
-      key: "ghana_card",
-      message: "Ghana Card verification is not verified.",
-      actionLabel: "Verify Ghana Card",
-      to: "/verify/ghana-card",
+      key: "profile",
+      message: "Your user profile is not complete.",
+      actionLabel: "Complete profile",
+      to: "/verify/profile",
     });
   }
 
@@ -98,6 +104,15 @@ export function getProfileEligibilityIssues(profile: Profile, verification: User
       message: "Phone OTP verification is not verified.",
       actionLabel: "Verify phone",
       to: "/verify/phone",
+    });
+  }
+
+  if (!verification?.ghana_card_verified) {
+    issues.push({
+      key: "ghana_card",
+      message: "Ghana Card verification is not verified.",
+      actionLabel: "Verify Ghana Card",
+      to: "/verify/ghana-card",
     });
   }
 
@@ -116,15 +131,6 @@ export function getProfileEligibilityIssues(profile: Profile, verification: User
       message: "Face verification is not verified.",
       actionLabel: "Verify face",
       to: "/verify/selfie",
-    });
-  }
-
-  if (!profile.profile_completed) {
-    issues.push({
-      key: "profile",
-      message: "Your user profile is not complete.",
-      actionLabel: "Complete profile",
-      to: "/profile",
     });
   }
 
@@ -163,10 +169,17 @@ export async function getVerificationGateSummary(): Promise<VerificationGateSumm
     profile.profile_completed &&
     profile.account_status === "active",
   );
+  const steps = buildVerificationSteps(profile ?? null, verification ?? null);
+  const nextStep = steps.find((step) => step.status !== "verified") ?? statusStep(isEligible);
 
   return {
     isEligible,
-    message: isEligible ? "" : "Complete verification before creating or joining a circle.",
+    message: isEligible ? "Verification complete. You can create and join circles." : nextStep.description,
+    nextStep: {
+      to: nextStep.to,
+      label: nextStep.label,
+      description: nextStep.description,
+    },
     statuses: {
       phone: verification?.phone_verified ? "verified" : "not_started",
       ghanaCard: verification?.ghana_card_verified ? "verified" : "not_started",
@@ -178,9 +191,15 @@ export async function getVerificationGateSummary(): Promise<VerificationGateSumm
 }
 
 function emptyGateSummary(isEligible: boolean): VerificationGateSummary {
+  const nextStep = isEligible ? statusStep(true) : buildVerificationSteps(null, null)[0];
   return {
     isEligible,
-    message: isEligible ? "" : "Complete verification before creating or joining a circle.",
+    message: isEligible ? "Verification complete. You can create and join circles." : nextStep.description,
+    nextStep: {
+      to: nextStep.to,
+      label: nextStep.label,
+      description: nextStep.description,
+    },
     statuses: {
       phone: "not_started",
       ghanaCard: "not_started",

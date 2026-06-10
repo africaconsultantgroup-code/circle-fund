@@ -20,6 +20,12 @@ export function VerifySelfiePage() {
 
   const handleSubmit = async () => {
     setError("");
+
+    if (!captureReference) {
+      setError("Capture or upload a selfie before submitting.");
+      return;
+    }
+
     setIsSaving(true);
     const { data, error } = await submitFaceVerification(captureReference);
     setIsSaving(false);
@@ -34,7 +40,7 @@ export function VerifySelfiePage() {
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
-      <PageHeader title="Face match" subtitle="Step 3 of 3" back="/verify" />
+      <PageHeader title="Face match" subtitle="Step 4 of 5" back="/verify" />
 
       <div className="flex flex-1 flex-col gap-5 p-5">
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary text-primary">
@@ -88,8 +94,8 @@ export function VerifySelfiePage() {
           >
             {isSaving ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Submitting</span> : "Submit to secure backend"}
           </button>
-          <button onClick={() => navigate({ to: "/verify" })} className="rounded-2xl border border-border py-4 font-display text-base font-semibold text-primary">
-            Back to verification
+          <button onClick={() => navigate({ to: "/verify/status" })} className="rounded-2xl border border-border py-4 font-display text-base font-semibold text-primary">
+            View status
           </button>
         </div>
       </div>

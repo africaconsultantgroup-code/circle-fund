@@ -195,9 +195,11 @@ function VerificationStatusCard({ gateSummary }: { gateSummary: VerificationGate
             <p className="font-display text-sm font-semibold">Verification status</p>
             {complete && <TrustBadge tier={trustScore.tier} score={trustScore.score} />}
           </div>
-          {!complete && <p className="text-[11px] text-muted-foreground">Complete verification before creating or joining a circle.</p>}
+          {!complete && <p className="text-[11px] text-muted-foreground">{gateSummary?.nextStep.description ?? "Complete verification before creating or joining a circle."}</p>}
         </div>
-        <Link to="/verify" className="text-xs font-semibold text-primary">Review</Link>
+        <Link to={complete ? "/verify/status" : gateSummary?.nextStep.to ?? "/verify"} className="text-xs font-semibold text-primary">
+          {complete ? "Status" : gateSummary?.nextStep.label ?? "Review"}
+        </Link>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2">

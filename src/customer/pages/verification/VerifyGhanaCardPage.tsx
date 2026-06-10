@@ -14,6 +14,12 @@ export function VerifyGhanaCardPage() {
   const handleSubmit = async () => {
     setError("");
     setMessage("");
+
+    if (ghanaCardNumber.trim().length < 8) {
+      setError("Enter a valid Ghana Card number.");
+      return;
+    }
+
     setIsSaving(true);
     const { data, error } = await submitGhanaCardVerification(ghanaCardNumber);
     setIsSaving(false);
@@ -28,7 +34,7 @@ export function VerifyGhanaCardPage() {
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
-      <PageHeader title="Ghana Card" subtitle="Step 2 of 3" back="/verify" />
+      <PageHeader title="Ghana Card" subtitle="Step 3 of 5" back="/verify" />
 
       <div className="flex flex-1 flex-col gap-5 p-5">
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary text-primary">
@@ -71,6 +77,9 @@ export function VerifyGhanaCardPage() {
         </button>
         <button onClick={() => navigate({ to: "/verify/selfie" })} className="rounded-2xl border border-border py-4 font-display text-base font-semibold text-primary">
           Continue to face match
+        </button>
+        <button onClick={() => navigate({ to: "/verify/status" })} className="rounded-2xl border border-border py-4 font-display text-base font-semibold text-muted-foreground">
+          View status
         </button>
       </div>
     </div>

@@ -21,7 +21,9 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as AdminRouteImport } from './routes/_admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VerifyIndexRouteImport } from './routes/verify.index'
+import { Route as VerifyStatusRouteImport } from './routes/verify.status'
 import { Route as VerifySelfieRouteImport } from './routes/verify.selfie'
+import { Route as VerifyProfileRouteImport } from './routes/verify.profile'
 import { Route as VerifyPhoneRouteImport } from './routes/verify.phone'
 import { Route as VerifyMomoRouteImport } from './routes/verify.momo'
 import { Route as VerifyGuarantorRouteImport } from './routes/verify.guarantor'
@@ -99,9 +101,19 @@ const VerifyIndexRoute = VerifyIndexRouteImport.update({
   path: '/verify/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VerifyStatusRoute = VerifyStatusRouteImport.update({
+  id: '/verify/status',
+  path: '/verify/status',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VerifySelfieRoute = VerifySelfieRouteImport.update({
   id: '/verify/selfie',
   path: '/verify/selfie',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VerifyProfileRoute = VerifyProfileRouteImport.update({
+  id: '/verify/profile',
+  path: '/verify/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const VerifyPhoneRoute = VerifyPhoneRouteImport.update({
@@ -218,7 +230,9 @@ export interface FileRoutesByFullPath {
   '/verify/guarantor': typeof VerifyGuarantorRoute
   '/verify/momo': typeof VerifyMomoRoute
   '/verify/phone': typeof VerifyPhoneRoute
+  '/verify/profile': typeof VerifyProfileRoute
   '/verify/selfie': typeof VerifySelfieRoute
+  '/verify/status': typeof VerifyStatusRoute
   '/verify/': typeof VerifyIndexRoute
   '/admin/users': typeof AdminAdminUsersRoute
   '/admin/verifications': typeof AdminAdminVerificationsRoute
@@ -249,7 +263,9 @@ export interface FileRoutesByTo {
   '/verify/guarantor': typeof VerifyGuarantorRoute
   '/verify/momo': typeof VerifyMomoRoute
   '/verify/phone': typeof VerifyPhoneRoute
+  '/verify/profile': typeof VerifyProfileRoute
   '/verify/selfie': typeof VerifySelfieRoute
+  '/verify/status': typeof VerifyStatusRoute
   '/verify': typeof VerifyIndexRoute
   '/admin/users': typeof AdminAdminUsersRoute
   '/admin/verifications': typeof AdminAdminVerificationsRoute
@@ -283,7 +299,9 @@ export interface FileRoutesById {
   '/verify/guarantor': typeof VerifyGuarantorRoute
   '/verify/momo': typeof VerifyMomoRoute
   '/verify/phone': typeof VerifyPhoneRoute
+  '/verify/profile': typeof VerifyProfileRoute
   '/verify/selfie': typeof VerifySelfieRoute
+  '/verify/status': typeof VerifyStatusRoute
   '/verify/': typeof VerifyIndexRoute
   '/_admin/admin/users': typeof AdminAdminUsersRoute
   '/_admin/admin/verifications': typeof AdminAdminVerificationsRoute
@@ -316,7 +334,9 @@ export interface FileRouteTypes {
     | '/verify/guarantor'
     | '/verify/momo'
     | '/verify/phone'
+    | '/verify/profile'
     | '/verify/selfie'
+    | '/verify/status'
     | '/verify/'
     | '/admin/users'
     | '/admin/verifications'
@@ -347,7 +367,9 @@ export interface FileRouteTypes {
     | '/verify/guarantor'
     | '/verify/momo'
     | '/verify/phone'
+    | '/verify/profile'
     | '/verify/selfie'
+    | '/verify/status'
     | '/verify'
     | '/admin/users'
     | '/admin/verifications'
@@ -380,7 +402,9 @@ export interface FileRouteTypes {
     | '/verify/guarantor'
     | '/verify/momo'
     | '/verify/phone'
+    | '/verify/profile'
     | '/verify/selfie'
+    | '/verify/status'
     | '/verify/'
     | '/_admin/admin/users'
     | '/_admin/admin/verifications'
@@ -409,7 +433,9 @@ export interface RootRouteChildren {
   VerifyGuarantorRoute: typeof VerifyGuarantorRoute
   VerifyMomoRoute: typeof VerifyMomoRoute
   VerifyPhoneRoute: typeof VerifyPhoneRoute
+  VerifyProfileRoute: typeof VerifyProfileRoute
   VerifySelfieRoute: typeof VerifySelfieRoute
+  VerifyStatusRoute: typeof VerifyStatusRoute
   VerifyIndexRoute: typeof VerifyIndexRoute
 }
 
@@ -499,11 +525,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VerifyIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/verify/status': {
+      id: '/verify/status'
+      path: '/verify/status'
+      fullPath: '/verify/status'
+      preLoaderRoute: typeof VerifyStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/verify/selfie': {
       id: '/verify/selfie'
       path: '/verify/selfie'
       fullPath: '/verify/selfie'
       preLoaderRoute: typeof VerifySelfieRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/verify/profile': {
+      id: '/verify/profile'
+      path: '/verify/profile'
+      fullPath: '/verify/profile'
+      preLoaderRoute: typeof VerifyProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/verify/phone': {
@@ -701,7 +741,9 @@ const rootRouteChildren: RootRouteChildren = {
   VerifyGuarantorRoute: VerifyGuarantorRoute,
   VerifyMomoRoute: VerifyMomoRoute,
   VerifyPhoneRoute: VerifyPhoneRoute,
+  VerifyProfileRoute: VerifyProfileRoute,
   VerifySelfieRoute: VerifySelfieRoute,
+  VerifyStatusRoute: VerifyStatusRoute,
   VerifyIndexRoute: VerifyIndexRoute,
 }
 export const routeTree = rootRouteImport
