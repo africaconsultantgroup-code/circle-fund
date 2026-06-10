@@ -24,15 +24,83 @@ export type AdminUser = {
   verification: AdminUserVerification | null;
 };
 
+type AdminFunctionResult<T> = {
+  data: T | null;
+  error: { message: string } | null;
+};
+
 export async function listAdminUsers() {
-  return supabase.functions.invoke<{ users: AdminUser[] }>("admin-list-users");
+  return invokeAdminFunction<{ users: AdminUser[] }>("admin-list-users");
 }
 
 export async function markTestUserVerified(userId: string, adminSecret: string) {
-  return supabase.functions.invoke<{ status: string; providerReference: string }>("admin-mark-test-user-verified", {
+  return invokeAdminFunction<{ status: string; providerReference: string }>("admin-mark-test-user-verified", {
     body: { userId },
     headers: {
       "x-admin-verification-secret": adminSecret,
     },
   });
+}
+
+async function invokeAdminFunction<T>(functionName: string, options?: Parameters<typeof supabase.functions.invoke<T>>[1]): Promise<AdminFunctionResult<T>> {
+  try {
+    const { data, error } = await supabase.functions.invoke<T>(functionName, options);
+    if (error) {
+      const message = await describeFunctionError(functionName, error);
+      console.error("[admin edge function error]", { functionName, error, message });
+      return { data: null, error: { message } };
+    }
+
+    return { data, error: null };
+  } catch (error) {
+    const message = await describeFunctionError(functionName, error);
+    console.error("[admin edge function exception]", { functionName, error, message });
+    return { data: null, error: { message } };
+  }
+}
+
+async function describeFunctionError(functionName: string, error: unknown) {
+  const details: string[] = [];
+  const errorLike = error as {
+    name?: string;
+    message?: string;
+    context?: unknown;
+    cause?: unknown;
+  };
+
+  if (errorLike.name) details.push(`type=${errorLike.name}`);
+  if (errorLike.message) details.push(`message=${errorLike.message}`);
+
+  if (errorLike.context instanceof Response) {
+    details.push(`status=${errorLike.context.status} ${errorLike.context.statusText}`.trim());
+    const body = await safeReadResponseBody(errorLike.context);
+    if (body) details.push(`body=${body}`);
+  } else if (errorLike.context) {
+    details.push(`context=${safeStringify(errorLike.context)}`);
+  }
+
+  if (errorLike.cause) details.push(`cause=${safeStringify(errorLike.cause)}`);
+
+  if (details.length === 0) {
+    details.push(safeStringify(error));
+  }
+
+  return `Edge Function "${functionName}" failed. ${details.join(" | ")}`;
+}
+
+async function safeReadResponseBody(response: Response) {
+  try {
+    return await response.clone().text();
+  } catch {
+    return "";
+  }
+}
+
+function safeStringify(value: unknown) {
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }
