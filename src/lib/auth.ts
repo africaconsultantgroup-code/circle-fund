@@ -14,6 +14,7 @@ export interface UserProfile extends AuthUser {
   selfie_image_url?: string | null;
   profile_completed?: boolean;
   account_status?: string;
+  role?: string;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -115,6 +116,7 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
     selfie_image_url: data.selfie_image_url,
     profile_completed: data.profile_completed,
     account_status: data.account_status,
+    role: data.role,
     created_at: data.created_at,
     updated_at: data.updated_at,
   };
@@ -130,6 +132,7 @@ export async function upsertUserProfile(profile: {
   selfie_image_url?: string | null;
   profile_completed?: boolean;
   account_status?: string;
+  role?: string;
 }) {
   if (!isSupabaseConfigured) {
     return { data: null, error: { message: 'Supabase is not configured.' } };

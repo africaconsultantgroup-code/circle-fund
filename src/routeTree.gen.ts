@@ -18,6 +18,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as JoinCircleRouteImport } from './routes/join-circle'
 import { Route as CreateCircleRouteImport } from './routes/create-circle'
 import { Route as AppRouteImport } from './routes/_app'
+import { Route as AdminRouteImport } from './routes/_admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VerifyIndexRouteImport } from './routes/verify.index'
 import { Route as VerifySelfieRouteImport } from './routes/verify.selfie'
@@ -28,13 +29,17 @@ import { Route as VerifyGhanaCardRouteImport } from './routes/verify.ghana-card'
 import { Route as PayoutIdRouteImport } from './routes/payout.$id'
 import { Route as PaymentIdRouteImport } from './routes/payment.$id'
 import { Route as CircleIdRouteImport } from './routes/circle.$id'
+import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AppProfileRouteImport } from './routes/_app/profile'
 import { Route as AppPaymentsRouteImport } from './routes/_app/payments'
 import { Route as AppNotificationsRouteImport } from './routes/_app/notifications'
 import { Route as AppHomeRouteImport } from './routes/_app/home'
 import { Route as AppCirclesRouteImport } from './routes/_app/circles'
+import { Route as AdminAdminIndexRouteImport } from './routes/_admin.admin.index'
 import { Route as CircleIdMembersRouteImport } from './routes/circle.$id.members'
 import { Route as CircleIdApprovalsRouteImport } from './routes/circle.$id.approvals'
+import { Route as AdminAdminVerificationsRouteImport } from './routes/_admin.admin.verifications'
+import { Route as AdminAdminUsersRouteImport } from './routes/_admin.admin.users'
 
 const TrustScoreRoute = TrustScoreRouteImport.update({
   id: '/trust-score',
@@ -80,14 +85,18 @@ const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/_admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const VerifyIndexRoute = VerifyIndexRouteImport.update({
-  id: '/verify',
-  path: '/verify',
+  id: '/verify/',
+  path: '/verify/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const VerifySelfieRoute = VerifySelfieRouteImport.update({
@@ -130,6 +139,11 @@ const CircleIdRoute = CircleIdRouteImport.update({
   path: '/circle/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/admin/login',
+  path: '/admin/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppProfileRoute = AppProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -155,6 +169,11 @@ const AppCirclesRoute = AppCirclesRouteImport.update({
   path: '/circles',
   getParentRoute: () => AppRoute,
 } as any)
+const AdminAdminIndexRoute = AdminAdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => AdminRoute,
+} as any)
 const CircleIdMembersRoute = CircleIdMembersRouteImport.update({
   id: '/members',
   path: '/members',
@@ -164,6 +183,16 @@ const CircleIdApprovalsRoute = CircleIdApprovalsRouteImport.update({
   id: '/approvals',
   path: '/approvals',
   getParentRoute: () => CircleIdRoute,
+} as any)
+const AdminAdminVerificationsRoute = AdminAdminVerificationsRouteImport.update({
+  id: '/admin/verifications',
+  path: '/admin/verifications',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAdminUsersRoute = AdminAdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => AdminRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -181,6 +210,7 @@ export interface FileRoutesByFullPath {
   '/notifications': typeof AppNotificationsRoute
   '/payments': typeof AppPaymentsRoute
   '/profile': typeof AppProfileRoute
+  '/admin/login': typeof AdminLoginRoute
   '/circle/$id': typeof CircleIdRouteWithChildren
   '/payment/$id': typeof PaymentIdRoute
   '/payout/$id': typeof PayoutIdRoute
@@ -189,9 +219,12 @@ export interface FileRoutesByFullPath {
   '/verify/momo': typeof VerifyMomoRoute
   '/verify/phone': typeof VerifyPhoneRoute
   '/verify/selfie': typeof VerifySelfieRoute
-  '/verify': typeof VerifyIndexRoute
+  '/verify/': typeof VerifyIndexRoute
+  '/admin/users': typeof AdminAdminUsersRoute
+  '/admin/verifications': typeof AdminAdminVerificationsRoute
   '/circle/$id/approvals': typeof CircleIdApprovalsRoute
   '/circle/$id/members': typeof CircleIdMembersRoute
+  '/admin/': typeof AdminAdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -208,6 +241,7 @@ export interface FileRoutesByTo {
   '/notifications': typeof AppNotificationsRoute
   '/payments': typeof AppPaymentsRoute
   '/profile': typeof AppProfileRoute
+  '/admin/login': typeof AdminLoginRoute
   '/circle/$id': typeof CircleIdRouteWithChildren
   '/payment/$id': typeof PaymentIdRoute
   '/payout/$id': typeof PayoutIdRoute
@@ -217,12 +251,16 @@ export interface FileRoutesByTo {
   '/verify/phone': typeof VerifyPhoneRoute
   '/verify/selfie': typeof VerifySelfieRoute
   '/verify': typeof VerifyIndexRoute
+  '/admin/users': typeof AdminAdminUsersRoute
+  '/admin/verifications': typeof AdminAdminVerificationsRoute
   '/circle/$id/approvals': typeof CircleIdApprovalsRoute
   '/circle/$id/members': typeof CircleIdMembersRoute
+  '/admin': typeof AdminAdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_admin': typeof AdminRouteWithChildren
   '/_app': typeof AppRouteWithChildren
   '/create-circle': typeof CreateCircleRoute
   '/join-circle': typeof JoinCircleRoute
@@ -237,6 +275,7 @@ export interface FileRoutesById {
   '/_app/notifications': typeof AppNotificationsRoute
   '/_app/payments': typeof AppPaymentsRoute
   '/_app/profile': typeof AppProfileRoute
+  '/admin/login': typeof AdminLoginRoute
   '/circle/$id': typeof CircleIdRouteWithChildren
   '/payment/$id': typeof PaymentIdRoute
   '/payout/$id': typeof PayoutIdRoute
@@ -245,9 +284,12 @@ export interface FileRoutesById {
   '/verify/momo': typeof VerifyMomoRoute
   '/verify/phone': typeof VerifyPhoneRoute
   '/verify/selfie': typeof VerifySelfieRoute
-  '/verify': typeof VerifyIndexRoute
+  '/verify/': typeof VerifyIndexRoute
+  '/_admin/admin/users': typeof AdminAdminUsersRoute
+  '/_admin/admin/verifications': typeof AdminAdminVerificationsRoute
   '/circle/$id/approvals': typeof CircleIdApprovalsRoute
   '/circle/$id/members': typeof CircleIdMembersRoute
+  '/_admin/admin/': typeof AdminAdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -266,6 +308,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/payments'
     | '/profile'
+    | '/admin/login'
     | '/circle/$id'
     | '/payment/$id'
     | '/payout/$id'
@@ -274,9 +317,12 @@ export interface FileRouteTypes {
     | '/verify/momo'
     | '/verify/phone'
     | '/verify/selfie'
-    | '/verify'
+    | '/verify/'
+    | '/admin/users'
+    | '/admin/verifications'
     | '/circle/$id/approvals'
     | '/circle/$id/members'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -293,6 +339,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/payments'
     | '/profile'
+    | '/admin/login'
     | '/circle/$id'
     | '/payment/$id'
     | '/payout/$id'
@@ -302,11 +349,15 @@ export interface FileRouteTypes {
     | '/verify/phone'
     | '/verify/selfie'
     | '/verify'
+    | '/admin/users'
+    | '/admin/verifications'
     | '/circle/$id/approvals'
     | '/circle/$id/members'
+    | '/admin'
   id:
     | '__root__'
     | '/'
+    | '/_admin'
     | '/_app'
     | '/create-circle'
     | '/join-circle'
@@ -321,6 +372,7 @@ export interface FileRouteTypes {
     | '/_app/notifications'
     | '/_app/payments'
     | '/_app/profile'
+    | '/admin/login'
     | '/circle/$id'
     | '/payment/$id'
     | '/payout/$id'
@@ -329,13 +381,17 @@ export interface FileRouteTypes {
     | '/verify/momo'
     | '/verify/phone'
     | '/verify/selfie'
-    | '/verify'
+    | '/verify/'
+    | '/_admin/admin/users'
+    | '/_admin/admin/verifications'
     | '/circle/$id/approvals'
     | '/circle/$id/members'
+    | '/_admin/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
   AppRoute: typeof AppRouteWithChildren
   CreateCircleRoute: typeof CreateCircleRoute
   JoinCircleRoute: typeof JoinCircleRoute
@@ -345,6 +401,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   TransactionsRoute: typeof TransactionsRoute
   TrustScoreRoute: typeof TrustScoreRoute
+  AdminLoginRoute: typeof AdminLoginRoute
   CircleIdRoute: typeof CircleIdRouteWithChildren
   PaymentIdRoute: typeof PaymentIdRoute
   PayoutIdRoute: typeof PayoutIdRoute
@@ -421,6 +478,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_admin': {
+      id: '/_admin'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -428,10 +492,10 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/verify': {
-      id: '/verify'
+    '/verify/': {
+      id: '/verify/'
       path: '/verify'
-      fullPath: '/verify'
+      fullPath: '/verify/'
       preLoaderRoute: typeof VerifyIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
@@ -491,6 +555,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CircleIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/login': {
+      id: '/admin/login'
+      path: '/admin/login'
+      fullPath: '/admin/login'
+      preLoaderRoute: typeof AdminLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/profile': {
       id: '/_app/profile'
       path: '/profile'
@@ -526,6 +597,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCirclesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_admin/admin/': {
+      id: '/_admin/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminAdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/circle/$id/members': {
       id: '/circle/$id/members'
       path: '/members'
@@ -540,8 +618,36 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CircleIdApprovalsRouteImport
       parentRoute: typeof CircleIdRoute
     }
+    '/_admin/admin/verifications': {
+      id: '/_admin/admin/verifications'
+      path: '/admin/verifications'
+      fullPath: '/admin/verifications'
+      preLoaderRoute: typeof AdminAdminVerificationsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/_admin/admin/users': {
+      id: '/_admin/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminAdminUsersRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
+
+interface AdminRouteChildren {
+  AdminAdminUsersRoute: typeof AdminAdminUsersRoute
+  AdminAdminVerificationsRoute: typeof AdminAdminVerificationsRoute
+  AdminAdminIndexRoute: typeof AdminAdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminAdminUsersRoute: AdminAdminUsersRoute,
+  AdminAdminVerificationsRoute: AdminAdminVerificationsRoute,
+  AdminAdminIndexRoute: AdminAdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface AppRouteChildren {
   AppCirclesRoute: typeof AppCirclesRoute
@@ -577,6 +683,7 @@ const CircleIdRouteWithChildren = CircleIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
   AppRoute: AppRouteWithChildren,
   CreateCircleRoute: CreateCircleRoute,
   JoinCircleRoute: JoinCircleRoute,
@@ -586,6 +693,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   TransactionsRoute: TransactionsRoute,
   TrustScoreRoute: TrustScoreRoute,
+  AdminLoginRoute: AdminLoginRoute,
   CircleIdRoute: CircleIdRouteWithChildren,
   PaymentIdRoute: PaymentIdRoute,
   PayoutIdRoute: PayoutIdRoute,
@@ -599,13 +707,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

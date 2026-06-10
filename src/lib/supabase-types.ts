@@ -9,6 +9,7 @@ export type TransactionStatus = 'pending' | 'completed' | 'failed';
 export type LegacyVerificationStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
 export type VerificationStatus = 'not_started' | 'pending' | 'verified' | 'failed' | 'manual_review';
 export type AccountStatus = 'active' | 'pending' | 'suspended' | 'disabled';
+export type UserRole = 'customer' | 'admin';
 
 export interface Database {
   public: {
@@ -25,6 +26,7 @@ export interface Database {
           selfie_image_url: string | null;
           profile_completed: boolean;
           account_status: AccountStatus;
+          role: UserRole;
           created_at: string | null;
           updated_at: string | null;
         };
@@ -39,6 +41,7 @@ export interface Database {
           selfie_image_url?: string | null;
           profile_completed?: boolean;
           account_status?: AccountStatus;
+          role?: UserRole;
           created_at?: string | null;
           updated_at?: string | null;
         };
@@ -51,6 +54,7 @@ export interface Database {
           selfie_image_url?: string | null;
           profile_completed?: boolean;
           account_status?: AccountStatus;
+          role?: UserRole;
           updated_at?: string | null;
         };
       };
@@ -292,6 +296,10 @@ export interface Database {
       };
       circle_has_member_capacity: {
         Args: { check_circle_id: string };
+        Returns: boolean;
+      };
+      current_user_is_admin: {
+        Args: Record<PropertyKey, never>;
         Returns: boolean;
       };
     };
