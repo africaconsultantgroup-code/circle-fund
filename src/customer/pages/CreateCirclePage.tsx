@@ -12,7 +12,7 @@ export function CreateCirclePage() {
   const [description, setDescription] = useState("Monthly contributions with close friends.");
   const [category, setCategory] = useState("Family");
   const [members, setMembers] = useState(8);
-  const [amount, setAmount] = useState(250);
+  const [amount, setAmount] = useState(150);
   const [frequency, setFrequency] = useState<"weekly" | "biweekly" | "monthly">("monthly");
   const [startDate, setStartDate] = useState("2026-06-15");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -65,13 +65,13 @@ export function CreateCirclePage() {
       const currentEligibility = eligibility ?? await getCircleEligibility();
       if (!currentEligibility.isEligible || !currentEligibility.userId) {
         setEligibility(currentEligibility);
-        setSubmitError(currentEligibility.message || "Complete onboarding before creating a circle.");
+        setSubmitError(currentEligibility.message || "Complete verification before creating a circle.");
         return;
       }
 
       const { data, error } = await createCircleWithCreator(
         {
-          owner_id: user.id,
+          owner_id: currentEligibility.userId,
           name: name.trim(),
           description: description.trim() ? `${description.trim()} Category: ${category}` : `Category: ${category}`,
           contribution_amount: amount,
@@ -88,7 +88,7 @@ export function CreateCirclePage() {
         return;
       }
 
-      setSuccess("Circle created successfully. You have been added as admin.");
+      setSuccess("Circle created successfully. You have been added as admin/creator.");
       setTimeout(() => navigate({ to: "/circles" }), 900);
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "We could not create this circle. Please try again.");

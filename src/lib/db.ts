@@ -70,12 +70,12 @@ export async function createCircleMember(payload: Partial<CircleMember> & { circ
 export async function createCircleWithCreator(payload: CircleInsert, userId: string) {
   const eligibilityResult = await supabase.rpc('user_passes_circle_onboarding', { check_user_id: userId });
   if (eligibilityResult.error || !eligibilityResult.data) {
-    return { data: null, error: eligibilityResult.error ?? { message: 'Complete onboarding before creating a circle.' } };
+    return { data: null, error: eligibilityResult.error ?? { message: 'Complete verification before creating a circle.' } };
   }
 
-  const circleResult = await createCircle(payload);
+  const circleResult = await createCircle({ ...payload, owner_id: userId });
   if (circleResult.error || !circleResult.data) {
-    return { data: null, error: circleResult.error };
+    return { data: null, error: { message: describeCircleCreateError(circleResult.error.message) } };
   }
 
   const memberResult = await createCircleMember({
@@ -88,10 +88,30 @@ export async function createCircleWithCreator(payload: CircleInsert, userId: str
 
   if (memberResult.error) {
     await supabase.from('circles').delete().eq('id', circleResult.data.id);
-    return { data: null, error: memberResult.error };
+    return { data: null, error: { message: describeCircleMemberError(memberResult.error.message) } };
   }
 
   return { data: circleResult.data, error: null };
+}
+
+function describeCircleCreateError(message: string) {
+  if (/row-level security|violates row-level security/i.test(message)) {
+    return 'Only verified users can create circles. Please complete verification and try again.';
+  }
+
+  return message || 'We could not save this circle. Please try again.';
+}
+
+function describeCircleMemberError(message: string) {
+  if (/row-level security|violates row-level security/i.test(message)) {
+    return 'The circle was created, but we could not add you as creator. Please confirm verification is complete and try again.';
+  }
+
+  if (/duplicate key|unique/i.test(message)) {
+    return 'You are already a member of this circle.';
+  }
+
+  return message || 'We could not add you as the circle creator. Please try again.';
 }
 
 export async function joinCircle(circleId: string, userId: string) {
