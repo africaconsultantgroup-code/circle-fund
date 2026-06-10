@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { PageHeader } from "@/components/page-header";
-import { IdCard, Upload, Camera, CheckCircle2 } from "lucide-react";
+import { IdCard, ShieldAlert, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { submitGhanaCardVerification } from "@/lib/db";
 
 export const Route = createFileRoute("/verify/ghana-card")({
   component: GhanaCardVerify,
@@ -9,12 +10,29 @@ export const Route = createFileRoute("/verify/ghana-card")({
 
 function GhanaCardVerify() {
   const navigate = useNavigate();
-  const [front, setFront] = useState(false);
-  const [back, setBack] = useState(false);
+  const [ghanaCardNumber, setGhanaCardNumber] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const handleSubmit = async () => {
+    setError("");
+    setMessage("");
+    setIsSaving(true);
+    const { data, error } = await submitGhanaCardVerification(ghanaCardNumber);
+    setIsSaving(false);
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    setMessage(resultMessage(data, "Ghana Card verification request submitted."));
+  };
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
-      <PageHeader title="Ghana Card" subtitle="Step 2 of 5" back="/verify" />
+      <PageHeader title="Ghana Card" subtitle="Step 2 of 3" back="/verify" />
 
       <div className="flex flex-1 flex-col gap-5 p-5">
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary text-primary">
@@ -22,47 +40,49 @@ function GhanaCardVerify() {
         </div>
         <div>
           <h2 className="font-display text-xl font-bold">Verify your Ghana Card</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Enter your card number and upload clear photos of both sides.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Your card number is sent only to a secure Edge Function and stored as a hash.</p>
         </div>
 
         <div>
           <label className="text-xs font-medium text-muted-foreground">Ghana Card number</label>
-          <input defaultValue="GHA-723456789-4" className="mt-1.5 w-full rounded-2xl border border-input bg-muted/40 px-4 py-3.5 font-mono text-sm tracking-wider outline-none" />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <UploadCard label="Front" done={front} onClick={() => setFront(true)} />
-          <UploadCard label="Back" done={back} onClick={() => setBack(true)} />
+          <input
+            value={ghanaCardNumber}
+            onChange={(event) => setGhanaCardNumber(event.target.value)}
+            placeholder="GHA-XXXXXXXXX-X"
+            className="mt-1.5 w-full rounded-2xl border border-input bg-muted/40 px-4 py-3.5 font-mono text-sm tracking-wider outline-none"
+          />
         </div>
 
         <div className="rounded-2xl bg-secondary p-4">
-          <p className="text-xs font-semibold text-primary">Tips for a good photo</p>
+          <p className="text-xs font-semibold text-primary">Secure processing</p>
           <ul className="mt-2 space-y-1 text-[11px] text-primary/80">
-            <li>• Place card on a flat, dark surface</li>
-            <li>• Make sure all 4 corners are visible</li>
-            <li>• Avoid glare on the holographic strip</li>
+            <li>- API credentials stay in Supabase Edge Function secrets.</li>
+            <li>- The app stores only a hash, status, timestamp, and provider reference.</li>
+            <li>- Raw Ghana Card images are not collected in this placeholder flow.</li>
           </ul>
         </div>
 
-        <button onClick={() => navigate({ to: "/verify/selfie" })} className="mt-auto rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card">
-          Submit for review
+        {message && <p className="rounded-2xl bg-secondary p-4 text-[11px] font-medium text-primary">{message}</p>}
+        {error && (
+          <div className="flex items-center gap-2 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-destructive">
+            <ShieldAlert className="h-4 w-4" />
+            <p className="text-[11px] font-medium">{error}</p>
+          </div>
+        )}
+
+        <button disabled={isSaving} onClick={handleSubmit} className="mt-auto rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card disabled:opacity-50">
+          {isSaving ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Submitting</span> : "Submit to secure backend"}
+        </button>
+        <button onClick={() => navigate({ to: "/verify/selfie" })} className="rounded-2xl border border-border py-4 font-display text-base font-semibold text-primary">
+          Continue to face match
         </button>
       </div>
     </div>
   );
 }
 
-function UploadCard({ label, done, onClick }: { label: string; done: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed p-3 ${
-        done ? "border-success bg-success/5" : "border-border bg-muted/40"
-      }`}
-    >
-      {done ? <CheckCircle2 className="h-7 w-7 text-success" /> : <Upload className="h-7 w-7 text-muted-foreground" />}
-      <p className="font-display text-sm font-semibold">{label}</p>
-      <p className="text-[10px] text-muted-foreground">{done ? "Uploaded" : "Tap to upload"}</p>
-    </button>
-  );
+function resultMessage(data: unknown, fallback: string) {
+  if (!data || typeof data !== "object") return fallback;
+  const response = data as { message?: string; status?: string; providerReference?: string };
+  return [response.message ?? fallback, response.status ? `Status: ${response.status}` : "", response.providerReference ? `Reference: ${response.providerReference}` : ""].filter(Boolean).join(" ");
 }

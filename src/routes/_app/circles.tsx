@@ -1,12 +1,33 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Plus, Search, LogIn } from "lucide-react";
-import { circles, formatGHS } from "@/lib/mock-data";
+import { useEffect, useState } from "react";
+import { Plus, Search, LogIn, Loader2 } from "lucide-react";
+import { formatGHS } from "@/lib/mock-data";
+import { loadUserCircles, type UserCircle } from "@/lib/user-circles";
 
 export const Route = createFileRoute("/_app/circles")({
   component: CirclesPage,
 });
 
 function CirclesPage() {
+  const [circles, setCircles] = useState<UserCircle[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    loadUserCircles().then(({ data, error }) => {
+      if (!isMounted) return;
+      setCircles(data);
+      setError(error ?? "");
+      setIsLoading(false);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
     <div className="flex flex-col px-5 pt-12">
       <div className="flex items-center justify-between">
@@ -38,6 +59,21 @@ function CirclesPage() {
       </div>
 
       <ul className="mt-7 flex flex-col gap-3">
+        {isLoading && (
+          <li className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading circles
+          </li>
+        )}
+        {error && (
+          <li className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            {error}
+          </li>
+        )}
+        {!isLoading && !error && circles.length === 0 && (
+          <li className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
+            No circles yet. Create your first circle to get started.
+          </li>
+        )}
         {circles.map((c) => (
           <li key={c.id}>
             <Link to="/circle/$id" params={{ id: c.id }} className="block rounded-3xl border border-border bg-card p-4 shadow-card">
@@ -50,7 +86,7 @@ function CirclesPage() {
                     <p className="font-display text-sm font-semibold">{c.name}</p>
                     <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">{c.category}</span>
                   </div>
-                  <p className="text-[11px] text-muted-foreground">{c.members.length}/15 members · {formatGHS(c.amount)}/{c.frequency}</p>
+                  <p className="text-[11px] text-muted-foreground">{c.memberCount}/{c.maxMembers} members - {formatGHS(c.amount)}/{c.frequency}</p>
                 </div>
               </div>
               <div className="mt-3 flex items-center gap-3">

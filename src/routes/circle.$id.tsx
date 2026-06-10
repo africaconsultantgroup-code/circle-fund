@@ -3,12 +3,40 @@ import { PageHeader } from "@/components/page-header";
 import { Share2, Users, Calendar, CheckCircle2, Coins, UserCheck } from "lucide-react";
 import { getCircle, formatGHS, type Circle as CircleType } from "@/lib/mock-data";
 import { pendingApprovals } from "@/lib/mock-data";
+import { getCircleById } from "@/lib/db";
+import { isSupabaseConfigured } from "@/lib/supabase";
+import { toUserCircle } from "@/lib/user-circles";
 
 export const Route = createFileRoute("/circle/$id")({
-  loader: ({ params }) => {
+  loader: async ({ params }) => {
     const c = getCircle(params.id);
-    if (!c) throw notFound();
-    return c;
+    if (c) return c;
+
+    if (!isSupabaseConfigured) throw notFound();
+
+    const { data, error } = await getCircleById(params.id);
+    if (error || !data) throw notFound();
+
+    const circle = toUserCircle(data);
+    return {
+      id: circle.id,
+      name: circle.name,
+      category: circle.category,
+      inviteCode: "Pending",
+      amount: circle.amount,
+      frequency: circle.frequency,
+      currentCycle: circle.currentCycle,
+      totalCycles: circle.totalCycles,
+      nextRecipient: circle.nextRecipient,
+      nextPayoutDate: circle.nextPayoutDate,
+      members: Array.from({ length: circle.memberCount }, (_, index) => ({
+        id: `${circle.id}-${index}`,
+        name: index === 0 ? "You" : `Member ${index + 1}`,
+        avatar: "",
+        payoutPosition: index + 1,
+        hasReceivedPayout: false,
+      })),
+    } as CircleType;
   },
   component: CircleDetails,
   notFoundComponent: () => (
@@ -33,11 +61,11 @@ function CircleDetails() {
       <div className="bg-gradient-card px-5 pt-5 pb-8 text-primary-foreground">
         <div className="flex items-center justify-between">
           <span className="rounded-full bg-white/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide">{c.category}</span>
-          <span className="text-[10px] uppercase tracking-wide text-primary-foreground/70">Invite · {c.inviteCode}</span>
+          <span className="text-[10px] uppercase tracking-wide text-primary-foreground/70">Invite - {c.inviteCode}</span>
         </div>
         <p className="mt-4 text-xs uppercase tracking-wide text-primary-foreground/60">Pool per cycle</p>
         <p className="mt-1 font-display text-3xl font-bold">{formatGHS(pool)}</p>
-        <p className="text-xs text-primary-foreground/70">{formatGHS(c.amount)} from each member · {c.frequency}</p>
+        <p className="text-xs text-primary-foreground/70">{formatGHS(c.amount)} from each member - {c.frequency}</p>
 
         <div className="mt-5">
           <div className="flex justify-between text-[11px] text-primary-foreground/70">
@@ -70,7 +98,7 @@ function CircleDetails() {
           </span>
           <div className="flex-1">
             <p className="font-display text-sm font-semibold">Pending approvals</p>
-            <p className="text-[11px] text-muted-foreground">{pendingApprovals.length} members awaiting · review verification</p>
+            <p className="text-[11px] text-muted-foreground">{pendingApprovals.length} members awaiting - review verification</p>
           </div>
           <span className="rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold text-destructive-foreground">{pendingApprovals.length}</span>
         </Link>
@@ -100,7 +128,7 @@ function CircleDetails() {
                     {isNext && <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-semibold text-[color:var(--gold-foreground)]">Next</span>}
                     {done && <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success">Paid</span>}
                   </div>
-                  <p className="text-[11px] text-muted-foreground">{formatGHS(pool)} · Position {m.payoutPosition}</p>
+                  <p className="text-[11px] text-muted-foreground">{formatGHS(pool)} - Position {m.payoutPosition}</p>
                 </div>
               </li>
             );

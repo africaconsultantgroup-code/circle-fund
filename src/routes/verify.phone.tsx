@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { PageHeader } from "@/components/page-header";
-import { Phone, MessageSquare } from "lucide-react";
+import { Phone, MessageSquare, Loader2, ShieldAlert } from "lucide-react";
+import { requestPhoneOtp, verifyPhoneOtp } from "@/lib/db";
 
 export const Route = createFileRoute("/verify/phone")({
   component: PhoneVerify,
@@ -10,11 +11,46 @@ export const Route = createFileRoute("/verify/phone")({
 function PhoneVerify() {
   const navigate = useNavigate();
   const [step, setStep] = useState<"enter" | "otp">("enter");
+  const [phoneNumber, setPhoneNumber] = useState("0245550142");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const handleRequestOtp = async () => {
+    setError("");
+    setMessage("");
+    setIsSaving(true);
+    const { data, error } = await requestPhoneOtp(phoneNumber);
+    setIsSaving(false);
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    setMessage(resultMessage(data, "Phone OTP request submitted."));
+    setStep("otp");
+  };
+
+  const handleVerifyOtp = async () => {
+    setError("");
+    setMessage("");
+    setIsSaving(true);
+    const { data, error } = await verifyPhoneOtp(phoneNumber, otp.join(""));
+    setIsSaving(false);
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    setMessage(resultMessage(data, "Phone OTP verification submitted."));
+  };
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
-      <PageHeader title="Phone verification" subtitle="Step 1 of 5" back="/verify" />
+      <PageHeader title="Phone verification" subtitle="Step 1 of 3" back="/verify" />
 
       <div className="flex flex-1 flex-col gap-5 p-5">
         {step === "enter" ? (
@@ -24,14 +60,14 @@ function PhoneVerify() {
             </div>
             <div>
               <h2 className="font-display text-xl font-bold">Enter your phone number</h2>
-              <p className="mt-1 text-sm text-muted-foreground">We'll send a 6-digit code to confirm it's you.</p>
+              <p className="mt-1 text-sm text-muted-foreground">OTP requests go through the secure backend provider function.</p>
             </div>
             <div className="flex items-center gap-2 rounded-2xl border border-input bg-muted/40 px-4 py-3.5">
-              <span className="rounded-lg bg-card px-2 py-1 text-sm font-semibold">🇬🇭 +233</span>
-              <input defaultValue="24 555 0142" className="flex-1 bg-transparent text-sm outline-none" />
+              <span className="rounded-lg bg-card px-2 py-1 text-sm font-semibold">GH +233</span>
+              <input value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} className="flex-1 bg-transparent text-sm outline-none" />
             </div>
-            <button onClick={() => setStep("otp")} className="mt-auto rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card">
-              Send OTP
+            <button disabled={isSaving} onClick={handleRequestOtp} className="mt-auto rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card disabled:opacity-50">
+              {isSaving ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Sending</span> : "Send OTP"}
             </button>
           </>
         ) : (
@@ -40,8 +76,8 @@ function PhoneVerify() {
               <MessageSquare className="h-6 w-6" />
             </div>
             <div>
-              <h2 className="font-display text-xl font-bold">Enter the 6-digit code</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Sent to +233 24 555 0142. <button className="font-medium text-primary">Resend</button></p>
+              <h2 className="font-display text-xl font-bold">Enter the provider OTP</h2>
+              <p className="mt-1 text-sm text-muted-foreground">The backend will verify the code once the official provider is connected.</p>
             </div>
             <div className="grid grid-cols-6 gap-2">
               {otp.map((v, i) => (
@@ -58,12 +94,29 @@ function PhoneVerify() {
                 />
               ))}
             </div>
-            <button onClick={() => navigate({ to: "/verify/ghana-card" })} className="mt-auto rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card">
-              Verify & Continue
+            <button disabled={isSaving} onClick={handleVerifyOtp} className="mt-auto rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card disabled:opacity-50">
+              {isSaving ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Submitting</span> : "Verify OTP"}
+            </button>
+            <button onClick={() => navigate({ to: "/verify/ghana-card" })} className="rounded-2xl border border-border py-4 font-display text-base font-semibold text-primary">
+              Continue to Ghana Card
             </button>
           </>
+        )}
+
+        {message && <p className="rounded-2xl bg-secondary p-4 text-[11px] font-medium text-primary">{message}</p>}
+        {error && (
+          <div className="flex items-center gap-2 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-destructive">
+            <ShieldAlert className="h-4 w-4" />
+            <p className="text-[11px] font-medium">{error}</p>
+          </div>
         )}
       </div>
     </div>
   );
+}
+
+function resultMessage(data: unknown, fallback: string) {
+  if (!data || typeof data !== "object") return fallback;
+  const response = data as { message?: string; status?: string; providerReference?: string };
+  return [response.message ?? fallback, response.status ? `Status: ${response.status}` : "", response.providerReference ? `Reference: ${response.providerReference}` : ""].filter(Boolean).join(" ");
 }

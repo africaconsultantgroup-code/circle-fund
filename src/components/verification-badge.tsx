@@ -1,10 +1,16 @@
 import { ShieldCheck, ShieldAlert, ShieldQuestion, Clock, Sparkles } from "lucide-react";
-import type { VerificationStatus, TrustTier } from "@/lib/mock-data";
+import type { TrustTier } from "@/lib/mock-data";
+import type { VerificationStatus } from "@/lib/supabase-types";
 
-export function VerificationBadge({ status, label }: { status: VerificationStatus; label?: string }) {
+type BadgeStatus = VerificationStatus | "unverified" | "rejected";
+
+export function VerificationBadge({ status, label }: { status: BadgeStatus; label?: string }) {
   const map = {
     verified: { cls: "bg-success/15 text-success", Icon: ShieldCheck, text: label ?? "Verified" },
     pending: { cls: "bg-gold/20 text-[color:var(--gold-foreground)]", Icon: Clock, text: label ?? "Pending" },
+    not_started: { cls: "bg-muted text-muted-foreground", Icon: ShieldQuestion, text: label ?? "Not started" },
+    manual_review: { cls: "bg-gold/20 text-[color:var(--gold-foreground)]", Icon: Clock, text: label ?? "Manual review" },
+    failed: { cls: "bg-destructive/15 text-destructive", Icon: ShieldAlert, text: label ?? "Failed" },
     unverified: { cls: "bg-muted text-muted-foreground", Icon: ShieldQuestion, text: label ?? "Unverified" },
     rejected: { cls: "bg-destructive/15 text-destructive", Icon: ShieldAlert, text: label ?? "Rejected" },
   } as const;
@@ -26,7 +32,7 @@ export function TrustBadge({ tier, score }: { tier: TrustTier; score?: number })
   const { cls, Icon, text } = map[tier];
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold ${cls}`}>
-      <Icon className="h-3.5 w-3.5" /> {text}{score !== undefined && <span className="opacity-80">· {score}</span>}
+      <Icon className="h-3.5 w-3.5" /> {text}{score !== undefined && <span className="opacity-80">- {score}</span>}
     </span>
   );
 }

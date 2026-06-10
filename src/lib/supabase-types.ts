@@ -6,6 +6,9 @@ export type ContributionStatus = 'pending' | 'processed' | 'failed';
 export type PayoutStatus = 'pending' | 'completed' | 'failed';
 export type TransactionType = 'contribution' | 'payout' | 'refund' | 'fee' | 'adjustment';
 export type TransactionStatus = 'pending' | 'completed' | 'failed';
+export type LegacyVerificationStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
+export type VerificationStatus = 'not_started' | 'pending' | 'verified' | 'failed' | 'manual_review';
+export type AccountStatus = 'active' | 'pending' | 'suspended' | 'disabled';
 
 export interface Database {
   public: {
@@ -17,6 +20,11 @@ export interface Database {
           full_name: string | null;
           phone: string | null;
           avatar_url: string | null;
+          ghana_card_verification_status: LegacyVerificationStatus;
+          phone_otp_verification_status: LegacyVerificationStatus;
+          selfie_image_url: string | null;
+          profile_completed: boolean;
+          account_status: AccountStatus;
           created_at: string | null;
           updated_at: string | null;
         };
@@ -26,6 +34,11 @@ export interface Database {
           full_name?: string | null;
           phone?: string | null;
           avatar_url?: string | null;
+          ghana_card_verification_status?: LegacyVerificationStatus;
+          phone_otp_verification_status?: LegacyVerificationStatus;
+          selfie_image_url?: string | null;
+          profile_completed?: boolean;
+          account_status?: AccountStatus;
           created_at?: string | null;
           updated_at?: string | null;
         };
@@ -33,6 +46,11 @@ export interface Database {
           full_name?: string | null;
           phone?: string | null;
           avatar_url?: string | null;
+          ghana_card_verification_status?: LegacyVerificationStatus;
+          phone_otp_verification_status?: LegacyVerificationStatus;
+          selfie_image_url?: string | null;
+          profile_completed?: boolean;
+          account_status?: AccountStatus;
           updated_at?: string | null;
         };
       };
@@ -105,6 +123,53 @@ export interface Database {
           status?: MemberStatus;
           joined_at?: string | null;
           invited_by?: string | null;
+          updated_at?: string | null;
+        };
+      };
+      user_verifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          ghana_card_number_hash: string | null;
+          phone_verified: boolean;
+          ghana_card_verified: boolean;
+          face_verified: boolean;
+          selfie_uploaded: boolean;
+          verification_provider: string | null;
+          provider_reference: string | null;
+          verification_status: VerificationStatus;
+          failure_reason: string | null;
+          verified_at: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          ghana_card_number_hash?: string | null;
+          phone_verified?: boolean;
+          ghana_card_verified?: boolean;
+          face_verified?: boolean;
+          selfie_uploaded?: boolean;
+          verification_provider?: string | null;
+          provider_reference?: string | null;
+          verification_status?: VerificationStatus;
+          failure_reason?: string | null;
+          verified_at?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          ghana_card_number_hash?: string | null;
+          phone_verified?: boolean;
+          ghana_card_verified?: boolean;
+          face_verified?: boolean;
+          selfie_uploaded?: boolean;
+          verification_provider?: string | null;
+          provider_reference?: string | null;
+          verification_status?: VerificationStatus;
+          failure_reason?: string | null;
+          verified_at?: string | null;
           updated_at?: string | null;
         };
       };
@@ -221,9 +286,13 @@ export interface Database {
       };
     };
     Functions: {
-      [_: string]: {
-        Args: Record<string, unknown>;
-        Returns: unknown;
+      user_passes_circle_onboarding: {
+        Args: { check_user_id: string };
+        Returns: boolean;
+      };
+      circle_has_member_capacity: {
+        Args: { check_circle_id: string };
+        Returns: boolean;
       };
     };
     Enums: {
