@@ -29,7 +29,7 @@ export function VerifyGhanaCardPage() {
       return;
     }
 
-    setMessage(resultMessage(data, "Ghana Card verification request submitted."));
+    setMessage(resultMessage(data, "Ghana Card submitted for review."));
   };
 
   return (

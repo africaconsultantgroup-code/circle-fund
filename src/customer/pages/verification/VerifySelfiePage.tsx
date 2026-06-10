@@ -35,7 +35,7 @@ export function VerifySelfiePage() {
       return;
     }
 
-    setMessage(resultMessage(data, "Face verification request submitted."));
+    setMessage(resultMessage(data, "Selfie submitted for review."));
   };
 
   return (
