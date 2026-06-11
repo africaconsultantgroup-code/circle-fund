@@ -27,7 +27,7 @@ export function VerifyPhonePage() {
     setIsSaving(false);
 
     if (error) {
-      setError(error.message);
+      setError(await describeFunctionError(error));
       return;
     }
 
@@ -49,7 +49,7 @@ export function VerifyPhonePage() {
     setIsSaving(false);
 
     if (error) {
-      setError(error.message);
+      setError(await describeFunctionError(error));
       return;
     }
 
@@ -130,4 +130,19 @@ function resultMessage(data: unknown, fallback: string) {
   if (!data || typeof data !== "object") return fallback;
   const response = data as { message?: string; status?: string; providerReference?: string };
   return [response.message ?? fallback, response.status ? `Status: ${response.status}` : "", response.providerReference ? `Reference: ${response.providerReference}` : ""].filter(Boolean).join(" ");
+}
+
+async function describeFunctionError(error: unknown) {
+  const errorLike = error as { message?: string; context?: unknown };
+
+  if (errorLike.context instanceof Response) {
+    try {
+      const body = await errorLike.context.clone().json() as { error?: unknown };
+      if (typeof body.error === "string") return body.error;
+    } catch {
+      return errorLike.message ?? "Phone verification failed.";
+    }
+  }
+
+  return errorLike.message ?? "Phone verification failed.";
 }
