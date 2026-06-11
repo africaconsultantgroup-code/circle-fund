@@ -17,20 +17,30 @@ Deno.serve(async (req) => {
     }
 
     const reference = providerReference("selfie_review");
-    const status = "manual_review";
     const failureReason = "Live face verification provider is not connected. Submitted for admin review.";
+    const { data: existingVerification, error: existingVerificationError } = await serviceClient
+      .from("user_verifications")
+      .select("ghana_card_verified, face_verified, verification_status")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (existingVerificationError) return json({ error: existingVerificationError.message }, 500);
+
+    const faceAlreadyVerified = existingVerification?.face_verified === true;
+    const status = resolveAggregateStatus(existingVerification);
+    const faceStatus = faceAlreadyVerified ? "verified" : "manual_review";
 
     const { error: upsertError } = await serviceClient
       .from("user_verifications")
       .upsert({
         user_id: user.id,
         selfie_uploaded: true,
-        face_verified: false,
-        face_status: status,
+        face_verified: faceAlreadyVerified,
+        face_status: faceStatus,
         verification_provider: "admin_review",
         provider_reference: reference,
         verification_status: status,
-        failure_reason: failureReason,
+        failure_reason: status === "verified" ? null : failureReason,
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" });
 
@@ -46,3 +56,19 @@ Deno.serve(async (req) => {
     return json({ error: message }, 500);
   }
 });
+
+function resolveAggregateStatus(existingVerification: {
+  ghana_card_verified: boolean;
+  face_verified: boolean;
+  verification_status: string;
+} | null) {
+  if (
+    existingVerification?.ghana_card_verified &&
+    existingVerification.face_verified &&
+    existingVerification.verification_status === "verified"
+  ) {
+    return "verified";
+  }
+
+  return "manual_review";
+}

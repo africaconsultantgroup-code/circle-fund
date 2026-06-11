@@ -22,20 +22,30 @@ Deno.serve(async (req) => {
 
     const reference = providerReference("ghana_card_review");
     const ghanaCardNumberHash = await hashSensitiveValue(normalizedCardNumber);
-    const status = "pending";
     const failureReason = "Live Ghana Card provider is not connected. Submitted for admin review.";
+    const { data: existingVerification, error: existingVerificationError } = await serviceClient
+      .from("user_verifications")
+      .select("ghana_card_verified, face_verified, verification_status")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (existingVerificationError) return json({ ok: false, error: existingVerificationError.message }, 500);
+
+    const cardAlreadyVerified = existingVerification?.ghana_card_verified === true;
+    const status = resolveAggregateStatus(existingVerification);
+    const ghanaCardStatus = cardAlreadyVerified ? "verified" : "pending";
 
     const { error: upsertError } = await serviceClient
       .from("user_verifications")
       .upsert({
         user_id: user.id,
         ghana_card_number_hash: ghanaCardNumberHash,
-        ghana_card_verified: false,
-        ghana_card_status: status,
+        ghana_card_verified: cardAlreadyVerified,
+        ghana_card_status: ghanaCardStatus,
         verification_provider: "admin_review",
         provider_reference: reference,
         verification_status: status,
-        failure_reason: failureReason,
+        failure_reason: status === "verified" ? null : failureReason,
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" });
 
@@ -57,6 +67,22 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: message });
   }
 });
+
+function resolveAggregateStatus(existingVerification: {
+  ghana_card_verified: boolean;
+  face_verified: boolean;
+  verification_status: string;
+} | null) {
+  if (
+    existingVerification?.ghana_card_verified &&
+    existingVerification.face_verified &&
+    existingVerification.verification_status === "verified"
+  ) {
+    return "verified";
+  }
+
+  return existingVerification?.verification_status === "manual_review" ? "manual_review" : "pending";
+}
 
 function isValidGhanaCardNumber(value: string) {
   return /^GHA-\d{9}-\d$/.test(value) || /^GHA\d{10}$/.test(value);

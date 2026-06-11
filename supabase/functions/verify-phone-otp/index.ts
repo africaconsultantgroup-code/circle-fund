@@ -31,11 +31,7 @@ Deno.serve(async (req) => {
 
     if (existingVerificationError) return json({ error: existingVerificationError.message }, 500);
 
-    const status = existingVerification?.ghana_card_verified &&
-      existingVerification.face_verified &&
-      existingVerification.verification_status === "verified"
-      ? "verified"
-      : "pending";
+    const status = resolveAggregateStatus(existingVerification);
 
     const { error: profileError } = await serviceClient
       .from("profiles")
@@ -71,3 +67,19 @@ Deno.serve(async (req) => {
     return json({ error: message }, 500);
   }
 });
+
+function resolveAggregateStatus(existingVerification: {
+  ghana_card_verified: boolean;
+  face_verified: boolean;
+  verification_status: string;
+} | null) {
+  if (
+    existingVerification?.ghana_card_verified &&
+    existingVerification.face_verified &&
+    existingVerification.verification_status === "verified"
+  ) {
+    return "verified";
+  }
+
+  return existingVerification?.verification_status === "manual_review" ? "manual_review" : "pending";
+}

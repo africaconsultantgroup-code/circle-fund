@@ -21,6 +21,16 @@ Deno.serve(async (req) => {
     const status = "pending";
     const testOtp = Deno.env.get("PHONE_TEST_OTP") ?? "123456";
     const failureReason = "SMS provider is not connected. Test OTP issued by Edge Function.";
+    const { data: existingVerification, error: existingVerificationError } = await serviceClient
+      .from("user_verifications")
+      .select("phone_verified, verification_status")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (existingVerificationError) return json({ error: existingVerificationError.message }, 500);
+
+    const phoneAlreadyVerified = existingVerification?.phone_verified === true;
+    const nextStatus = existingVerification?.verification_status === "verified" ? "verified" : status;
 
     const { error: profileError } = await serviceClient
       .from("profiles")
@@ -33,18 +43,18 @@ Deno.serve(async (req) => {
       .from("user_verifications")
       .upsert({
         user_id: user.id,
-        phone_verified: false,
+        phone_verified: phoneAlreadyVerified,
         verification_provider: "test_phone_otp",
         provider_reference: reference,
-        verification_status: status,
-        failure_reason: failureReason,
+        verification_status: nextStatus,
+        failure_reason: phoneAlreadyVerified ? null : failureReason,
         updated_at: now,
       }, { onConflict: "user_id" });
 
     if (upsertError) return json({ error: upsertError.message }, 500);
 
     return json({
-      status,
+      status: nextStatus,
       providerReference: reference,
       testOtp,
       message: `Test OTP sent. Use ${testOtp} to verify your phone.`,
