@@ -104,16 +104,16 @@ export function CreateCirclePage() {
         {isCheckingEligibility && (
           <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-muted-foreground shadow-card">
             <Loader2 className="h-5 w-5 animate-spin" />
-            <p className="text-[11px] font-medium">Checking onboarding eligibility...</p>
+            <p className="text-[11px] font-medium">Checking verification eligibility...</p>
           </div>
         )}
         {!isCheckingEligibility && !eligible && (
           <Link to={eligibility?.issues[0]?.to ?? "/verify"} className="flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-destructive">
             <ShieldAlert className="h-5 w-5" />
             <div className="flex-1">
-              <p className="font-display text-sm font-semibold">Onboarding required</p>
-              <p className="text-[11px] opacity-80">{eligibility?.issues[0]?.message ?? "Complete onboarding to create a circle."}</p>
-              <p className="mt-1 text-[11px] font-semibold">{eligibility?.issues[0]?.actionLabel ?? "Complete onboarding"}</p>
+              <p className="font-display text-sm font-semibold">Verification required</p>
+              <p className="text-[11px] opacity-80">{eligibility?.issues[0]?.message ?? "Complete verification to create a circle."}</p>
+              <p className="mt-1 text-[11px] font-semibold">{eligibility?.issues[0]?.actionLabel ?? "Complete verification"}</p>
             </div>
           </Link>
         )}
@@ -132,7 +132,7 @@ export function CreateCirclePage() {
         {eligible && (
           <div className="flex items-center gap-2 rounded-2xl bg-success/10 px-4 py-2.5 text-success">
             <ShieldCheck className="h-4 w-4" />
-            <p className="text-[11px] font-medium">Onboarding complete - trust score {trustScore.score}</p>
+            <p className="text-[11px] font-medium">Verification complete - trust score {trustScore.score}</p>
           </div>
         )}
 

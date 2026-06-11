@@ -3,7 +3,7 @@ import { getProfileByUserId, getUserVerification, type Profile, type UserVerific
 import { isSupabaseConfigured } from "@/lib/supabase";
 import type { VerificationStatus } from "@/lib/supabase-types";
 
-export type VerificationStepKey = "profile" | "phone" | "ghana_card" | "selfie" | "status";
+export type VerificationStepKey = "profile" | "phone" | "ghana_card" | "selfie" | "account" | "status";
 
 export type VerificationStepSummary = {
   key: VerificationStepKey;
@@ -87,6 +87,13 @@ export function buildVerificationSteps(profile: Profile | null, verification: Us
       label: "Selfie / face match",
       description: "Capture or upload a selfie reference.",
       status: verification?.face_verified ? "verified" : submittedStatus(Boolean(verification?.selfie_uploaded), verification),
+    },
+    {
+      key: "account",
+      to: "/verify/status",
+      label: "Account status",
+      description: "Your account must be active.",
+      status: profile?.account_status === "active" ? "verified" : "not_started",
     },
   ];
 }

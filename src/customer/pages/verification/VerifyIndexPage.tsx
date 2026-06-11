@@ -54,7 +54,7 @@ export function VerifyIndexPage() {
         <p className="mt-2 text-sm text-primary-foreground/75">Verification requests are processed through secure backend functions. Provider keys are never exposed in the app.</p>
         <div className="mt-5">
           <div className="flex items-center justify-between text-[11px] text-primary-foreground/70">
-            <span>{done} of {flowSteps.length || 4} verified</span><span>{percent}%</span>
+            <span>{done} of {flowSteps.length || 5} verified</span><span>{percent}%</span>
           </div>
           <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/15">
             <div className="h-full rounded-full bg-gradient-gold" style={{ width: `${percent}%` }} />
@@ -94,5 +94,6 @@ function stepIcon(key: VerificationStepKey) {
   if (key === "phone") return Phone;
   if (key === "ghana_card") return IdCard;
   if (key === "selfie") return ScanFace;
+  if (key === "account") return ShieldCheck;
   return ListChecks;
 }

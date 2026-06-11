@@ -67,7 +67,7 @@ export function JoinCirclePage() {
         {isCheckingEligibility && (
           <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-muted-foreground shadow-card">
             <Loader2 className="h-5 w-5 animate-spin" />
-            <p className="text-[11px] font-medium">Checking onboarding eligibility...</p>
+            <p className="text-[11px] font-medium">Checking verification eligibility...</p>
           </div>
         )}
 
@@ -76,14 +76,14 @@ export function JoinCirclePage() {
             <div className="flex items-start gap-3">
               <ShieldAlert className="mt-0.5 h-5 w-5" />
               <div className="flex-1">
-                <p className="font-display text-sm font-semibold">Complete onboarding before joining</p>
+                <p className="font-display text-sm font-semibold">Complete verification before joining</p>
                 <ul className="mt-2 flex flex-col gap-1">
                   {(eligibility?.issues ?? []).map((issue) => (
                     <li key={issue.key} className="text-[11px] opacity-85">{issue.message}</li>
                   ))}
                 </ul>
                 <Link to={eligibility?.issues[0]?.to ?? "/verify"} className="mt-3 inline-flex rounded-xl bg-destructive px-3 py-2 text-[11px] font-semibold text-destructive-foreground">
-                  {eligibility?.issues[0]?.actionLabel ?? "Complete onboarding"}
+                  {eligibility?.issues[0]?.actionLabel ?? "Complete verification"}
                 </Link>
               </div>
             </div>
@@ -93,7 +93,7 @@ export function JoinCirclePage() {
         {eligible && (
           <div className="flex items-center gap-2 rounded-2xl bg-success/10 px-4 py-2.5 text-success">
             <ShieldCheck className="h-4 w-4" />
-            <p className="text-[11px] font-medium">Onboarding complete - you can join eligible circles</p>
+            <p className="text-[11px] font-medium">Verification complete - you can join eligible circles</p>
           </div>
         )}
 
@@ -118,7 +118,7 @@ export function JoinCirclePage() {
               <span className="flex items-center justify-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" /> Joining
               </span>
-            ) : eligible ? "Join Circle" : "Complete onboarding to join"}
+            ) : eligible ? "Join Circle" : "Complete verification to join"}
           </button>
           <p className="mt-3 text-[10px] text-primary-foreground/60">Trust score {trustScore.score} - max circle value GHS {trustScore.maxCircleValue.toLocaleString()}</p>
         </div>

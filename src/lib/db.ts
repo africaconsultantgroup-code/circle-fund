@@ -117,7 +117,7 @@ function describeCircleMemberError(message: string) {
 export async function joinCircle(circleId: string, userId: string) {
   const eligibilityResult = await supabase.rpc('user_passes_circle_onboarding', { check_user_id: userId });
   if (eligibilityResult.error || !eligibilityResult.data) {
-    return { data: null, error: eligibilityResult.error ?? { message: 'Complete onboarding before joining a circle.' } };
+    return { data: null, error: eligibilityResult.error ?? { message: 'Complete verification before joining a circle.' } };
   }
 
   const capacityResult = await supabase.rpc('circle_has_member_capacity', { check_circle_id: circleId });

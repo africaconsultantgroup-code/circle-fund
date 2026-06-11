@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowRight, CheckCircle2, Clock, Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock, Home, Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { VerificationBadge } from "@/components/verification-badge";
 import { loadVerificationFlowSummary, type VerificationFlowSummary } from "@/lib/verification-flow";
@@ -82,9 +82,14 @@ export function VerifyStatusPage() {
               </Link>
             )}
             {summary.isComplete && (
-              <Link to="/circles" className="mt-auto flex items-center justify-center gap-2 rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card">
-                Create or join circles <CheckCircle2 className="h-4 w-4" />
-              </Link>
+              <div className="mt-auto flex flex-col gap-3">
+                <Link to="/circles" className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card">
+                  Create or join circles <CheckCircle2 className="h-4 w-4" />
+                </Link>
+                <Link to="/home" className="flex items-center justify-center gap-2 rounded-2xl border border-border py-4 font-display text-base font-semibold text-primary">
+                  Back to dashboard <Home className="h-4 w-4" />
+                </Link>
+              </div>
             )}
           </>
         )}
