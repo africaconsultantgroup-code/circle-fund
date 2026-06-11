@@ -11,6 +11,7 @@ export function CirclesPage() {
   const [error, setError] = useState("");
   const [gateSummary, setGateSummary] = useState<VerificationGateSummary | null>(null);
   const canUseCircles = Boolean(gateSummary?.isEligible);
+  const formsComplete = Boolean(gateSummary?.formsComplete);
 
   useEffect(() => {
     let isMounted = true;
@@ -73,8 +74,8 @@ export function CirclesPage() {
         )}
       </div>
       {!canUseCircles && gateSummary?.message && (
-        <Link to={gateSummary.nextStep.to} className="mt-3 rounded-2xl border border-gold/40 bg-gold/10 p-4 text-[11px] font-medium text-[color:var(--gold-foreground)]">
-          {gateSummary.nextStep.label}: {gateSummary.message}
+        <Link to={formsComplete ? "/verify/status" : gateSummary.nextStep.to} className="mt-3 rounded-2xl border border-gold/40 bg-gold/10 p-4 text-[11px] font-medium text-[color:var(--gold-foreground)]">
+          {formsComplete ? "Verification submitted. Your account is under review." : `Continue verification: ${gateSummary.nextStep.label}`}
         </Link>
       )}
 
@@ -132,7 +133,7 @@ function DisabledCircleAction({ icon, title }: { icon: React.ReactNode; title: s
     <button disabled className="flex flex-col items-start gap-2 rounded-2xl border border-border bg-card p-4 text-left opacity-50 shadow-card">
       <span className="text-primary">{icon}</span>
       <p className="font-display text-sm font-semibold">{title}</p>
-      <p className="text-[11px] text-muted-foreground">Verify first</p>
+      <p className="text-[11px] text-muted-foreground">Verification required</p>
     </button>
   );
 }

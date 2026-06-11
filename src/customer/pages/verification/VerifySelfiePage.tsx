@@ -35,7 +35,8 @@ export function VerifySelfiePage() {
       return;
     }
 
-    setMessage(resultMessage(data, "Selfie submitted for review."));
+    setMessage(resultMessage(data, "Selfie submitted for review. Taking you to verification status."));
+    setTimeout(() => navigate({ to: "/verify/status" }), 600);
   };
 
   return (

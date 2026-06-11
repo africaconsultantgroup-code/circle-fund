@@ -204,6 +204,7 @@ export function HomePage() {
 function VerificationStatusCard({ gateSummary }: { gateSummary: VerificationGateSummary | null }) {
   const statuses = gateSummary?.statuses;
   const complete = Boolean(gateSummary?.isEligible);
+  const formsComplete = Boolean(gateSummary?.formsComplete);
 
   return (
     <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
@@ -216,11 +217,12 @@ function VerificationStatusCard({ gateSummary }: { gateSummary: VerificationGate
             <p className="font-display text-sm font-semibold">Verification status</p>
             {complete && <TrustBadge tier={trustScore.tier} score={trustScore.score} />}
           </div>
-          {complete && <p className="text-[11px] text-muted-foreground">Verification complete. Create and join circles are unlocked.</p>}
-          {!complete && <p className="text-[11px] text-muted-foreground">{gateSummary?.nextStep.description ?? "Complete verification before creating or joining a circle."}</p>}
+          {complete && <p className="text-[11px] text-muted-foreground">Verification approved. Create and join circles are unlocked.</p>}
+          {!complete && formsComplete && <p className="text-[11px] text-muted-foreground">Verification submitted. Your account is under review.</p>}
+          {!complete && !formsComplete && <p className="text-[11px] text-muted-foreground">Continue verification to create or join circles.</p>}
         </div>
-        <Link to={complete ? "/verify/status" : gateSummary?.nextStep.to ?? "/verify"} className="text-xs font-semibold text-primary">
-          {complete ? "Status" : gateSummary?.nextStep.label ?? "Review"}
+        <Link to={complete || formsComplete ? "/verify/status" : gateSummary?.nextStep.to ?? "/verify"} className="text-xs font-semibold text-primary">
+          {complete ? "Status" : formsComplete ? "Review" : "Continue"}
         </Link>
       </div>
 

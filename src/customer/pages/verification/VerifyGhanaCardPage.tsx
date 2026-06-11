@@ -34,7 +34,8 @@ export function VerifyGhanaCardPage() {
       return;
     }
 
-    setMessage(resultMessage(data, "Ghana Card submitted for review."));
+    setMessage(resultMessage(data, "Ghana Card submitted for review. Taking you to face verification."));
+    setTimeout(() => navigate({ to: "/verify/selfie" }), 600);
   };
 
   return (

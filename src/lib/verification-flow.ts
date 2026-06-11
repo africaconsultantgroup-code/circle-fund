@@ -21,6 +21,7 @@ export type VerificationFlowSummary = {
   steps: VerificationStepSummary[];
   nextStep: VerificationStepSummary;
   isComplete: boolean;
+  isFullyVerified: boolean;
   completedCount: number;
   percent: number;
   error: string | null;
@@ -44,6 +45,7 @@ export async function loadVerificationFlowSummary(): Promise<VerificationFlowSum
   const steps = buildVerificationSteps(profile ?? null, verification ?? null);
   const completedCount = steps.filter((step) => step.accepted).length;
   const isComplete = completedCount === steps.length;
+  const isFullyVerified = isUserFullyVerified(profile ?? null, verification ?? null);
   const nextStep = steps.find((step) => !step.accepted) ?? statusStep(isComplete);
 
   return {
@@ -53,6 +55,7 @@ export async function loadVerificationFlowSummary(): Promise<VerificationFlowSum
     steps,
     nextStep,
     isComplete,
+    isFullyVerified,
     completedCount,
     percent: Math.round((completedCount / steps.length) * 100),
     error: profileError?.message ?? verificationError?.message ?? null,
@@ -114,8 +117,8 @@ export function statusStep(isComplete: boolean): VerificationStepSummary {
   return {
     key: "status",
     to: "/verify/status",
-    label: isComplete ? "Verification complete" : "Verification status",
-    description: isComplete ? "You can now create and join circles." : "Review pending and missing verification steps.",
+    label: isComplete ? "Verification submitted" : "Verification status",
+    description: isComplete ? "Review your verification status." : "Review pending and missing verification steps.",
     status: isComplete ? "verified" : "manual_review",
     accepted: isComplete,
   };
@@ -139,6 +142,17 @@ function reviewStatusAllowsEligibility(status: VerificationStatus | null | undef
   return status === "verified" || status === "manual_review" || status === "pending";
 }
 
+export function isUserFullyVerified(profile: Profile | null, verification: UserVerification | null) {
+  return Boolean(
+    profile?.profile_completed &&
+    profile.account_status === "active" &&
+    verification?.phone_verified &&
+    verification.ghana_card_verified &&
+    verification.face_verified &&
+    verification.verification_status === "verified",
+  );
+}
+
 function submittedStatus(hasSubmission: boolean, verification: UserVerification | null): VerificationStatus {
   if (!hasSubmission) return "not_started";
   if (verification?.verification_status === "failed") return "failed";
@@ -154,6 +168,7 @@ function emptySummary(error: string): VerificationFlowSummary {
     steps,
     nextStep: steps[0],
     isComplete: false,
+    isFullyVerified: false,
     completedCount: 0,
     percent: 0,
     error,

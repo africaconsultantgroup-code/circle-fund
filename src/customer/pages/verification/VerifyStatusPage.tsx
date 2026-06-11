@@ -36,17 +36,21 @@ export function VerifyStatusPage() {
 
         {summary && (
           <>
-            <div className={`rounded-3xl p-5 ${summary.isComplete ? "bg-success/10 text-success" : "bg-secondary text-primary"}`}>
+            <div className={`rounded-3xl p-5 ${summary.isFullyVerified ? "bg-success/10 text-success" : "bg-secondary text-primary"}`}>
               <div className="flex items-center gap-3">
                 <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-card/70">
-                  {summary.isComplete ? <ShieldCheck className="h-6 w-6" /> : <Clock className="h-6 w-6" />}
+                  {summary.isFullyVerified ? <ShieldCheck className="h-6 w-6" /> : <Clock className="h-6 w-6" />}
                 </span>
                 <div className="flex-1">
                   <p className="font-display text-base font-semibold">
-                    {summary.isComplete ? "Verification complete" : "Verification in progress"}
+                    {summary.isFullyVerified ? "Verification approved" : summary.isComplete ? "Verification submitted" : "Verification in progress"}
                   </p>
                   <p className="text-[11px] opacity-80">
-                    {summary.completedCount} of {summary.steps.length} steps accepted
+                    {summary.isFullyVerified
+                      ? "Create and join circles are unlocked."
+                      : summary.isComplete
+                        ? "Your account is under review."
+                        : `${summary.completedCount} of ${summary.steps.length} forms completed`}
                   </p>
                 </div>
               </div>
@@ -81,7 +85,17 @@ export function VerifyStatusPage() {
                 Continue: {summary.nextStep.label} <ArrowRight className="h-4 w-4" />
               </Link>
             )}
-            {summary.isComplete && (
+            {summary.isComplete && !summary.isFullyVerified && (
+              <div className="mt-auto flex flex-col gap-3">
+                <p className="rounded-2xl border border-gold/40 bg-gold/10 p-4 text-center text-[11px] font-medium text-[color:var(--gold-foreground)]">
+                  Verification submitted. Your account is under review.
+                </p>
+                <Link to="/home" className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card">
+                  Back to dashboard <Home className="h-4 w-4" />
+                </Link>
+              </div>
+            )}
+            {summary.isFullyVerified && (
               <div className="mt-auto flex flex-col gap-3">
                 <Link to="/circles" className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card">
                   Create or join circles <CheckCircle2 className="h-4 w-4" />

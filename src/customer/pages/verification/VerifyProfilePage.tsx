@@ -76,7 +76,8 @@ export function VerifyProfilePage() {
       return;
     }
 
-    setMessage("Profile saved. Continue to phone verification.");
+    setMessage("Profile saved. Taking you to phone verification.");
+    setTimeout(() => navigate({ to: "/verify/phone" }), 600);
   };
 
   return (

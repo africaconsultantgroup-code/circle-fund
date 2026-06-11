@@ -53,7 +53,8 @@ export function VerifyPhonePage() {
       return;
     }
 
-    setMessage(resultMessage(data, "Phone OTP verification submitted."));
+    setMessage(resultMessage(data, "Phone verified. Taking you to Ghana Card verification."));
+    setTimeout(() => navigate({ to: "/verify/ghana-card" }), 600);
   };
 
   return (

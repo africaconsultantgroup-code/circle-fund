@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/auth";
 import { getProfileByUserId, getUserVerification, type Profile, type UserVerification } from "@/lib/db";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
-import { buildVerificationSteps, hasAcceptedFaceVerification, hasAcceptedGhanaCardVerification, statusStep } from "@/lib/verification-flow";
+import { buildVerificationSteps, hasAcceptedFaceVerification, hasAcceptedGhanaCardVerification, isUserFullyVerified, statusStep } from "@/lib/verification-flow";
 import type { VerificationStatus } from "@/lib/supabase-types";
 
 export type EligibilityIssue = {
@@ -20,6 +20,7 @@ export type CircleEligibility = {
 
 export type VerificationGateSummary = {
   isEligible: boolean;
+  formsComplete: boolean;
   message: string;
   nextStep: {
     to: string;
@@ -61,12 +62,12 @@ export async function getCircleEligibility(): Promise<CircleEligibility> {
       key: "profile",
       message: "Complete your profile before creating or joining a circle.",
       actionLabel: "Complete profile",
-      to: "/profile",
+      to: "/verify/profile",
     }]);
   }
 
   const { data: verification } = await getUserVerification(user.id);
-  const issues = getProfileEligibilityIssues(profile, verification);
+  const issues = getCircleAccessIssues(profile, verification);
   if (issues.length > 0) {
     return blocked(user.id, issues);
   }
@@ -77,10 +78,10 @@ export async function getCircleEligibility(): Promise<CircleEligibility> {
 
   if (rpcError || !allowed) {
     return blocked(user.id, [{
-      key: "profile",
-      message: rpcError?.message ?? "Your onboarding checks could not be verified.",
-      actionLabel: "Review onboarding",
-      to: "/verify",
+      key: "account",
+      message: rpcError?.message ?? "Verification approval could not be confirmed yet.",
+      actionLabel: "View status",
+      to: "/verify/status",
     }]);
   }
 
@@ -147,6 +148,22 @@ export function getProfileEligibilityIssues(profile: Profile, verification: User
   return issues;
 }
 
+export function getCircleAccessIssues(profile: Profile, verification: UserVerification | null): EligibilityIssue[] {
+  const formIssues = getProfileEligibilityIssues(profile, verification);
+  if (formIssues.length > 0) return formIssues;
+
+  if (!isUserFullyVerified(profile, verification)) {
+    return [{
+      key: "account",
+      message: "Verification submitted. Your account is under review.",
+      actionLabel: "View status",
+      to: "/verify/status",
+    }];
+  }
+
+  return [];
+}
+
 export async function getVerificationGateSummary(): Promise<VerificationGateSummary> {
   if (!isSupabaseConfigured) {
     return emptyGateSummary(false);
@@ -162,20 +179,19 @@ export async function getVerificationGateSummary(): Promise<VerificationGateSumm
     getUserVerification(user.id),
   ]);
 
-  const isEligible = Boolean(
-    profile &&
-    verification?.phone_verified &&
-    hasAcceptedGhanaCardVerification(verification) &&
-    hasAcceptedFaceVerification(verification) &&
-    profile.profile_completed &&
-    profile.account_status === "active",
-  );
   const steps = buildVerificationSteps(profile ?? null, verification ?? null);
-  const nextStep = steps.find((step) => step.status !== "verified") ?? statusStep(isEligible);
+  const formsComplete = steps.every((step) => step.accepted);
+  const isEligible = isUserFullyVerified(profile ?? null, verification ?? null);
+  const nextStep = steps.find((step) => !step.accepted) ?? statusStep(formsComplete);
 
   return {
     isEligible,
-    message: isEligible ? "Verification complete. You can create and join circles." : nextStep.description,
+    formsComplete,
+    message: isEligible
+      ? "Verification approved. You can create and join circles."
+      : formsComplete
+        ? "Verification submitted. Your account is under review."
+        : nextStep.description,
     nextStep: {
       to: nextStep.to,
       label: nextStep.label,
@@ -201,7 +217,8 @@ function emptyGateSummary(isEligible: boolean): VerificationGateSummary {
   const nextStep = isEligible ? statusStep(true) : buildVerificationSteps(null, null)[0];
   return {
     isEligible,
-    message: isEligible ? "Verification complete. You can create and join circles." : nextStep.description,
+    formsComplete: false,
+    message: isEligible ? "Verification approved. You can create and join circles." : nextStep.description,
     nextStep: {
       to: nextStep.to,
       label: nextStep.label,
