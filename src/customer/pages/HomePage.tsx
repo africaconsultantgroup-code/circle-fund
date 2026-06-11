@@ -218,7 +218,7 @@ function VerificationStatusCard({ gateSummary }: { gateSummary: VerificationGate
             {complete && <TrustBadge tier={trustScore.tier} score={trustScore.score} />}
           </div>
           {complete && <p className="text-[11px] text-muted-foreground">Verification approved. Create and join circles are unlocked.</p>}
-          {!complete && formsComplete && <p className="text-[11px] text-muted-foreground">Verification submitted. Your account is under review.</p>}
+          {!complete && formsComplete && <p className="text-[11px] text-muted-foreground">Verification forms complete. Waiting for admin approval.</p>}
           {!complete && !formsComplete && <p className="text-[11px] text-muted-foreground">Continue verification to create or join circles.</p>}
         </div>
         <Link to={complete || formsComplete ? "/verify/status" : gateSummary?.nextStep.to ?? "/verify"} className="text-xs font-semibold text-primary">
@@ -227,7 +227,7 @@ function VerificationStatusCard({ gateSummary }: { gateSummary: VerificationGate
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <StatusLine label="Phone OTP" value={statuses?.phone === "verified" ? "Verified" : "Not started"} good={statuses?.phone === "verified"} />
+        <StatusLine label="Phone OTP" value={statusLabel(statuses?.phone)} good={statuses?.phone === "verified"} />
         <StatusLine label="Ghana Card" value={statusLabel(statuses?.ghanaCard)} good={statusAccepted(statuses?.ghanaCard)} />
         <StatusLine label="Face" value={statusLabel(statuses?.face)} good={statusAccepted(statuses?.face)} />
         <StatusLine label="Profile" value={statuses?.profile === "complete" ? "Complete" : "Incomplete"} good={statuses?.profile === "complete"} />
@@ -248,7 +248,7 @@ function StatusLine({ label, value, good }: { label: string; value: string; good
 
 function statusLabel(status: string | undefined) {
   if (status === "verified") return "Verified";
-  if (status === "manual_review") return "Review accepted";
+  if (status === "manual_review") return "Pending review";
   if (status === "pending") return "Pending review";
   if (status === "failed") return "Failed";
   return "Not started";

@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/auth";
 import { getProfileByUserId, getUserVerification, type Profile, type UserVerification } from "@/lib/db";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
-import { buildVerificationSteps, hasAcceptedFaceVerification, hasAcceptedGhanaCardVerification, isUserFullyVerified, statusStep } from "@/lib/verification-flow";
+import { buildVerificationSteps, faceStepStatus, ghanaCardStepStatus, hasAcceptedFaceVerification, hasAcceptedGhanaCardVerification, isUserFullyVerified, statusStep } from "@/lib/verification-flow";
 import type { VerificationStatus } from "@/lib/supabase-types";
 
 export type EligibilityIssue = {
@@ -190,7 +190,7 @@ export async function getVerificationGateSummary(): Promise<VerificationGateSumm
     message: isEligible
       ? "Verification approved. You can create and join circles."
       : formsComplete
-        ? "Verification submitted. Your account is under review."
+        ? "Verification forms complete. Waiting for admin approval."
         : nextStep.description,
     nextStep: {
       to: nextStep.to,
@@ -199,18 +199,12 @@ export async function getVerificationGateSummary(): Promise<VerificationGateSumm
     },
     statuses: {
       phone: verification?.phone_verified ? "verified" : "not_started",
-      ghanaCard: verification?.ghana_card_verified ? "verified" : submittedStatus(Boolean(verification?.ghana_card_number_hash), verification),
-      face: verification?.face_verified ? "verified" : submittedStatus(Boolean(verification?.selfie_uploaded), verification),
+      ghanaCard: ghanaCardStepStatus(verification ?? null),
+      face: faceStepStatus(verification ?? null),
       profile: profile?.profile_completed ? "complete" : "incomplete",
       account: profile?.account_status === "active" ? "active" : "inactive",
     },
   };
-}
-
-function submittedStatus(hasSubmission: boolean, verification: UserVerification | null): VerificationStatus {
-  if (!hasSubmission) return "not_started";
-  if (verification?.verification_status === "failed") return "failed";
-  return verification?.verification_status === "pending" ? "pending" : "manual_review";
 }
 
 function emptyGateSummary(isEligible: boolean): VerificationGateSummary {

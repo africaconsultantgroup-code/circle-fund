@@ -31,6 +31,7 @@ Deno.serve(async (req) => {
         user_id: user.id,
         ghana_card_number_hash: ghanaCardNumberHash,
         ghana_card_verified: false,
+        ghana_card_status: status,
         verification_provider: "admin_review",
         provider_reference: reference,
         verification_status: status,

@@ -49,7 +49,7 @@ export function VerifyStatusPage() {
                     {summary.isFullyVerified
                       ? "Create and join circles are unlocked."
                       : summary.isComplete
-                        ? "Your account is under review."
+                        ? "Verification forms complete. Waiting for admin approval."
                         : `${summary.completedCount} of ${summary.steps.length} forms completed`}
                   </p>
                 </div>
@@ -88,7 +88,7 @@ export function VerifyStatusPage() {
             {summary.isComplete && !summary.isFullyVerified && (
               <div className="mt-auto flex flex-col gap-3">
                 <p className="rounded-2xl border border-gold/40 bg-gold/10 p-4 text-center text-[11px] font-medium text-[color:var(--gold-foreground)]">
-                  Verification submitted. Your account is under review.
+                  Verification forms complete. Waiting for admin approval.
                 </p>
                 <Link to="/home" className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card">
                   Back to dashboard <Home className="h-4 w-4" />

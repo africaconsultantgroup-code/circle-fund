@@ -143,7 +143,9 @@ export interface Database {
           ghana_card_number_hash: string | null;
           phone_verified: boolean;
           ghana_card_verified: boolean;
+          ghana_card_status: VerificationStatus;
           face_verified: boolean;
+          face_status: VerificationStatus;
           selfie_uploaded: boolean;
           verification_provider: string | null;
           provider_reference: string | null;
@@ -159,7 +161,9 @@ export interface Database {
           ghana_card_number_hash?: string | null;
           phone_verified?: boolean;
           ghana_card_verified?: boolean;
+          ghana_card_status?: VerificationStatus;
           face_verified?: boolean;
+          face_status?: VerificationStatus;
           selfie_uploaded?: boolean;
           verification_provider?: string | null;
           provider_reference?: string | null;
@@ -173,7 +177,9 @@ export interface Database {
           ghana_card_number_hash?: string | null;
           phone_verified?: boolean;
           ghana_card_verified?: boolean;
+          ghana_card_status?: VerificationStatus;
           face_verified?: boolean;
+          face_status?: VerificationStatus;
           selfie_uploaded?: boolean;
           verification_provider?: string | null;
           provider_reference?: string | null;

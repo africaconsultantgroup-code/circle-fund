@@ -25,13 +25,17 @@ Deno.serve(async (req) => {
     const reference = providerReference("phone_verify");
     const { data: existingVerification, error: existingVerificationError } = await serviceClient
       .from("user_verifications")
-      .select("ghana_card_verified, face_verified")
+      .select("ghana_card_verified, face_verified, verification_status")
       .eq("user_id", user.id)
       .maybeSingle();
 
     if (existingVerificationError) return json({ error: existingVerificationError.message }, 500);
 
-    const status = existingVerification?.ghana_card_verified && existingVerification.face_verified ? "verified" : "pending";
+    const status = existingVerification?.ghana_card_verified &&
+      existingVerification.face_verified &&
+      existingVerification.verification_status === "verified"
+      ? "verified"
+      : "pending";
 
     const { error: profileError } = await serviceClient
       .from("profiles")

@@ -83,7 +83,7 @@ export function buildVerificationSteps(profile: Profile | null, verification: Us
       to: "/verify/phone",
       label: "Phone OTP",
       description: "Submit your phone number and OTP request.",
-      status: phoneAccepted ? "verified" : submittedStatus(Boolean(profile?.phone), verification),
+      status: phoneAccepted ? "verified" : phoneStatus(Boolean(profile?.phone), verification),
       accepted: phoneAccepted,
     },
     {
@@ -91,7 +91,7 @@ export function buildVerificationSteps(profile: Profile | null, verification: Us
       to: "/verify/ghana-card",
       label: "Ghana Card",
       description: "Submit your Ghana Card number for review.",
-      status: verification?.ghana_card_verified ? "verified" : submittedStatus(Boolean(verification?.ghana_card_number_hash), verification),
+      status: ghanaCardStepStatus(verification),
       accepted: ghanaCardAccepted,
     },
     {
@@ -99,7 +99,7 @@ export function buildVerificationSteps(profile: Profile | null, verification: Us
       to: "/verify/selfie",
       label: "Selfie / face match",
       description: "Capture or upload a selfie reference.",
-      status: verification?.face_verified ? "verified" : submittedStatus(Boolean(verification?.selfie_uploaded), verification),
+      status: faceStepStatus(verification),
       accepted: faceAccepted,
     },
     {
@@ -127,14 +127,30 @@ export function statusStep(isComplete: boolean): VerificationStepSummary {
 export function hasAcceptedGhanaCardVerification(verification: UserVerification | null) {
   return Boolean(
     verification?.ghana_card_verified ||
-    (verification?.ghana_card_number_hash && reviewStatusAllowsEligibility(verification.verification_status)),
+    (verification?.ghana_card_number_hash && reviewStatusAllowsEligibility(stepStatusOrAggregate(verification.ghana_card_status, verification.verification_status))),
   );
 }
 
 export function hasAcceptedFaceVerification(verification: UserVerification | null) {
   return Boolean(
     verification?.face_verified ||
-    (verification?.selfie_uploaded && reviewStatusAllowsEligibility(verification.verification_status)),
+    (verification?.selfie_uploaded && reviewStatusAllowsEligibility(stepStatusOrAggregate(verification.face_status, verification.verification_status))),
+  );
+}
+
+export function ghanaCardStepStatus(verification: UserVerification | null): VerificationStatus {
+  if (verification?.ghana_card_verified) return "verified";
+  return submittedStatus(
+    Boolean(verification?.ghana_card_number_hash),
+    stepStatusOrAggregate(verification?.ghana_card_status, verification?.verification_status),
+  );
+}
+
+export function faceStepStatus(verification: UserVerification | null): VerificationStatus {
+  if (verification?.face_verified) return "verified";
+  return submittedStatus(
+    Boolean(verification?.selfie_uploaded),
+    stepStatusOrAggregate(verification?.face_status, verification?.verification_status),
   );
 }
 
@@ -153,10 +169,23 @@ export function isUserFullyVerified(profile: Profile | null, verification: UserV
   );
 }
 
-function submittedStatus(hasSubmission: boolean, verification: UserVerification | null): VerificationStatus {
-  if (!hasSubmission) return "not_started";
+function phoneStatus(hasPhoneSubmission: boolean, verification: UserVerification | null): VerificationStatus {
+  if (verification?.phone_verified) return "verified";
+  if (!hasPhoneSubmission) return "not_started";
   if (verification?.verification_status === "failed") return "failed";
-  return verification?.verification_status === "pending" ? "pending" : "manual_review";
+  return verification?.verification_status === "not_started" ? "not_started" : "pending";
+}
+
+function submittedStatus(hasSubmission: boolean, status: VerificationStatus | null | undefined): VerificationStatus {
+  if (!hasSubmission) return "not_started";
+  if (status === "failed") return "failed";
+  if (status === "verified") return "verified";
+  if (status === "manual_review") return "manual_review";
+  return "pending";
+}
+
+function stepStatusOrAggregate(stepStatus: VerificationStatus | null | undefined, aggregateStatus: VerificationStatus | null | undefined) {
+  return stepStatus && stepStatus !== "not_started" ? stepStatus : aggregateStatus;
 }
 
 function emptySummary(error: string): VerificationFlowSummary {

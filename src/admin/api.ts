@@ -4,7 +4,9 @@ export type AdminUserVerification = {
   user_id: string;
   phone_verified: boolean;
   ghana_card_verified: boolean;
+  ghana_card_status?: string;
   face_verified: boolean;
+  face_status?: string;
   selfie_uploaded: boolean;
   verification_status: string;
   provider_reference: string | null;
