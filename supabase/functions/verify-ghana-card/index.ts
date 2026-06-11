@@ -12,13 +12,17 @@ Deno.serve(async (req) => {
     if (error) return error;
 
     const { ghanaCardNumber } = await req.json();
-    if (typeof ghanaCardNumber !== "string" || ghanaCardNumber.trim().length < 8) {
-      return json({ error: "A valid Ghana Card number is required." }, 400);
+    const normalizedCardNumber = typeof ghanaCardNumber === "string" ? ghanaCardNumber.trim().toUpperCase() : "";
+    if (!isValidGhanaCardNumber(normalizedCardNumber)) {
+      return json({
+        ok: false,
+        error: "Enter a valid Ghana Card number, for example GHA-123456789-1.",
+      });
     }
 
     const reference = providerReference("ghana_card_review");
-    const ghanaCardNumberHash = await hashSensitiveValue(ghanaCardNumber);
-    const status = "manual_review";
+    const ghanaCardNumberHash = await hashSensitiveValue(normalizedCardNumber);
+    const status = "pending";
     const failureReason = "Live Ghana Card provider is not connected. Submitted for admin review.";
 
     const { error: upsertError } = await serviceClient
@@ -34,15 +38,25 @@ Deno.serve(async (req) => {
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" });
 
-    if (upsertError) return json({ error: upsertError.message }, 500);
+    if (upsertError) {
+      return json({
+        ok: false,
+        error: upsertError.message,
+      });
+    }
 
     return json({
+      ok: true,
       status,
       providerReference: reference,
       message: "Ghana Card submitted for review.",
-    }, 202);
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error.";
-    return json({ error: message }, 500);
+    return json({ ok: false, error: message });
   }
 });
+
+function isValidGhanaCardNumber(value: string) {
+  return /^GHA-\d{9}-\d$/.test(value) || /^GHA\d{10}$/.test(value);
+}

@@ -29,6 +29,11 @@ export function VerifyGhanaCardPage() {
       return;
     }
 
+    if (isFunctionError(data)) {
+      setError(data.error);
+      return;
+    }
+
     setMessage(resultMessage(data, "Ghana Card submitted for review."));
   };
 
@@ -90,4 +95,8 @@ function resultMessage(data: unknown, fallback: string) {
   if (!data || typeof data !== "object") return fallback;
   const response = data as { message?: string; status?: string; providerReference?: string };
   return [response.message ?? fallback, response.status ? `Status: ${response.status}` : "", response.providerReference ? `Reference: ${response.providerReference}` : ""].filter(Boolean).join(" ");
+}
+
+function isFunctionError(data: unknown): data is { ok: false; error: string } {
+  return Boolean(data && typeof data === "object" && (data as { ok?: unknown }).ok === false && typeof (data as { error?: unknown }).error === "string");
 }
