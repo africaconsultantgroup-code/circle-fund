@@ -19,6 +19,7 @@ export function CreateCirclePage() {
   const [submitError, setSubmitError] = useState("");
   const [success, setSuccess] = useState("");
   const [inviteLink, setInviteLink] = useState("");
+  const [createdCircleName, setCreatedCircleName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [eligibility, setEligibility] = useState<CircleEligibility | null>(null);
   const [isCheckingEligibility, setIsCheckingEligibility] = useState(true);
@@ -59,6 +60,7 @@ export function CreateCirclePage() {
     setSubmitError("");
     setSuccess("");
     setInviteLink("");
+    setCreatedCircleName("");
 
     if (blocked || !validate()) return;
 
@@ -67,7 +69,7 @@ export function CreateCirclePage() {
       const currentEligibility = eligibility ?? await getCircleEligibility();
       if (!currentEligibility.isEligible || !currentEligibility.userId) {
         setEligibility(currentEligibility);
-        setSubmitError(currentEligibility.message || "Complete verification before creating a circle.");
+        setSubmitError(currentEligibility.message || "Please sign in before creating a circle.");
         return;
       }
 
@@ -95,6 +97,7 @@ export function CreateCirclePage() {
 
       const link = `${window.location.origin}/join-circle?code=${encodeURIComponent(data.invite_token)}`;
       setInviteLink(link);
+      setCreatedCircleName(data.name);
       setSuccess("Circle created successfully. You have been added as admin/creator.");
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "We could not create this circle. Please try again.");
@@ -117,9 +120,9 @@ export function CreateCirclePage() {
           <Link to={eligibility?.issues[0]?.to ?? "/verify"} className="flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-destructive">
             <ShieldAlert className="h-5 w-5" />
             <div className="flex-1">
-              <p className="font-display text-sm font-semibold">Verification required</p>
-              <p className="text-[11px] opacity-80">{eligibility?.issues[0]?.message ?? "Complete verification to create a circle."}</p>
-              <p className="mt-1 text-[11px] font-semibold">{eligibility?.issues[0]?.actionLabel ?? "Complete verification"}</p>
+              <p className="font-display text-sm font-semibold">Sign in required</p>
+              <p className="text-[11px] opacity-80">{eligibility?.issues[0]?.message ?? "Please sign in to create a circle."}</p>
+              <p className="mt-1 text-[11px] font-semibold">{eligibility?.issues[0]?.actionLabel ?? "Sign in"}</p>
             </div>
           </Link>
         )}
@@ -138,7 +141,7 @@ export function CreateCirclePage() {
         {eligible && (
           <div className="flex items-center gap-2 rounded-2xl bg-success/10 px-4 py-2.5 text-success">
             <ShieldCheck className="h-4 w-4" />
-            <p className="text-[11px] font-medium">Verification complete - trust score {trustScore.score}</p>
+            <p className="text-[11px] font-medium">Circle testing enabled - you can create a circle.</p>
           </div>
         )}
 
@@ -219,6 +222,8 @@ export function CreateCirclePage() {
             </div>
             {inviteLink && (
               <div className="mt-3 rounded-xl bg-background/70 p-3 text-foreground">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Circle</p>
+                <p className="mt-1 font-display text-sm font-semibold">{createdCircleName}</p>
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Invite link</p>
                 <p className="mt-1 break-all font-mono text-[11px]">{inviteLink}</p>
                 <div className="mt-3 grid grid-cols-2 gap-2">

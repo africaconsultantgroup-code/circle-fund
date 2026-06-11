@@ -91,15 +91,25 @@ export async function createCircleMember(payload: Partial<CircleMember> & { circ
 export async function createCircleWithCreator(payload: CircleInsert, userId: string) {
   const eligibilityResult = await supabase.rpc('user_passes_circle_onboarding', { check_user_id: userId });
   if (eligibilityResult.error || !eligibilityResult.data) {
-    return { data: null, error: eligibilityResult.error ?? { message: 'Complete verification before creating a circle.' } };
+    return { data: null, error: eligibilityResult.error ?? { message: 'Please sign in before creating a circle.' } };
   }
 
-  const circleResult = await createCircle({
+  let circleResult = await createCircle({
     ...payload,
     owner_id: userId,
     invite_token: payload.invite_token ?? generateInviteToken(),
     max_members: Math.min(Math.max(payload.max_members ?? 15, 2), 15),
   });
+
+  for (let attempt = 0; circleResult.error && /invite_token|duplicate key|unique/i.test(circleResult.error.message) && attempt < 2; attempt += 1) {
+    circleResult = await createCircle({
+      ...payload,
+      owner_id: userId,
+      invite_token: generateInviteToken(),
+      max_members: Math.min(Math.max(payload.max_members ?? 15, 2), 15),
+    });
+  }
+
   if (circleResult.error || !circleResult.data) {
     return { data: null, error: { message: describeCircleCreateError(circleResult.error.message) } };
   }
@@ -122,7 +132,7 @@ export async function createCircleWithCreator(payload: CircleInsert, userId: str
 
 function describeCircleCreateError(message: string) {
   if (/row-level security|violates row-level security/i.test(message)) {
-    return 'Only verified users can create circles. Please complete verification and try again.';
+    return 'Please sign in before creating a circle.';
   }
 
   return message || 'We could not save this circle. Please try again.';
@@ -130,7 +140,7 @@ function describeCircleCreateError(message: string) {
 
 function describeCircleMemberError(message: string) {
   if (/row-level security|violates row-level security/i.test(message)) {
-    return 'The circle was created, but we could not add you as creator. Please confirm verification is complete and try again.';
+    return 'The circle was created, but we could not add you as creator. Please sign in and try again.';
   }
 
   if (/duplicate key|unique/i.test(message)) {
@@ -143,7 +153,7 @@ function describeCircleMemberError(message: string) {
 export async function joinCircle(circleId: string, userId: string) {
   const eligibilityResult = await supabase.rpc('user_passes_circle_onboarding', { check_user_id: userId });
   if (eligibilityResult.error || !eligibilityResult.data) {
-    return { data: null, error: eligibilityResult.error ?? { message: 'Complete verification before joining a circle.' } };
+    return { data: null, error: eligibilityResult.error ?? { message: 'Please sign in before joining a circle.' } };
   }
 
   const capacityResult = await supabase.rpc('circle_has_member_capacity', { check_circle_id: circleId });

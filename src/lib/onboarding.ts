@@ -20,6 +20,7 @@ export type CircleEligibility = {
 
 export type VerificationGateSummary = {
   isEligible: boolean;
+  canUseCircleActions: boolean;
   formsComplete: boolean;
   message: string;
   nextStep: {
@@ -57,20 +58,6 @@ export async function getCircleEligibility(): Promise<CircleEligibility> {
   }
 
   const { data: profile, error } = await getProfileByUserId(user.id);
-  if (error || !profile) {
-    return blocked(user.id, [{
-      key: "profile",
-      message: "Complete your profile before creating or joining a circle.",
-      actionLabel: "Complete profile",
-      to: "/verify/profile",
-    }]);
-  }
-
-  const { data: verification } = await getUserVerification(user.id);
-  const issues = getCircleAccessIssues(profile, verification);
-  if (issues.length > 0) {
-    return blocked(user.id, issues);
-  }
 
   const { data: allowed, error: rpcError } = await supabase.rpc("user_passes_circle_onboarding", {
     check_user_id: user.id,
@@ -79,13 +66,17 @@ export async function getCircleEligibility(): Promise<CircleEligibility> {
   if (rpcError || !allowed) {
     return blocked(user.id, [{
       key: "account",
-      message: rpcError?.message ?? "Verification approval could not be confirmed yet.",
-      actionLabel: "View status",
-      to: "/verify/status",
+      message: rpcError?.message ?? "Please sign in again before creating or joining a circle.",
+      actionLabel: "Sign in",
+      to: "/login",
     }]);
   }
 
-  return { isEligible: true, userId: user.id, issues: [], message: "" };
+  if (error || !profile) {
+    return { isEligible: true, userId: user.id, issues: [], message: "Circle testing is enabled for signed-in users." };
+  }
+
+  return { isEligible: true, userId: user.id, issues: [], message: "Circle testing is enabled for signed-in users." };
 }
 
 export function getProfileEligibilityIssues(profile: Profile, verification: UserVerification | null): EligibilityIssue[] {
@@ -182,10 +173,12 @@ export async function getVerificationGateSummary(): Promise<VerificationGateSumm
   const steps = buildVerificationSteps(profile ?? null, verification ?? null);
   const formsComplete = steps.every((step) => step.accepted);
   const isEligible = isUserFullyVerified(profile ?? null, verification ?? null);
+  const canUseCircleActions = Boolean(user);
   const nextStep = steps.find((step) => !step.accepted) ?? statusStep(formsComplete);
 
   return {
     isEligible,
+    canUseCircleActions,
     formsComplete,
     message: isEligible
       ? "Verification approved. You can create and join circles."
@@ -211,6 +204,7 @@ function emptyGateSummary(isEligible: boolean): VerificationGateSummary {
   const nextStep = isEligible ? statusStep(true) : buildVerificationSteps(null, null)[0];
   return {
     isEligible,
+    canUseCircleActions: isEligible,
     formsComplete: false,
     message: isEligible ? "Verification approved. You can create and join circles." : nextStep.description,
     nextStep: {

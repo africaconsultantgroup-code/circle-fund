@@ -16,7 +16,7 @@ export function HomePage() {
   const totalMembers = circles.reduce((a, c) => a + c.memberCount, 0);
   const unread = notifications.filter((n) => !n.read).length;
   const nextCircle = circles[0];
-  const canUseCircles = Boolean(gateSummary?.isEligible);
+  const canUseCircles = Boolean(gateSummary?.canUseCircleActions);
 
   const loadDashboard = useCallback(async () => {
     const [circleResult, gateResult] = await Promise.all([loadUserCircles(), getVerificationGateSummary()]);

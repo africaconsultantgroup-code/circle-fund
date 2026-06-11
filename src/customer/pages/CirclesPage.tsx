@@ -10,7 +10,7 @@ export function CirclesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [gateSummary, setGateSummary] = useState<VerificationGateSummary | null>(null);
-  const canUseCircles = Boolean(gateSummary?.isEligible);
+  const canUseCircles = Boolean(gateSummary?.canUseCircleActions);
   const formsComplete = Boolean(gateSummary?.formsComplete);
 
   useEffect(() => {
