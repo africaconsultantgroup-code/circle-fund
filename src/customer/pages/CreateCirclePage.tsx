@@ -1,8 +1,8 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
-import { Users, Repeat, Calendar, FileText, ShieldCheck, ShieldAlert, CheckCircle2, Loader2 } from "lucide-react";
-import { createCircleWithCreator } from "@/lib/db";
+import { Users, Repeat, Calendar, FileText, ShieldCheck, ShieldAlert, CheckCircle2, Loader2, Copy } from "lucide-react";
+import { createCircleWithCreator, generateInviteToken } from "@/lib/db";
 import { trustScore } from "@/lib/mock-data";
 import { getCircleEligibility, type CircleEligibility } from "@/lib/onboarding";
 
@@ -18,6 +18,7 @@ export function CreateCirclePage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState("");
   const [success, setSuccess] = useState("");
+  const [inviteLink, setInviteLink] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [eligibility, setEligibility] = useState<CircleEligibility | null>(null);
   const [isCheckingEligibility, setIsCheckingEligibility] = useState(true);
@@ -57,6 +58,7 @@ export function CreateCirclePage() {
   const handleCreateCircle = async () => {
     setSubmitError("");
     setSuccess("");
+    setInviteLink("");
 
     if (blocked || !validate()) return;
 
@@ -69,6 +71,7 @@ export function CreateCirclePage() {
         return;
       }
 
+      const inviteToken = generateInviteToken();
       const { data, error } = await createCircleWithCreator(
         {
           owner_id: currentEligibility.userId,
@@ -77,6 +80,8 @@ export function CreateCirclePage() {
           contribution_amount: amount,
           goal_amount: amount * members,
           frequency,
+          max_members: members,
+          invite_token: inviteToken,
           start_date: new Date(`${startDate}T00:00:00`).toISOString(),
           status: "active",
         },
@@ -88,8 +93,9 @@ export function CreateCirclePage() {
         return;
       }
 
+      const link = `${window.location.origin}/join-circle?code=${encodeURIComponent(data.invite_token)}`;
+      setInviteLink(link);
       setSuccess("Circle created successfully. You have been added as admin/creator.");
-      setTimeout(() => navigate({ to: "/circles" }), 900);
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "We could not create this circle. Please try again.");
     } finally {
@@ -206,9 +212,33 @@ export function CreateCirclePage() {
         </div>
 
         {success && (
-          <div className="flex items-center gap-2 rounded-2xl border border-success/30 bg-success/10 px-4 py-3 text-success">
-            <CheckCircle2 className="h-4 w-4" />
-            <p className="text-[11px] font-medium">{success}</p>
+          <div className="rounded-2xl border border-success/30 bg-success/10 px-4 py-3 text-success">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              <p className="text-[11px] font-medium">{success}</p>
+            </div>
+            {inviteLink && (
+              <div className="mt-3 rounded-xl bg-background/70 p-3 text-foreground">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Invite link</p>
+                <p className="mt-1 break-all font-mono text-[11px]">{inviteLink}</p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void navigator.clipboard?.writeText(inviteLink)}
+                    className="flex items-center justify-center gap-2 rounded-xl border border-border py-2 text-[11px] font-semibold text-primary"
+                  >
+                    <Copy className="h-3.5 w-3.5" /> Copy link
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate({ to: "/circles" })}
+                    className="rounded-xl bg-gradient-primary py-2 text-[11px] font-semibold text-primary-foreground"
+                  >
+                    View circles
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
         {submitError && (

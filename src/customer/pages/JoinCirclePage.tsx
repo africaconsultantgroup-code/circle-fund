@@ -2,21 +2,30 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { KeyRound, Link2, ScanLine, ShieldAlert, ShieldCheck, Loader2 } from "lucide-react";
-import { joinCircle } from "@/lib/db";
+import { countCircleMembers, getCircleByInviteToken, joinCircle, normalizeInviteToken, type Circle } from "@/lib/db";
 import { getCircleEligibility, type CircleEligibility } from "@/lib/onboarding";
-import { trustScore } from "@/lib/mock-data";
+import { formatGHS, trustScore } from "@/lib/mock-data";
+
+type CirclePreview = {
+  circle: Circle;
+  memberCount: number;
+};
 
 export function JoinCirclePage() {
   const navigate = useNavigate();
   const [eligibility, setEligibility] = useState<CircleEligibility | null>(null);
   const [isCheckingEligibility, setIsCheckingEligibility] = useState(true);
   const [inviteValue, setInviteValue] = useState("");
+  const [preview, setPreview] = useState<CirclePreview | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [joinError, setJoinError] = useState("");
   const eligible = Boolean(eligibility?.isEligible);
 
   useEffect(() => {
     let isMounted = true;
+    const code = new URLSearchParams(window.location.search).get("code") ?? "";
+    if (code) setInviteValue(normalizeInviteToken(code));
 
     getCircleEligibility().then((result) => {
       if (!isMounted) return;
@@ -24,10 +33,42 @@ export function JoinCirclePage() {
       setIsCheckingEligibility(false);
     });
 
+    if (code) void loadPreview(code);
+
     return () => {
       isMounted = false;
     };
   }, []);
+
+  const loadPreview = async (rawCode = inviteValue) => {
+    setJoinError("");
+    setPreview(null);
+
+    const code = normalizeInviteToken(rawCode);
+    if (!code) {
+      setJoinError("Enter an invite code or open an invite link.");
+      return null;
+    }
+
+    setIsLoadingPreview(true);
+    const { data: circle, error } = await getCircleByInviteToken(code);
+    if (error || !circle) {
+      setJoinError("We could not find an active circle for this invite code.");
+      setIsLoadingPreview(false);
+      return null;
+    }
+
+    const { count, error: countError } = await countCircleMembers(circle.id);
+    setIsLoadingPreview(false);
+    if (countError) {
+      setJoinError(countError.message);
+      return null;
+    }
+
+    const nextPreview = { circle, memberCount: count ?? 0 };
+    setPreview(nextPreview);
+    return nextPreview;
+  };
 
   const handleJoin = async () => {
     setJoinError("");
@@ -35,18 +76,22 @@ export function JoinCirclePage() {
     const currentEligibility = eligibility ?? await getCircleEligibility();
     if (!currentEligibility.isEligible || !currentEligibility.userId) {
       setEligibility(currentEligibility);
-      setJoinError(currentEligibility.message || "Complete onboarding before joining a circle.");
+      setJoinError(currentEligibility.message || "Complete verification before joining a circle.");
       return;
     }
 
-    if (!isUuid(inviteValue.trim())) {
-      setJoinError("Enter a valid circle invite UUID. Short invite-code lookup is not configured yet.");
+    const currentPreview = preview ?? await loadPreview();
+    if (!currentPreview) return;
+
+    const maxMembers = Math.min(currentPreview.circle.max_members ?? 15, 15);
+    if (currentPreview.memberCount >= maxMembers) {
+      setJoinError("This circle already has the maximum 15 members.");
       return;
     }
 
     setIsJoining(true);
     try {
-      const { data, error } = await joinCircle(inviteValue.trim(), currentEligibility.userId);
+      const { data, error } = await joinCircle(currentPreview.circle.id, currentEligibility.userId);
       if (error || !data) {
         setJoinError(error?.message ?? "We could not join this circle. Please try again.");
         return;
@@ -93,24 +138,48 @@ export function JoinCirclePage() {
         {eligible && (
           <div className="flex items-center gap-2 rounded-2xl bg-success/10 px-4 py-2.5 text-success">
             <ShieldCheck className="h-4 w-4" />
-            <p className="text-[11px] font-medium">Verification complete - you can join eligible circles</p>
+            <p className="text-[11px] font-medium">Verification approved - you can join eligible circles</p>
           </div>
         )}
 
         <div className="rounded-3xl bg-gradient-card p-6 text-primary-foreground shadow-elevated">
           <KeyRound className="h-8 w-8 text-gold" />
           <h2 className="mt-3 font-display text-xl font-bold">Enter invite code</h2>
-          <p className="mt-1 text-sm text-primary-foreground/70">Ask the circle creator for the invite link or circle ID.</p>
+          <p className="mt-1 text-sm text-primary-foreground/70">Open an invite link or paste the code shared by the circle creator.</p>
 
           <input
             value={inviteValue}
-            onChange={(event) => setInviteValue(event.target.value)}
-            placeholder="Circle UUID"
+            onChange={(event) => setInviteValue(event.target.value.toUpperCase())}
+            placeholder="SC-ABC12345"
             className="mt-5 w-full rounded-2xl border border-white/15 bg-white/15 px-4 py-3.5 font-mono text-sm text-primary-foreground outline-none placeholder:text-primary-foreground/45"
           />
 
           <button
-            disabled={!eligible || isCheckingEligibility || isJoining}
+            disabled={isLoadingPreview}
+            onClick={() => void loadPreview()}
+            className="mt-3 w-full rounded-2xl border border-white/20 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            {isLoadingPreview ? (
+              <span className="flex items-center justify-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading preview
+              </span>
+            ) : "Preview circle"}
+          </button>
+
+          {preview && (
+            <div className="mt-4 rounded-2xl bg-white/15 p-4">
+              <p className="font-display text-base font-semibold">{preview.circle.name}</p>
+              <p className="mt-1 text-xs text-primary-foreground/75">
+                {formatGHS(Number(preview.circle.contribution_amount ?? 0))} / {preview.circle.frequency ?? "monthly"}
+              </p>
+              <p className="mt-2 text-[11px] text-primary-foreground/70">
+                {preview.memberCount}/{Math.min(preview.circle.max_members ?? 15, 15)} members
+              </p>
+            </div>
+          )}
+
+          <button
+            disabled={!eligible || isCheckingEligibility || isJoining || !preview}
             onClick={handleJoin}
             className="mt-5 w-full rounded-2xl bg-gradient-gold py-3.5 font-display text-sm font-semibold text-gold-foreground disabled:opacity-50"
           >
@@ -160,8 +229,4 @@ export function JoinCirclePage() {
       </div>
     </div>
   );
-}
-
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }

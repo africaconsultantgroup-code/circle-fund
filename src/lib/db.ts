@@ -55,6 +55,27 @@ export async function getCircleById(circleId: string) {
   return supabase.from('circles').select('*').eq('id', circleId).single();
 }
 
+export async function getCircleByInviteToken(inviteToken: string) {
+  return supabase.from('circles').select('*').eq('invite_token', normalizeInviteToken(inviteToken)).eq('status', 'active').single();
+}
+
+export async function countCircleMembers(circleId: string) {
+  return supabase
+    .from('circle_members')
+    .select('id', { count: 'exact', head: true })
+    .eq('circle_id', circleId)
+    .in('status', ['active', 'pending']);
+}
+
+export async function getCircleMembership(circleId: string, userId: string) {
+  return supabase
+    .from('circle_members')
+    .select('*')
+    .eq('circle_id', circleId)
+    .eq('user_id', userId)
+    .maybeSingle();
+}
+
 export async function listCirclesForUser(userId: string) {
   return supabase
     .from('circle_members')
@@ -73,7 +94,12 @@ export async function createCircleWithCreator(payload: CircleInsert, userId: str
     return { data: null, error: eligibilityResult.error ?? { message: 'Complete verification before creating a circle.' } };
   }
 
-  const circleResult = await createCircle({ ...payload, owner_id: userId });
+  const circleResult = await createCircle({
+    ...payload,
+    owner_id: userId,
+    invite_token: payload.invite_token ?? generateInviteToken(),
+    max_members: Math.min(Math.max(payload.max_members ?? 15, 2), 15),
+  });
   if (circleResult.error || !circleResult.data) {
     return { data: null, error: { message: describeCircleCreateError(circleResult.error.message) } };
   }
@@ -129,12 +155,34 @@ export async function joinCircle(circleId: string, userId: string) {
     return { data: null, error: { message: 'This circle already has the maximum 15 members.' } };
   }
 
+  const membershipResult = await getCircleMembership(circleId, userId);
+  if (membershipResult.error) {
+    return { data: null, error: membershipResult.error };
+  }
+
+  if (membershipResult.data) {
+    return { data: null, error: { message: 'You are already a member of this circle.' } };
+  }
+
   return createCircleMember({
     circle_id: circleId,
     user_id: userId,
     role: 'member',
     status: 'pending',
   });
+}
+
+export function generateInviteToken() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let token = 'SC-';
+  for (let index = 0; index < 8; index += 1) {
+    token += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return token;
+}
+
+export function normalizeInviteToken(inviteToken: string) {
+  return inviteToken.trim().toUpperCase();
 }
 
 export async function listCircleMembers(circleId: string) {

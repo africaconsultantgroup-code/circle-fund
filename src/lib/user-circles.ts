@@ -16,6 +16,7 @@ export type UserCircle = {
   totalCycles: number;
   nextRecipient: string;
   nextPayoutDate: string;
+  inviteToken: string | null;
 };
 
 type CircleMembershipRow = {
@@ -36,6 +37,7 @@ export function mockUserCircles(): UserCircle[] {
     totalCycles: circle.totalCycles,
     nextRecipient: circle.nextRecipient,
     nextPayoutDate: circle.nextPayoutDate,
+    inviteToken: circle.inviteCode,
   }));
 }
 
@@ -64,7 +66,7 @@ export async function loadUserCircles(): Promise<{ data: UserCircle[]; error: st
 export function toUserCircle(circle: Circle): UserCircle {
   const amount = Number(circle.contribution_amount ?? 0);
   const goal = Number(circle.goal_amount ?? amount);
-  const maxMembers = amount > 0 ? Math.min(Math.max(Math.round(goal / amount), 1), 15) : 1;
+  const maxMembers = Math.min(Math.max(circle.max_members ?? (amount > 0 ? Math.round(goal / amount) : 1), 1), 15);
 
   return {
     id: circle.id,
@@ -79,6 +81,7 @@ export function toUserCircle(circle: Circle): UserCircle {
     totalCycles: maxMembers,
     nextRecipient: "Pending",
     nextPayoutDate: circle.start_date ? new Date(circle.start_date).toLocaleDateString() : "Not set",
+    inviteToken: circle.invite_token ?? null,
   };
 }
 

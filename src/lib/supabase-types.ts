@@ -67,6 +67,8 @@ export interface Database {
           goal_amount: number | null;
           contribution_amount: number | null;
           frequency: string | null;
+          max_members: number;
+          invite_token: string;
           start_date: string | null;
           end_date: string | null;
           status: CircleStatus;
@@ -81,6 +83,8 @@ export interface Database {
           goal_amount?: number | null;
           contribution_amount?: number | null;
           frequency?: string | null;
+          max_members?: number;
+          invite_token?: string;
           start_date?: string | null;
           end_date?: string | null;
           status?: CircleStatus;
@@ -93,6 +97,8 @@ export interface Database {
           goal_amount?: number | null;
           contribution_amount?: number | null;
           frequency?: string | null;
+          max_members?: number;
+          invite_token?: string;
           start_date?: string | null;
           end_date?: string | null;
           status?: CircleStatus;

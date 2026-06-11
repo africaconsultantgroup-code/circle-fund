@@ -1,5 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { PageHeader } from "@/components/page-header";
+import { SavingsPlanner } from "@/components/savings-planner";
 import { Share2, Users, Calendar, CheckCircle2, Coins, UserCheck } from "lucide-react";
 import { getCircle, formatGHS, type Circle as CircleType } from "@/lib/mock-data";
 import { pendingApprovals } from "@/lib/mock-data";
@@ -22,7 +23,7 @@ export const Route = createFileRoute("/circle/$id")({
       id: circle.id,
       name: circle.name,
       category: circle.category,
-      inviteCode: "Pending",
+      inviteCode: circle.inviteToken ?? "Pending",
       amount: circle.amount,
       frequency: circle.frequency,
       currentCycle: circle.currentCycle,
@@ -104,6 +105,8 @@ function CircleDetails() {
         </Link>
       </div>
 
+      <SavingsPlanner defaultTargetAmount={c.amount} defaultDueDate={toDateInputValue(c.nextPayoutDate)} />
+
       <section className="px-5 pt-7">
         <h2 className="font-display text-base font-semibold">Payout timeline</h2>
         <ol className="mt-4 flex flex-col gap-0">
@@ -156,4 +159,13 @@ function CircleDetails() {
       </section>
     </div>
   );
+}
+
+function toDateInputValue(value: string | undefined) {
+  if (!value) return undefined;
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+
+  return parsed.toISOString().slice(0, 10);
 }
