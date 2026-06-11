@@ -1,7 +1,8 @@
 import { getCurrentUser } from "@/lib/auth";
 import { getProfileByUserId, getUserVerification, type Profile, type UserVerification } from "@/lib/db";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
-import { buildVerificationSteps, statusStep } from "@/lib/verification-flow";
+import { buildVerificationSteps, hasAcceptedFaceVerification, hasAcceptedGhanaCardVerification, statusStep } from "@/lib/verification-flow";
+import type { VerificationStatus } from "@/lib/supabase-types";
 
 export type EligibilityIssue = {
   key: "ghana_card" | "phone" | "face" | "selfie" | "profile" | "account" | "auth" | "config";
@@ -26,9 +27,9 @@ export type VerificationGateSummary = {
     description: string;
   };
   statuses: {
-    phone: "verified" | "not_started";
-    ghanaCard: "verified" | "not_started";
-    face: "verified" | "not_started";
+    phone: VerificationStatus;
+    ghanaCard: VerificationStatus;
+    face: VerificationStatus;
     profile: "complete" | "incomplete";
     account: "active" | "inactive";
   };
@@ -107,10 +108,10 @@ export function getProfileEligibilityIssues(profile: Profile, verification: User
     });
   }
 
-  if (!verification?.ghana_card_verified) {
+  if (!hasAcceptedGhanaCardVerification(verification)) {
     issues.push({
       key: "ghana_card",
-      message: "Ghana Card verification is not verified.",
+      message: "Ghana Card verification has not been submitted or approved for review.",
       actionLabel: "Verify Ghana Card",
       to: "/verify/ghana-card",
     });
@@ -125,10 +126,10 @@ export function getProfileEligibilityIssues(profile: Profile, verification: User
     });
   }
 
-  if (!verification?.face_verified) {
+  if (!hasAcceptedFaceVerification(verification)) {
     issues.push({
       key: "face",
-      message: "Face verification is not verified.",
+      message: "Face verification has not been submitted or approved for review.",
       actionLabel: "Verify face",
       to: "/verify/selfie",
     });
@@ -164,8 +165,8 @@ export async function getVerificationGateSummary(): Promise<VerificationGateSumm
   const isEligible = Boolean(
     profile &&
     verification?.phone_verified &&
-    verification.ghana_card_verified &&
-    verification.face_verified &&
+    hasAcceptedGhanaCardVerification(verification) &&
+    hasAcceptedFaceVerification(verification) &&
     profile.profile_completed &&
     profile.account_status === "active",
   );
@@ -182,12 +183,18 @@ export async function getVerificationGateSummary(): Promise<VerificationGateSumm
     },
     statuses: {
       phone: verification?.phone_verified ? "verified" : "not_started",
-      ghanaCard: verification?.ghana_card_verified ? "verified" : "not_started",
-      face: verification?.face_verified ? "verified" : "not_started",
+      ghanaCard: verification?.ghana_card_verified ? "verified" : submittedStatus(Boolean(verification?.ghana_card_number_hash), verification),
+      face: verification?.face_verified ? "verified" : submittedStatus(Boolean(verification?.selfie_uploaded), verification),
       profile: profile?.profile_completed ? "complete" : "incomplete",
       account: profile?.account_status === "active" ? "active" : "inactive",
     },
   };
+}
+
+function submittedStatus(hasSubmission: boolean, verification: UserVerification | null): VerificationStatus {
+  if (!hasSubmission) return "not_started";
+  if (verification?.verification_status === "failed") return "failed";
+  return verification?.verification_status === "pending" ? "pending" : "manual_review";
 }
 
 function emptyGateSummary(isEligible: boolean): VerificationGateSummary {

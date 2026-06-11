@@ -1,8 +1,9 @@
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowUpRight, Bell, Plus, TrendingUp, Users, Wallet, ChevronRight, LogIn, ShieldCheck, ShieldAlert } from "lucide-react";
 import { currentUser, formatGHS, notifications, trustScore, riskAlerts } from "@/lib/mock-data";
 import { TrustBadge } from "@/components/verification-badge";
+import { SavingsPlanner } from "@/components/savings-planner";
 import { loadUserCircles, type UserCircle } from "@/lib/user-circles";
 import { getVerificationGateSummary, type VerificationGateSummary } from "@/lib/onboarding";
 
@@ -17,20 +18,35 @@ export function HomePage() {
   const nextCircle = circles[0];
   const canUseCircles = Boolean(gateSummary?.isEligible);
 
+  const loadDashboard = useCallback(async () => {
+    const [circleResult, gateResult] = await Promise.all([loadUserCircles(), getVerificationGateSummary()]);
+    setCircles(circleResult.data);
+    setCircleError(circleResult.error ?? "");
+    setGateSummary(gateResult);
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
 
-    Promise.all([loadUserCircles(), getVerificationGateSummary()]).then(([circleResult, gateResult]) => {
+    loadDashboard().then(() => {
       if (!isMounted) return;
-      setCircles(circleResult.data);
-      setCircleError(circleResult.error ?? "");
-      setGateSummary(gateResult);
     });
+
+    const refresh = () => {
+      if (document.visibilityState === "visible") void loadDashboard();
+    };
+
+    window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", refresh);
+    document.addEventListener("visibilitychange", refresh);
 
     return () => {
       isMounted = false;
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", refresh);
+      document.removeEventListener("visibilitychange", refresh);
     };
-  }, []);
+  }, [loadDashboard]);
 
   return (
     <div className="flex flex-col">
@@ -106,6 +122,11 @@ export function HomePage() {
           </>
         )}
       </div>
+
+      <SavingsPlanner
+        defaultTargetAmount={nextCircle?.amount ?? 1000}
+        defaultDueDate={toDateInputValue(nextCircle?.nextPayoutDate)}
+      />
 
       <section className="mt-7 px-5">
         <SectionHeader title="Up next" actionTo="/payments" actionLabel="See all" />
@@ -205,8 +226,8 @@ function VerificationStatusCard({ gateSummary }: { gateSummary: VerificationGate
 
       <div className="mt-4 grid grid-cols-2 gap-2">
         <StatusLine label="Phone OTP" value={statuses?.phone === "verified" ? "Verified" : "Not started"} good={statuses?.phone === "verified"} />
-        <StatusLine label="Ghana Card" value={statuses?.ghanaCard === "verified" ? "Verified" : "Not started"} good={statuses?.ghanaCard === "verified"} />
-        <StatusLine label="Face" value={statuses?.face === "verified" ? "Verified" : "Not started"} good={statuses?.face === "verified"} />
+        <StatusLine label="Ghana Card" value={statusLabel(statuses?.ghanaCard)} good={statusAccepted(statuses?.ghanaCard)} />
+        <StatusLine label="Face" value={statusLabel(statuses?.face)} good={statusAccepted(statuses?.face)} />
         <StatusLine label="Profile" value={statuses?.profile === "complete" ? "Complete" : "Incomplete"} good={statuses?.profile === "complete"} />
         <StatusLine label="Account" value={statuses?.account === "active" ? "Active" : "Inactive"} good={statuses?.account === "active"} />
       </div>
@@ -221,6 +242,18 @@ function StatusLine({ label, value, good }: { label: string; value: string; good
       <p className={`mt-0.5 text-xs font-semibold ${good ? "text-success" : "text-muted-foreground"}`}>{value}</p>
     </div>
   );
+}
+
+function statusLabel(status: string | undefined) {
+  if (status === "verified") return "Verified";
+  if (status === "manual_review") return "Review accepted";
+  if (status === "pending") return "Pending review";
+  if (status === "failed") return "Failed";
+  return "Not started";
+}
+
+function statusAccepted(status: string | undefined) {
+  return status === "verified" || status === "manual_review" || status === "pending";
 }
 
 function DisabledAction({ icon, title }: { icon: React.ReactNode; title: string }) {
@@ -243,6 +276,13 @@ function Stat({ label, value, icon }: { label: string; value: number | string; i
       <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
     </div>
   );
+}
+
+function toDateInputValue(value: string | undefined) {
+  if (!value) return undefined;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  return parsed.toISOString().slice(0, 10);
 }
 
 export function SectionHeader({ title, actionTo, actionLabel }: { title: string; actionTo?: string; actionLabel?: string }) {

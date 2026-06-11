@@ -11,6 +11,7 @@ export type VerificationStepSummary = {
   label: string;
   description: string;
   status: VerificationStatus;
+  accepted: boolean;
 };
 
 export type VerificationFlowSummary = {
@@ -41,9 +42,9 @@ export async function loadVerificationFlowSummary(): Promise<VerificationFlowSum
   ]);
 
   const steps = buildVerificationSteps(profile ?? null, verification ?? null);
-  const completedCount = steps.filter((step) => step.status === "verified").length;
+  const completedCount = steps.filter((step) => step.accepted).length;
   const isComplete = completedCount === steps.length;
-  const nextStep = steps.find((step) => step.status !== "verified") ?? statusStep(isComplete);
+  const nextStep = steps.find((step) => !step.accepted) ?? statusStep(isComplete);
 
   return {
     userId: user.id,
@@ -59,20 +60,28 @@ export async function loadVerificationFlowSummary(): Promise<VerificationFlowSum
 }
 
 export function buildVerificationSteps(profile: Profile | null, verification: UserVerification | null): VerificationStepSummary[] {
+  const profileAccepted = Boolean(profile?.profile_completed);
+  const phoneAccepted = Boolean(verification?.phone_verified);
+  const ghanaCardAccepted = hasAcceptedGhanaCardVerification(verification);
+  const faceAccepted = hasAcceptedFaceVerification(verification);
+  const accountAccepted = profile?.account_status === "active";
+
   return [
     {
       key: "profile",
       to: "/verify/profile",
       label: "Profile completion",
       description: "Add your name and contact details.",
-      status: profile?.profile_completed ? "verified" : "not_started",
+      status: profileAccepted ? "verified" : "not_started",
+      accepted: profileAccepted,
     },
     {
       key: "phone",
       to: "/verify/phone",
       label: "Phone OTP",
       description: "Submit your phone number and OTP request.",
-      status: verification?.phone_verified ? "verified" : submittedStatus(Boolean(profile?.phone), verification),
+      status: phoneAccepted ? "verified" : submittedStatus(Boolean(profile?.phone), verification),
+      accepted: phoneAccepted,
     },
     {
       key: "ghana_card",
@@ -80,6 +89,7 @@ export function buildVerificationSteps(profile: Profile | null, verification: Us
       label: "Ghana Card",
       description: "Submit your Ghana Card number for review.",
       status: verification?.ghana_card_verified ? "verified" : submittedStatus(Boolean(verification?.ghana_card_number_hash), verification),
+      accepted: ghanaCardAccepted,
     },
     {
       key: "selfie",
@@ -87,13 +97,15 @@ export function buildVerificationSteps(profile: Profile | null, verification: Us
       label: "Selfie / face match",
       description: "Capture or upload a selfie reference.",
       status: verification?.face_verified ? "verified" : submittedStatus(Boolean(verification?.selfie_uploaded), verification),
+      accepted: faceAccepted,
     },
     {
       key: "account",
       to: "/verify/status",
       label: "Account status",
       description: "Your account must be active.",
-      status: profile?.account_status === "active" ? "verified" : "not_started",
+      status: accountAccepted ? "verified" : "not_started",
+      accepted: accountAccepted,
     },
   ];
 }
@@ -105,7 +117,26 @@ export function statusStep(isComplete: boolean): VerificationStepSummary {
     label: isComplete ? "Verification complete" : "Verification status",
     description: isComplete ? "You can now create and join circles." : "Review pending and missing verification steps.",
     status: isComplete ? "verified" : "manual_review",
+    accepted: isComplete,
   };
+}
+
+export function hasAcceptedGhanaCardVerification(verification: UserVerification | null) {
+  return Boolean(
+    verification?.ghana_card_verified ||
+    (verification?.ghana_card_number_hash && reviewStatusAllowsEligibility(verification.verification_status)),
+  );
+}
+
+export function hasAcceptedFaceVerification(verification: UserVerification | null) {
+  return Boolean(
+    verification?.face_verified ||
+    (verification?.selfie_uploaded && reviewStatusAllowsEligibility(verification.verification_status)),
+  );
+}
+
+function reviewStatusAllowsEligibility(status: VerificationStatus | null | undefined) {
+  return status === "verified" || status === "manual_review" || status === "pending";
 }
 
 function submittedStatus(hasSubmission: boolean, verification: UserVerification | null): VerificationStatus {

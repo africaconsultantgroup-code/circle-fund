@@ -46,7 +46,7 @@ export function VerifyStatusPage() {
                     {summary.isComplete ? "Verification complete" : "Verification in progress"}
                   </p>
                   <p className="text-[11px] opacity-80">
-                    {summary.completedCount} of {summary.steps.length} steps verified
+                    {summary.completedCount} of {summary.steps.length} steps accepted
                   </p>
                 </div>
               </div>
