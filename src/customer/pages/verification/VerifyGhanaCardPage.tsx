@@ -81,9 +81,6 @@ export function VerifyGhanaCardPage() {
         <button disabled={isSaving} onClick={handleSubmit} className="mt-auto rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card disabled:opacity-50">
           {isSaving ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Submitting</span> : "Submit to secure backend"}
         </button>
-        <button onClick={() => navigate({ to: "/verify/selfie" })} className="rounded-2xl border border-border py-4 font-display text-base font-semibold text-primary">
-          Continue to face match
-        </button>
         <button onClick={() => navigate({ to: "/verify/status" })} className="rounded-2xl border border-border py-4 font-display text-base font-semibold text-muted-foreground">
           View status
         </button>

@@ -64,7 +64,7 @@ export async function loadVerificationFlowSummary(): Promise<VerificationFlowSum
 
 export function buildVerificationSteps(profile: Profile | null, verification: UserVerification | null): VerificationStepSummary[] {
   const profileAccepted = Boolean(profile?.profile_completed);
-  const phoneAccepted = Boolean(verification?.phone_verified);
+  const phoneAccepted = Boolean(verification?.phone_verified && verification.otp_status === "verified");
   const ghanaCardAccepted = hasAcceptedGhanaCardVerification(verification);
   const faceAccepted = hasAcceptedFaceVerification(verification);
   const accountAccepted = profile?.account_status === "active";
@@ -163,6 +163,7 @@ export function isUserFullyVerified(profile: Profile | null, verification: UserV
     profile?.profile_completed &&
     profile.account_status === "active" &&
     verification?.phone_verified &&
+    verification.otp_status === "verified" &&
     verification.ghana_card_verified &&
     verification.face_verified &&
     verification.verification_status === "verified",

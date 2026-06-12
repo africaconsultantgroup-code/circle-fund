@@ -3,7 +3,6 @@ import { useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Phone, MessageSquare, Loader2, ShieldAlert } from "lucide-react";
 import { requestPhoneOtp, verifyPhoneOtp } from "@/lib/db";
-import { loadVerificationFlowSummary } from "@/lib/verification-flow";
 
 export function VerifyPhonePage() {
   const navigate = useNavigate();
@@ -72,8 +71,7 @@ export function VerifyPhonePage() {
 
     setMessage(resultMessage(data, "Phone verified. Taking you to the next verification step."));
     setTimeout(async () => {
-      const summary = await loadVerificationFlowSummary();
-      navigate({ to: summary.nextStep.to === "/verify/phone" ? "/verify/profile" : summary.nextStep.to });
+      navigate({ to: "/verify/ghana-card" });
     }, 600);
   };
 
@@ -125,9 +123,6 @@ export function VerifyPhonePage() {
             </div>
             <button disabled={isSaving} onClick={handleVerifyOtp} className="mt-auto rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card disabled:opacity-50">
               {isSaving ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Submitting</span> : "Verify OTP"}
-            </button>
-            <button onClick={() => navigate({ to: "/verify/ghana-card" })} className="rounded-2xl border border-border py-4 font-display text-base font-semibold text-primary">
-              Continue to Ghana Card
             </button>
             <button onClick={() => navigate({ to: "/verify/status" })} className="rounded-2xl border border-border py-4 font-display text-base font-semibold text-muted-foreground">
               View status

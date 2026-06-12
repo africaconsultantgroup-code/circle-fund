@@ -95,9 +95,6 @@ export function VerifySelfiePage() {
           >
             {isSaving ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Submitting</span> : "Submit to secure backend"}
           </button>
-          <button onClick={() => navigate({ to: "/verify/status" })} className="rounded-2xl border border-border py-4 font-display text-base font-semibold text-primary">
-            View status
-          </button>
         </div>
       </div>
     </div>

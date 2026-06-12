@@ -217,8 +217,8 @@ function VerificationStatusCard({ gateSummary }: { gateSummary: VerificationGate
             <p className="font-display text-sm font-semibold">Verification status</p>
             {complete && <TrustBadge tier={trustScore.tier} score={trustScore.score} />}
           </div>
-          {complete && <p className="text-[11px] text-muted-foreground">Verification approved. Create and join circles are unlocked.</p>}
-          {!complete && formsComplete && <p className="text-[11px] text-muted-foreground">Verification forms complete. Waiting for admin approval.</p>}
+          {complete && <p className="text-[11px] text-muted-foreground">Verification complete. Create and join circles are unlocked.</p>}
+          {!complete && formsComplete && <p className="text-[11px] text-muted-foreground">Verification forms complete. Create and join circles are unlocked.</p>}
           {!complete && !formsComplete && <p className="text-[11px] text-muted-foreground">Continue verification to create or join circles.</p>}
         </div>
         <Link to={complete || formsComplete ? "/verify/status" : gateSummary?.nextStep.to ?? "/verify"} className="text-xs font-semibold text-primary">

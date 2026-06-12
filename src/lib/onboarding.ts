@@ -66,17 +66,17 @@ export async function getCircleEligibility(): Promise<CircleEligibility> {
   if (rpcError || !allowed) {
     return blocked(user.id, [{
       key: "account",
-      message: rpcError?.message ?? "Please sign in again before creating or joining a circle.",
-      actionLabel: "Sign in",
-      to: "/login",
+      message: rpcError?.message ?? "Complete verification before creating or joining a circle.",
+      actionLabel: "Continue verification",
+      to: "/verify/status",
     }]);
   }
 
   if (error || !profile) {
-    return { isEligible: true, userId: user.id, issues: [], message: "Phone verified. Circle actions are available." };
+    return { isEligible: true, userId: user.id, issues: [], message: "Verification complete. Circle actions are available." };
   }
 
-  return { isEligible: true, userId: user.id, issues: [], message: "Phone verified. Circle actions are available." };
+  return { isEligible: true, userId: user.id, issues: [], message: "Verification complete. Circle actions are available." };
 }
 
 export function getProfileEligibilityIssues(profile: Profile, verification: UserVerification | null): EligibilityIssue[] {
@@ -172,8 +172,8 @@ export async function getVerificationGateSummary(): Promise<VerificationGateSumm
 
   const steps = buildVerificationSteps(profile ?? null, verification ?? null);
   const formsComplete = steps.every((step) => step.accepted);
-  const isEligible = isUserFullyVerified(profile ?? null, verification ?? null);
-  const canUseCircleActions = Boolean(verification?.phone_verified && verification.otp_status === "verified");
+  const isEligible = formsComplete;
+  const canUseCircleActions = formsComplete;
   const nextStep = steps.find((step) => !step.accepted) ?? statusStep(formsComplete);
 
   return {
@@ -181,7 +181,7 @@ export async function getVerificationGateSummary(): Promise<VerificationGateSumm
     canUseCircleActions,
     formsComplete,
     message: isEligible
-      ? "Verification approved. You can create and join circles."
+      ? "Verification complete. You can create and join circles."
       : formsComplete
         ? "Verification forms complete. Waiting for admin approval."
         : nextStep.description,
