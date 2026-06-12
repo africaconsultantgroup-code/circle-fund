@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, CheckCircle2, Clock, Home, Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { VerificationBadge } from "@/components/verification-badge";
-import { loadVerificationFlowSummary, type VerificationFlowSummary } from "@/lib/verification-flow";
+import { faceStepStatus, ghanaCardStepStatus, loadVerificationFlowSummary, type VerificationFlowSummary } from "@/lib/verification-flow";
 
 export function VerifyStatusPage() {
   const [summary, setSummary] = useState<VerificationFlowSummary | null>(null);
@@ -80,6 +80,8 @@ export function VerifyStatusPage() {
               ))}
             </ul>
 
+            <VerificationDebug summary={summary} />
+
             {!summary.isComplete && (
               <Link to={summary.nextStep.to} className="mt-auto flex items-center justify-center gap-2 rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card">
                 Continue: {summary.nextStep.label} <ArrowRight className="h-4 w-4" />
@@ -108,6 +110,21 @@ export function VerifyStatusPage() {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function VerificationDebug({ summary }: { summary: VerificationFlowSummary }) {
+  const verification = summary.verification;
+
+  return (
+    <div className="rounded-2xl border border-border bg-muted/40 p-4 text-[11px] text-muted-foreground">
+      <p className="font-semibold text-foreground">Verification debug</p>
+      <p className="mt-1">phone_verified: <span className="font-mono text-foreground">{String(Boolean(verification?.phone_verified))}</span></p>
+      <p>otp_status: <span className="font-mono text-foreground">{verification?.otp_status ?? "not_started"}</span></p>
+      <p>ghana_card_status: <span className="font-mono text-foreground">{ghanaCardStepStatus(verification ?? null)}</span></p>
+      <p>selfie_status: <span className="font-mono text-foreground">{faceStepStatus(verification ?? null)}</span></p>
+      <p>next_required_step: <span className="font-mono text-foreground">{summary.nextStep.to}</span></p>
     </div>
   );
 }

@@ -1,8 +1,9 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Phone, MessageSquare, Loader2, ShieldAlert } from "lucide-react";
 import { requestPhoneOtp, verifyPhoneOtp } from "@/lib/db";
+import { ghanaCardStepStatus, faceStepStatus, loadVerificationFlowSummary, type VerificationFlowSummary } from "@/lib/verification-flow";
 
 export function VerifyPhonePage() {
   const navigate = useNavigate();
@@ -14,9 +15,30 @@ export function VerifyPhonePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [flowSummary, setFlowSummary] = useState<VerificationFlowSummary | null>(null);
   const otpInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const otpCode = otp.join("");
   const otpComplete = otpCode.length === 6;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    loadVerificationFlowSummary().then((summary) => {
+      if (!isMounted) return;
+
+      setFlowSummary(summary);
+      if (summary.verification?.phone_verified && summary.verification.otp_status === "verified") {
+        const nextStep = summary.nextStep.to === "/verify/phone" ? "/verify/ghana-card" : summary.nextStep.to;
+        if (nextStep !== "/verify/phone") {
+          navigate({ to: nextStep });
+        }
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate]);
 
   const handleRequestOtp = async () => {
     setError("");
@@ -74,6 +96,8 @@ export function VerifyPhonePage() {
     }
 
     setMessage(resultMessage(data, "Phone verified. Taking you to the next verification step."));
+    const summary = await loadVerificationFlowSummary();
+    setFlowSummary(summary);
     setTimeout(async () => {
       navigate({ to: "/verify/ghana-card" });
     }, 600);
@@ -146,6 +170,7 @@ export function VerifyPhonePage() {
             <p>Normalized phone sent to Hubtel: <span className="font-mono text-foreground">{phoneDebug.normalizedPhoneNumber}</span></p>
           </div>
         )}
+        {flowSummary && <VerificationDebug summary={flowSummary} />}
         {error && (
           <div className="flex items-center gap-2 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-destructive">
             <ShieldAlert className="h-4 w-4" />
@@ -207,6 +232,21 @@ export function VerifyPhonePage() {
 
     otpInputRefs.current[Math.min(startIndex + digits.length, 5)]?.focus();
   }
+}
+
+function VerificationDebug({ summary }: { summary: VerificationFlowSummary }) {
+  const verification = summary.verification;
+
+  return (
+    <div className="rounded-2xl border border-border bg-muted/40 p-4 text-[11px] text-muted-foreground">
+      <p className="font-semibold text-foreground">Verification debug</p>
+      <p className="mt-1">phone_verified: <span className="font-mono text-foreground">{String(Boolean(verification?.phone_verified))}</span></p>
+      <p>otp_status: <span className="font-mono text-foreground">{verification?.otp_status ?? "not_started"}</span></p>
+      <p>ghana_card_status: <span className="font-mono text-foreground">{ghanaCardStepStatus(verification ?? null)}</span></p>
+      <p>selfie_status: <span className="font-mono text-foreground">{faceStepStatus(verification ?? null)}</span></p>
+      <p>next_required_step: <span className="font-mono text-foreground">{summary.nextStep.to}</span></p>
+    </div>
+  );
 }
 
 function resultMessage(data: unknown, fallback: string) {

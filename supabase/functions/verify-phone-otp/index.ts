@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
       return json({ error: profileError.message, reason: "profile_update_failed" }, 500);
     }
 
-    const { error: upsertError } = await serviceClient
+    const { data: verifiedRecord, error: upsertError } = await serviceClient
       .from("user_verifications")
       .upsert({
         user_id: user.id,
@@ -155,7 +155,9 @@ Deno.serve(async (req) => {
         verification_status: status,
         failure_reason: null,
         updated_at: now.toISOString(),
-      }, { onConflict: "user_id" });
+      }, { onConflict: "user_id" })
+      .select("user_id, phone_number, phone_verified, otp_status, otp_verified_at, otp_reference, verification_status")
+      .single();
 
     if (upsertError) {
       console.error("verify_phone_otp_upsert_failed", {
@@ -166,16 +168,22 @@ Deno.serve(async (req) => {
     }
 
     console.log("verify_phone_otp_success", {
-      userId: user.id,
+      userId: verifiedRecord.user_id,
       providerReference: reference,
-      otpReference: existingVerification.otp_reference,
-      phoneNumber: storedPhoneNumber,
+      otpReference: verifiedRecord.otp_reference,
+      phoneNumber: verifiedRecord.phone_number,
+      phoneVerified: verifiedRecord.phone_verified,
+      otpStatus: verifiedRecord.otp_status,
+      otpVerifiedAt: verifiedRecord.otp_verified_at,
       expiryTime: existingVerification.otp_expires_at,
     });
 
     return json({
       ok: true,
-      status,
+      status: verifiedRecord.verification_status,
+      phoneVerified: verifiedRecord.phone_verified,
+      otpStatus: verifiedRecord.otp_status,
+      otpVerifiedAt: verifiedRecord.otp_verified_at,
       providerReference: reference,
       message: status === "verified"
         ? "Phone number verified. Verification is complete."
