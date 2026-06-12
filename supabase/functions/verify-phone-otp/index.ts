@@ -155,6 +155,7 @@ Deno.serve(async (req) => {
     }
 
     const verificationPatch = {
+      user_id: user.id,
       phone_number: storedPhoneNumber,
       phone_verified: true,
       phone_verified_at: now.toISOString(),
@@ -173,6 +174,7 @@ Deno.serve(async (req) => {
     console.log("verify_phone_otp_update_attempt", {
       userId: user.id,
       verificationRecordId: existingVerification.id,
+      updateMode: "service_role_upsert_by_user_id",
       updatePayload: {
         phone_number: verificationPatch.phone_number,
         phone_verified: verificationPatch.phone_verified,
@@ -184,9 +186,7 @@ Deno.serve(async (req) => {
 
     const { data: verifiedRecord, error: updateError } = await serviceClient
       .from("user_verifications")
-      .update(verificationPatch)
-      .eq("id", existingVerification.id)
-      .eq("user_id", user.id)
+      .upsert(verificationPatch, { onConflict: "user_id" })
       .select("id, user_id, phone_number, phone_verified, phone_verified_at, otp_status, otp_verified_at, otp_reference, verification_status")
       .maybeSingle();
 
