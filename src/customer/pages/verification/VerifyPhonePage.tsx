@@ -3,12 +3,14 @@ import { useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Phone, MessageSquare, Loader2, ShieldAlert } from "lucide-react";
 import { requestPhoneOtp, verifyPhoneOtp } from "@/lib/db";
+import { loadVerificationFlowSummary } from "@/lib/verification-flow";
 
 export function VerifyPhonePage() {
   const navigate = useNavigate();
   const [step, setStep] = useState<"enter" | "otp">("enter");
   const [phoneNumber, setPhoneNumber] = useState("0245550142");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [otpReference, setOtpReference] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -31,7 +33,9 @@ export function VerifyPhonePage() {
       return;
     }
 
-    setMessage(resultMessage(data, "Phone OTP request submitted."));
+    const response = data as { providerReference?: string } | null;
+    setOtpReference(response?.providerReference ?? null);
+    setMessage(resultMessage(data, "Hubtel OTP sent. Enter the code to verify your phone."));
     setStep("otp");
   };
 
@@ -45,7 +49,7 @@ export function VerifyPhonePage() {
     }
 
     setIsSaving(true);
-    const { data, error } = await verifyPhoneOtp(phoneNumber, otp.join(""));
+    const { data, error } = await verifyPhoneOtp(phoneNumber, otp.join(""), otpReference);
     setIsSaving(false);
 
     if (error) {
@@ -53,13 +57,16 @@ export function VerifyPhonePage() {
       return;
     }
 
-    setMessage(resultMessage(data, "Phone verified. Taking you to Ghana Card verification."));
-    setTimeout(() => navigate({ to: "/verify/ghana-card" }), 600);
+    setMessage(resultMessage(data, "Phone verified. Taking you to the next verification step."));
+    setTimeout(async () => {
+      const summary = await loadVerificationFlowSummary();
+      navigate({ to: summary.nextStep.to === "/verify/phone" ? "/verify/profile" : summary.nextStep.to });
+    }, 600);
   };
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
-      <PageHeader title="Phone verification" subtitle="Step 2 of 5" back="/verify" />
+      <PageHeader title="Phone verification" subtitle="Required before using SikaCircle" back="/verify" />
 
       <div className="flex flex-1 flex-col gap-5 p-5">
         {step === "enter" ? (
@@ -69,7 +76,7 @@ export function VerifyPhonePage() {
             </div>
             <div>
               <h2 className="font-display text-xl font-bold">Enter your phone number</h2>
-              <p className="mt-1 text-sm text-muted-foreground">OTP requests go through the secure backend provider function.</p>
+              <p className="mt-1 text-sm text-muted-foreground">SikaCircle sends your verification code through Hubtel.</p>
             </div>
             <div className="flex items-center gap-2 rounded-2xl border border-input bg-muted/40 px-4 py-3.5">
               <span className="rounded-lg bg-card px-2 py-1 text-sm font-semibold">GH +233</span>
@@ -85,8 +92,8 @@ export function VerifyPhonePage() {
               <MessageSquare className="h-6 w-6" />
             </div>
             <div>
-              <h2 className="font-display text-xl font-bold">Enter the provider OTP</h2>
-              <p className="mt-1 text-sm text-muted-foreground">The backend will verify the code once the official provider is connected.</p>
+              <h2 className="font-display text-xl font-bold">Enter your Hubtel OTP</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Use the 6-digit code sent to your phone.</p>
             </div>
             <div className="grid grid-cols-6 gap-2">
               {otp.map((v, i) => (

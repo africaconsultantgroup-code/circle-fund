@@ -3,6 +3,7 @@ import { useState, type FormEvent } from "react";
 import { Coins, Mail, Lock, User as UserIcon, Phone } from "lucide-react";
 import { Field } from "./login";
 import { signUpWithEmail } from "@/lib/auth";
+import { upsertProfile } from "@/lib/db";
 
 export const Route = createFileRoute("/register")({
   component: RegisterPage,
@@ -23,14 +24,26 @@ function RegisterPage() {
     setError(null);
 
     const result = await signUpWithEmail(email, password);
-    setLoading(false);
-
     if (result.error) {
+      setLoading(false);
       setError(result.error.message || "Unable to create an account.");
       return;
     }
 
-    navigate({ to: "/home" });
+    if (result.data.user) {
+      await upsertProfile({
+        user_id: result.data.user.id,
+        full_name: fullName.trim() || null,
+        phone: phone.trim() || null,
+        profile_completed: Boolean(fullName.trim() && phone.trim()),
+        account_status: "active",
+        role: "customer",
+        updated_at: new Date().toISOString(),
+      });
+    }
+
+    setLoading(false);
+    navigate({ to: "/verify/phone" });
   };
 
   return (

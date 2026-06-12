@@ -3,8 +3,10 @@ import { useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { CreditCard, Smartphone, Building2, Check, ShieldCheck } from "lucide-react";
 import { getCircle, formatGHS, type Circle as CircleType } from "@/lib/mock-data";
+import { requireVerifiedPhone } from "@/lib/phone-guard";
 
 export const Route = createFileRoute("/payment/$id")({
+  beforeLoad: requireVerifiedPhone,
   loader: ({ params }) => {
     const c = getCircle(params.id);
     if (!c) throw notFound();

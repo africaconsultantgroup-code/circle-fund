@@ -7,8 +7,10 @@ import { pendingApprovals } from "@/lib/mock-data";
 import { getCircleById } from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { toUserCircle } from "@/lib/user-circles";
+import { requireVerifiedPhone } from "@/lib/phone-guard";
 
 export const Route = createFileRoute("/circle/$id")({
+  beforeLoad: requireVerifiedPhone,
   loader: async ({ params }) => {
     const c = getCircle(params.id);
     if (c) return c;

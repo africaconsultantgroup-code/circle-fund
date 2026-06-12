@@ -1,4 +1,4 @@
-import { getAuthedServiceClient, isOptions, json, providerReference, corsHeaders } from "../_shared/verification.ts";
+import { getAuthedServiceClient, hashSensitiveValue, isOptions, json, providerReference, corsHeaders } from "../_shared/verification.ts";
 
 Deno.serve(async (req) => {
   if (isOptions(req)) return new Response("ok", { headers: corsHeaders });
@@ -11,31 +11,45 @@ Deno.serve(async (req) => {
     const { user, serviceClient, error } = await getAuthedServiceClient(req);
     if (error) return error;
 
-    const { phoneNumber, otp } = await req.json();
-    if (typeof phoneNumber !== "string" || typeof otp !== "string" || otp.trim().length < 4) {
+    const { phoneNumber, otp, otpReference } = await req.json();
+    if (typeof phoneNumber !== "string" || typeof otp !== "string" || otp.trim().length !== 6) {
       return json({ error: "A phone number and OTP are required." }, 400);
     }
 
-    const expectedOtp = "123456";
-    if (otp.trim() !== expectedOtp) {
-      return json({ ok: false, error: "Invalid OTP. Use 123456 for sandbox phone verification." }, 400);
-    }
-
-    const now = new Date().toISOString();
+    const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
+    const now = new Date();
     const reference = providerReference("phone_verify");
     const { data: existingVerification, error: existingVerificationError } = await serviceClient
       .from("user_verifications")
-      .select("ghana_card_verified, face_verified, verification_status")
+      .select("ghana_card_verified, face_verified, verification_status, otp_code_hash, otp_expires_at, otp_reference")
       .eq("user_id", user.id)
       .maybeSingle();
 
     if (existingVerificationError) return json({ error: existingVerificationError.message }, 500);
+    if (!existingVerification?.otp_code_hash || !existingVerification.otp_expires_at) {
+      return json({ ok: false, error: "No active OTP request found. Please request a new code." }, 400);
+    }
+
+    if (typeof otpReference === "string" && existingVerification.otp_reference && otpReference !== existingVerification.otp_reference) {
+      return json({ ok: false, error: "Invalid OTP. Please try again." }, 400);
+    }
+
+    if (new Date(existingVerification.otp_expires_at).getTime() < now.getTime()) {
+      await markOtpFailed(serviceClient, user.id, normalizedPhoneNumber);
+      return json({ ok: false, error: "OTP expired. Please request a new code." }, 400);
+    }
+
+    const otpHash = await hashSensitiveValue(`${normalizedPhoneNumber}:${otp.trim()}`);
+    if (otpHash !== existingVerification.otp_code_hash) {
+      await markOtpFailed(serviceClient, user.id, normalizedPhoneNumber);
+      return json({ ok: false, error: "Invalid OTP. Please try again." }, 400);
+    }
 
     const status = resolveAggregateStatus(existingVerification);
 
     const { error: profileError } = await serviceClient
       .from("profiles")
-      .update({ phone: phoneNumber.trim(), updated_at: now })
+      .update({ phone: normalizedPhoneNumber, updated_at: now.toISOString() })
       .eq("user_id", user.id);
 
     if (profileError) return json({ error: profileError.message }, 500);
@@ -44,12 +58,18 @@ Deno.serve(async (req) => {
       .from("user_verifications")
       .upsert({
         user_id: user.id,
+        phone_number: normalizedPhoneNumber,
         phone_verified: true,
-        verification_provider: "test_phone_otp",
+        otp_status: "verified",
+        otp_reference: existingVerification.otp_reference ?? reference,
+        otp_verified_at: now.toISOString(),
+        otp_code_hash: null,
+        otp_expires_at: null,
+        verification_provider: "hubtel_otp",
         provider_reference: reference,
         verification_status: status,
         failure_reason: null,
-        updated_at: now,
+        updated_at: now.toISOString(),
       }, { onConflict: "user_id" });
 
     if (upsertError) return json({ error: upsertError.message }, 500);
@@ -60,13 +80,34 @@ Deno.serve(async (req) => {
       providerReference: reference,
       message: status === "verified"
         ? "Phone number verified. Verification is complete."
-        : "Phone number verified. Ghana Card and face verification are still pending review.",
+        : "Phone number verified. Continue to the next verification step.",
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error.";
     return json({ error: message }, 500);
   }
 });
+
+function normalizePhoneNumber(phoneNumber: string) {
+  const compact = phoneNumber.replace(/[\s()-]/g, "");
+  if (compact.startsWith("+")) return compact;
+  if (compact.startsWith("0")) return `+233${compact.slice(1)}`;
+  if (compact.startsWith("233")) return `+${compact}`;
+  return compact;
+}
+
+async function markOtpFailed(serviceClient: any, userId: string, phoneNumber: string) {
+  await serviceClient
+    .from("user_verifications")
+    .upsert({
+      user_id: userId,
+      phone_number: phoneNumber,
+      phone_verified: false,
+      otp_status: "failed",
+      failure_reason: "Invalid OTP. Please try again.",
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id" });
+}
 
 function resolveAggregateStatus(existingVerification: {
   ghana_card_verified: boolean;

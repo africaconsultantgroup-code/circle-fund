@@ -8,6 +8,7 @@ export type TransactionType = 'contribution' | 'payout' | 'refund' | 'fee' | 'ad
 export type TransactionStatus = 'pending' | 'completed' | 'failed';
 export type LegacyVerificationStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
 export type VerificationStatus = 'not_started' | 'pending' | 'verified' | 'failed' | 'manual_review';
+export type OtpStatus = 'not_started' | 'pending' | 'verified' | 'failed';
 export type AccountStatus = 'active' | 'pending' | 'suspended' | 'disabled';
 export type UserRole = 'customer' | 'admin';
 
@@ -140,8 +141,14 @@ export interface Database {
         Row: {
           id: string;
           user_id: string;
+          phone_number: string | null;
           ghana_card_number_hash: string | null;
           phone_verified: boolean;
+          otp_status: OtpStatus;
+          otp_reference: string | null;
+          otp_verified_at: string | null;
+          otp_code_hash: string | null;
+          otp_expires_at: string | null;
           ghana_card_verified: boolean;
           ghana_card_status: VerificationStatus;
           face_verified: boolean;
@@ -158,8 +165,14 @@ export interface Database {
         Insert: {
           id?: string;
           user_id: string;
+          phone_number?: string | null;
           ghana_card_number_hash?: string | null;
           phone_verified?: boolean;
+          otp_status?: OtpStatus;
+          otp_reference?: string | null;
+          otp_verified_at?: string | null;
+          otp_code_hash?: string | null;
+          otp_expires_at?: string | null;
           ghana_card_verified?: boolean;
           ghana_card_status?: VerificationStatus;
           face_verified?: boolean;
@@ -174,8 +187,14 @@ export interface Database {
           updated_at?: string | null;
         };
         Update: {
+          phone_number?: string | null;
           ghana_card_number_hash?: string | null;
           phone_verified?: boolean;
+          otp_status?: OtpStatus;
+          otp_reference?: string | null;
+          otp_verified_at?: string | null;
+          otp_code_hash?: string | null;
+          otp_expires_at?: string | null;
           ghana_card_verified?: boolean;
           ghana_card_status?: VerificationStatus;
           face_verified?: boolean;
@@ -306,6 +325,10 @@ export interface Database {
         Args: { check_user_id: string };
         Returns: boolean;
       };
+      user_has_verified_phone: {
+        Args: { check_user_id: string };
+        Returns: boolean;
+      };
       circle_has_member_capacity: {
         Args: { check_circle_id: string };
         Returns: boolean;
@@ -322,6 +345,7 @@ export interface Database {
       payout_status: PayoutStatus;
       transaction_type: TransactionType;
       transaction_status: TransactionStatus;
+      otp_status: OtpStatus;
     };
   };
 }

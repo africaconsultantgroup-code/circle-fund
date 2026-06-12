@@ -2,8 +2,10 @@ import { createFileRoute, notFound } from "@tanstack/react-router";
 import { PageHeader } from "@/components/page-header";
 import { Crown, UserPlus, CheckCircle2 } from "lucide-react";
 import { getCircle, type Circle as CircleType } from "@/lib/mock-data";
+import { requireVerifiedPhone } from "@/lib/phone-guard";
 
 export const Route = createFileRoute("/circle/$id/members")({
+  beforeLoad: requireVerifiedPhone,
   loader: ({ params }) => {
     const c = getCircle(params.id);
     if (!c) throw notFound();

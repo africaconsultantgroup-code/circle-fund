@@ -52,6 +52,8 @@ Deno.serve(async (req) => {
       .upsert({
         user_id: userId,
         phone_verified: true,
+        otp_status: "verified",
+        otp_verified_at: now,
         ghana_card_verified: true,
         ghana_card_status: "verified",
         face_verified: true,

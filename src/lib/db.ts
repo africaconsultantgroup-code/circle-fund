@@ -29,9 +29,9 @@ export async function requestPhoneOtp(phoneNumber: string) {
   });
 }
 
-export async function verifyPhoneOtp(phoneNumber: string, otp: string) {
+export async function verifyPhoneOtp(phoneNumber: string, otp: string, otpReference?: string | null) {
   return supabase.functions.invoke('verify-phone-otp', {
-    body: { phoneNumber, otp },
+    body: { phoneNumber, otp, otpReference },
   });
 }
 

@@ -3,8 +3,10 @@ import { PageHeader } from "@/components/page-header";
 import { getCircle, pendingApprovals, tierFromScore } from "@/lib/mock-data";
 import { VerificationBadge, TrustBadge } from "@/components/verification-badge";
 import { Check, X, Phone, IdCard, ScanFace, Smartphone, UserCheck } from "lucide-react";
+import { requireVerifiedPhone } from "@/lib/phone-guard";
 
 export const Route = createFileRoute("/circle/$id/approvals")({
+  beforeLoad: requireVerifiedPhone,
   loader: ({ params }) => {
     const c = getCircle(params.id);
     if (!c) throw notFound();

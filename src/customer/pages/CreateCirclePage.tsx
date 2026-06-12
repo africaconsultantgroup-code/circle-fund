@@ -141,7 +141,7 @@ export function CreateCirclePage() {
         {eligible && (
           <div className="flex items-center gap-2 rounded-2xl bg-success/10 px-4 py-2.5 text-success">
             <ShieldCheck className="h-4 w-4" />
-            <p className="text-[11px] font-medium">Circle testing enabled - you can create a circle.</p>
+            <p className="text-[11px] font-medium">Phone verified - you can create a circle.</p>
           </div>
         )}
 
