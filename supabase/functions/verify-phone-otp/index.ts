@@ -43,13 +43,14 @@ Deno.serve(async (req) => {
     const reference = providerReference("phone_verify");
     const { data: existingVerification, error: existingVerificationError } = await serviceClient
       .from("user_verifications")
-      .select("user_id, phone_number, phone_verified, ghana_card_verified, face_verified, verification_status, otp_status, otp_code_hash, otp_expires_at, otp_reference")
+      .select("id, user_id, phone_number, phone_verified, phone_verified_at, ghana_card_verified, face_verified, verification_status, otp_status, otp_verified_at, otp_code_hash, otp_expires_at, otp_reference")
       .eq("user_id", user.id)
       .maybeSingle();
 
     if (existingVerificationError) return json({ error: existingVerificationError.message }, 500);
     console.log("verify_phone_otp_record_lookup", {
       userId: user.id,
+      verificationRecordId: existingVerification?.id ?? null,
       requestedOtpReference: typeof otpReference === "string" ? otpReference : null,
       savedOtpReference: existingVerification?.otp_reference ?? null,
       phoneNumber: existingVerification?.phone_number ?? normalizedPhoneNumber,
@@ -60,18 +61,28 @@ Deno.serve(async (req) => {
     });
 
     if (!existingVerification?.otp_code_hash || !existingVerification.otp_expires_at) {
-      if (existingVerification?.phone_verified && existingVerification.otp_status === "verified") {
+      if (existingVerification?.phone_verified) {
+        const repairedRecord = existingVerification.otp_status === "verified"
+          ? existingVerification
+          : await repairVerifiedPhoneStatus(serviceClient, user.id, existingVerification.phone_number ?? normalizedPhoneNumber, now);
+
         console.log("verify_phone_otp_already_verified", {
           userId: user.id,
+          verificationRecordId: repairedRecord.id,
           requestedOtpReference: typeof otpReference === "string" ? otpReference : null,
-          savedOtpReference: existingVerification.otp_reference,
-          phoneNumber: existingVerification.phone_number ?? normalizedPhoneNumber,
+          savedOtpReference: repairedRecord.otp_reference,
+          phoneNumber: repairedRecord.phone_number ?? normalizedPhoneNumber,
+          otpStatus: repairedRecord.otp_status,
+          otpVerifiedAt: repairedRecord.otp_verified_at,
           databaseRecordFound: true,
         });
 
         return json({
           ok: true,
-          status: existingVerification.verification_status,
+          status: repairedRecord.verification_status,
+          phoneVerified: repairedRecord.phone_verified,
+          otpStatus: repairedRecord.otp_status,
+          otpVerifiedAt: repairedRecord.otp_verified_at,
           providerReference: reference,
           message: "Phone number already verified. Taking you to the next verification step.",
         });
@@ -79,6 +90,7 @@ Deno.serve(async (req) => {
 
       console.warn("verify_phone_otp_no_active_request", {
         userId: user.id,
+        verificationRecordId: existingVerification?.id ?? null,
         requestedOtpReference: typeof otpReference === "string" ? otpReference : null,
         savedOtpReference: existingVerification?.otp_reference ?? null,
         phoneNumber: existingVerification?.phone_number ?? normalizedPhoneNumber,
@@ -92,6 +104,7 @@ Deno.serve(async (req) => {
     if (typeof otpReference === "string" && existingVerification.otp_reference && otpReference !== existingVerification.otp_reference) {
       console.warn("verify_phone_otp_reference_mismatch", {
         userId: user.id,
+        verificationRecordId: existingVerification.id,
         requestedOtpReference: otpReference,
         savedOtpReference: existingVerification.otp_reference,
         phoneNumber: existingVerification.phone_number ?? normalizedPhoneNumber,
@@ -104,6 +117,7 @@ Deno.serve(async (req) => {
       await markOtpFailed(serviceClient, user.id, existingVerification.phone_number ?? normalizedPhoneNumber);
       console.warn("verify_phone_otp_expired", {
         userId: user.id,
+        verificationRecordId: existingVerification.id,
         otpReference: existingVerification.otp_reference,
         phoneNumber: existingVerification.phone_number ?? normalizedPhoneNumber,
         expiryTime: existingVerification.otp_expires_at,
@@ -117,6 +131,7 @@ Deno.serve(async (req) => {
       await markOtpFailed(serviceClient, user.id, storedPhoneNumber);
       console.warn("verify_phone_otp_invalid_code", {
         userId: user.id,
+        verificationRecordId: existingVerification.id,
         otpReference: existingVerification.otp_reference,
         phoneNumber: storedPhoneNumber,
         expiryTime: existingVerification.otp_expires_at,
@@ -139,12 +154,12 @@ Deno.serve(async (req) => {
       return json({ error: profileError.message, reason: "profile_update_failed" }, 500);
     }
 
-    const { data: verifiedRecord, error: upsertError } = await serviceClient
+    const { data: verifiedRecord, error: updateError } = await serviceClient
       .from("user_verifications")
-      .upsert({
-        user_id: user.id,
+      .update({
         phone_number: storedPhoneNumber,
         phone_verified: true,
+        phone_verified_at: now.toISOString(),
         otp_status: "verified",
         otp_reference: existingVerification.otp_reference ?? reference,
         otp_verified_at: now.toISOString(),
@@ -155,35 +170,96 @@ Deno.serve(async (req) => {
         verification_status: status,
         failure_reason: null,
         updated_at: now.toISOString(),
-      }, { onConflict: "user_id" })
-      .select("user_id, phone_number, phone_verified, otp_status, otp_verified_at, otp_reference, verification_status")
+      })
+      .eq("user_id", user.id)
+      .select("id, user_id, phone_number, phone_verified, phone_verified_at, otp_status, otp_verified_at, otp_reference, verification_status")
       .single();
 
-    if (upsertError) {
-      console.error("verify_phone_otp_upsert_failed", {
+    if (updateError) {
+      console.error("verify_phone_otp_update_failed", {
         userId: user.id,
-        error: upsertError.message,
+        verificationRecordId: existingVerification.id,
+        error: updateError.message,
       });
-      return json({ error: upsertError.message, reason: "verification_upsert_failed" }, 500);
+      return json({ error: updateError.message, reason: "verification_update_failed" }, 500);
     }
 
-    console.log("verify_phone_otp_success", {
+    console.log("verify_phone_otp_update_result", {
       userId: verifiedRecord.user_id,
-      providerReference: reference,
-      otpReference: verifiedRecord.otp_reference,
+      verificationRecordId: verifiedRecord.id,
       phoneNumber: verifiedRecord.phone_number,
       phoneVerified: verifiedRecord.phone_verified,
+      phoneVerifiedAt: verifiedRecord.phone_verified_at,
       otpStatus: verifiedRecord.otp_status,
       otpVerifiedAt: verifiedRecord.otp_verified_at,
+    });
+
+    if (!verifiedRecord.phone_verified || verifiedRecord.otp_status !== "verified" || !verifiedRecord.otp_verified_at) {
+      console.error("verify_phone_otp_update_not_persisted", {
+        userId: verifiedRecord.user_id,
+        phoneNumber: verifiedRecord.phone_number,
+        phoneVerified: verifiedRecord.phone_verified,
+        otpStatus: verifiedRecord.otp_status,
+        otpVerifiedAt: verifiedRecord.otp_verified_at,
+      });
+      return json({
+        ok: false,
+        error: "Phone verification did not persist. Please try again.",
+        reason: "otp_update_not_persisted",
+        phoneVerified: verifiedRecord.phone_verified,
+        otpStatus: verifiedRecord.otp_status,
+        otpVerifiedAt: verifiedRecord.otp_verified_at,
+      }, 500);
+    }
+
+    const { data: refreshedVerification, error: refreshError } = await serviceClient
+      .from("user_verifications")
+      .select("id, user_id, phone_number, phone_verified, phone_verified_at, otp_status, otp_verified_at, ghana_card_status, face_status, verification_status")
+      .eq("user_id", user.id)
+      .single();
+
+    if (refreshError) {
+      console.error("verify_phone_otp_refresh_failed", {
+        userId: user.id,
+        verificationRecordId: verifiedRecord.id,
+        error: refreshError.message,
+      });
+      return json({ error: refreshError.message, reason: "verification_refresh_failed" }, 500);
+    }
+
+    console.log("verify_phone_otp_refreshed_state", {
+      userId: refreshedVerification.user_id,
+      verificationRecordId: refreshedVerification.id,
+      phoneNumber: refreshedVerification.phone_number,
+      phoneVerified: refreshedVerification.phone_verified,
+      phoneVerifiedAt: refreshedVerification.phone_verified_at,
+      otpStatus: refreshedVerification.otp_status,
+      otpVerifiedAt: refreshedVerification.otp_verified_at,
+      ghanaCardStatus: refreshedVerification.ghana_card_status,
+      selfieStatus: refreshedVerification.face_status,
+      verificationStatus: refreshedVerification.verification_status,
+    });
+
+    console.log("verify_phone_otp_success", {
+      userId: refreshedVerification.user_id,
+      verificationRecordId: refreshedVerification.id,
+      providerReference: reference,
+      otpReference: verifiedRecord.otp_reference,
+      phoneNumber: refreshedVerification.phone_number,
+      phoneVerified: refreshedVerification.phone_verified,
+      phoneVerifiedAt: refreshedVerification.phone_verified_at,
+      otpStatus: refreshedVerification.otp_status,
+      otpVerifiedAt: refreshedVerification.otp_verified_at,
       expiryTime: existingVerification.otp_expires_at,
     });
 
     return json({
       ok: true,
-      status: verifiedRecord.verification_status,
-      phoneVerified: verifiedRecord.phone_verified,
-      otpStatus: verifiedRecord.otp_status,
-      otpVerifiedAt: verifiedRecord.otp_verified_at,
+      status: refreshedVerification.verification_status,
+      phoneVerified: refreshedVerification.phone_verified,
+      phoneVerifiedAt: refreshedVerification.phone_verified_at,
+      otpStatus: refreshedVerification.otp_status,
+      otpVerifiedAt: refreshedVerification.otp_verified_at,
       providerReference: reference,
       message: status === "verified"
         ? "Phone number verified. Verification is complete."
@@ -220,14 +296,40 @@ async function markOtpFailed(serviceClient: any, userId: string, phoneNumber: st
     }, { onConflict: "user_id" });
 }
 
+async function repairVerifiedPhoneStatus(serviceClient: any, userId: string, phoneNumber: string, now: Date) {
+  const { data, error } = await serviceClient
+    .from("user_verifications")
+    .update({
+      phone_number: phoneNumber,
+      phone_verified: true,
+      phone_verified_at: now.toISOString(),
+      otp_status: "verified",
+      otp_verified_at: now.toISOString(),
+      failure_reason: null,
+      updated_at: now.toISOString(),
+    })
+    .eq("user_id", userId)
+    .select("id, user_id, phone_number, phone_verified, phone_verified_at, otp_status, otp_verified_at, otp_reference, verification_status")
+    .single();
+
+  if (error) {
+    throw new Error(`Unable to repair verified phone OTP status: ${error.message}`);
+  }
+
+  return data;
+}
+
 function resolveAggregateStatus(existingVerification: {
   user_id: string;
+  id: string;
   phone_number: string | null;
   phone_verified: boolean;
+  phone_verified_at?: string | null;
   ghana_card_verified: boolean;
   face_verified: boolean;
   verification_status: string;
   otp_status: string;
+  otp_verified_at?: string | null;
   otp_code_hash: string | null;
   otp_expires_at: string | null;
   otp_reference: string | null;

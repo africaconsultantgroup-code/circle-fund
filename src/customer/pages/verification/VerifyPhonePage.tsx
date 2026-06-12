@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } 
 import { PageHeader } from "@/components/page-header";
 import { Phone, MessageSquare, Loader2, ShieldAlert } from "lucide-react";
 import { requestPhoneOtp, verifyPhoneOtp } from "@/lib/db";
-import { ghanaCardStepStatus, faceStepStatus, loadVerificationFlowSummary, type VerificationFlowSummary } from "@/lib/verification-flow";
+import { ghanaCardStepStatus, faceStepStatus, hasAcceptedGhanaCardVerification, loadVerificationFlowSummary, type VerificationFlowSummary } from "@/lib/verification-flow";
 
 export function VerifyPhonePage() {
   const navigate = useNavigate();
@@ -28,7 +28,9 @@ export function VerifyPhonePage() {
 
       setFlowSummary(summary);
       if (summary.verification?.phone_verified && summary.verification.otp_status === "verified") {
-        const nextStep = summary.nextStep.to === "/verify/phone" ? "/verify/ghana-card" : summary.nextStep.to;
+        const nextStep = !hasAcceptedGhanaCardVerification(summary.verification)
+          ? "/verify/ghana-card"
+          : summary.nextStep.to === "/verify/phone" ? "/verify/ghana-card" : summary.nextStep.to;
         if (nextStep !== "/verify/phone") {
           navigate({ to: nextStep });
         }
@@ -96,11 +98,10 @@ export function VerifyPhonePage() {
     }
 
     setMessage(resultMessage(data, "Phone verified. Taking you to the next verification step."));
-    const summary = await loadVerificationFlowSummary();
-    setFlowSummary(summary);
-    setTimeout(async () => {
+    setTimeout(() => {
       navigate({ to: "/verify/ghana-card" });
     }, 600);
+    loadVerificationFlowSummary().then(setFlowSummary);
   };
 
   return (

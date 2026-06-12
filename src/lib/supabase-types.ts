@@ -144,6 +144,7 @@ export interface Database {
           phone_number: string | null;
           ghana_card_number_hash: string | null;
           phone_verified: boolean;
+          phone_verified_at: string | null;
           otp_status: OtpStatus;
           otp_reference: string | null;
           otp_verified_at: string | null;
@@ -168,6 +169,7 @@ export interface Database {
           phone_number?: string | null;
           ghana_card_number_hash?: string | null;
           phone_verified?: boolean;
+          phone_verified_at?: string | null;
           otp_status?: OtpStatus;
           otp_reference?: string | null;
           otp_verified_at?: string | null;
@@ -190,6 +192,7 @@ export interface Database {
           phone_number?: string | null;
           ghana_card_number_hash?: string | null;
           phone_verified?: boolean;
+          phone_verified_at?: string | null;
           otp_status?: OtpStatus;
           otp_reference?: string | null;
           otp_verified_at?: string | null;
