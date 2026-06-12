@@ -11,6 +11,7 @@ export function VerifyPhonePage() {
   const [phoneNumber, setPhoneNumber] = useState("0245550142");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [otpReference, setOtpReference] = useState<string | null>(null);
+  const [phoneDebug, setPhoneDebug] = useState<{ rawPhoneNumber: string; normalizedPhoneNumber: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -18,6 +19,7 @@ export function VerifyPhonePage() {
   const handleRequestOtp = async () => {
     setError("");
     setMessage("");
+    setPhoneDebug(null);
 
     if (phoneNumber.trim().length < 8) {
       setError("Enter a valid phone number.");
@@ -29,12 +31,23 @@ export function VerifyPhonePage() {
     setIsSaving(false);
 
     if (error) {
-      setError(await describeFunctionError(error));
+      const details = await describeFunctionError(error);
+      setError(details.message);
+      if (details.normalizedPhoneNumber || details.rawPhoneNumber) {
+        setPhoneDebug({
+          rawPhoneNumber: details.rawPhoneNumber ?? phoneNumber,
+          normalizedPhoneNumber: details.normalizedPhoneNumber ?? "",
+        });
+      }
       return;
     }
 
-    const response = data as { providerReference?: string } | null;
+    const response = data as { providerReference?: string; rawPhoneNumber?: string; normalizedPhoneNumber?: string } | null;
     setOtpReference(response?.providerReference ?? null);
+    setPhoneDebug({
+      rawPhoneNumber: response?.rawPhoneNumber ?? phoneNumber,
+      normalizedPhoneNumber: response?.normalizedPhoneNumber ?? "",
+    });
     setMessage(resultMessage(data, "Hubtel OTP sent. Enter the code to verify your phone."));
     setStep("otp");
   };
@@ -53,7 +66,7 @@ export function VerifyPhonePage() {
     setIsSaving(false);
 
     if (error) {
-      setError(await describeFunctionError(error));
+      setError((await describeFunctionError(error)).message);
       return;
     }
 
@@ -123,6 +136,13 @@ export function VerifyPhonePage() {
         )}
 
         {message && <p className="rounded-2xl bg-secondary p-4 text-[11px] font-medium text-primary">{message}</p>}
+        {phoneDebug && (
+          <div className="rounded-2xl border border-border bg-muted/40 p-4 text-[11px] text-muted-foreground">
+            <p className="font-semibold text-foreground">OTP debug</p>
+            <p className="mt-1">Raw phone entered: <span className="font-mono text-foreground">{phoneDebug.rawPhoneNumber}</span></p>
+            <p>Normalized phone sent to Hubtel: <span className="font-mono text-foreground">{phoneDebug.normalizedPhoneNumber}</span></p>
+          </div>
+        )}
         {error && (
           <div className="flex items-center gap-2 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-destructive">
             <ShieldAlert className="h-4 w-4" />
@@ -140,20 +160,29 @@ function resultMessage(data: unknown, fallback: string) {
   return [response.message ?? fallback, response.status ? `Status: ${response.status}` : "", response.providerReference ? `Reference: ${response.providerReference}` : ""].filter(Boolean).join(" ");
 }
 
-async function describeFunctionError(error: unknown) {
+async function describeFunctionError(error: unknown): Promise<{ message: string; rawPhoneNumber?: string; normalizedPhoneNumber?: string }> {
   const errorLike = error as { message?: string; context?: unknown };
 
   if (errorLike.context instanceof Response) {
     try {
-      const body = await errorLike.context.clone().json() as { error?: unknown; message?: unknown; reason?: unknown; code?: unknown };
-      if (typeof body.error === "string") return body.error;
-      if (typeof body.message === "string") return body.message;
-      if (typeof body.reason === "string") return body.reason;
-      if (typeof body.code === "string") return body.code;
+      const body = await errorLike.context.clone().json() as {
+        error?: unknown;
+        message?: unknown;
+        reason?: unknown;
+        code?: unknown;
+        rawPhoneNumber?: unknown;
+        normalizedPhoneNumber?: unknown;
+      };
+      const message = [body.error, body.message, body.reason, body.code].find((value) => typeof value === "string");
+      return {
+        message: typeof message === "string" ? message : errorLike.message ?? "Phone verification failed.",
+        rawPhoneNumber: typeof body.rawPhoneNumber === "string" ? body.rawPhoneNumber : undefined,
+        normalizedPhoneNumber: typeof body.normalizedPhoneNumber === "string" ? body.normalizedPhoneNumber : undefined,
+      };
     } catch {
-      return errorLike.message ?? "Phone verification failed.";
+      return { message: errorLike.message ?? "Phone verification failed." };
     }
   }
 
-  return errorLike.message ?? "Phone verification failed.";
+  return { message: errorLike.message ?? "Phone verification failed." };
 }

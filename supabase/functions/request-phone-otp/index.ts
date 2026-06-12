@@ -28,6 +28,7 @@ Deno.serve(async (req) => {
         ok: false,
         error: "SMS delivery failed. Invalid recipient format.",
         reason: "invalid_recipient_format",
+        rawPhoneNumber: phoneNumber,
         normalizedPhoneNumber,
       }, 400);
     }
@@ -80,6 +81,8 @@ Deno.serve(async (req) => {
         ok: false,
         error: hubtelResult.error,
         reason: "hubtel_send_failed",
+        rawPhoneNumber: phoneNumber,
+        normalizedPhoneNumber,
       }, hubtelResult.status);
     }
 
@@ -118,6 +121,8 @@ Deno.serve(async (req) => {
     return json({
       status: nextStatus,
       providerReference: reference,
+      rawPhoneNumber: phoneNumber,
+      normalizedPhoneNumber,
       message: "Hubtel OTP sent. Enter the code to verify your phone.",
     });
   } catch (error) {
