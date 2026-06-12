@@ -56,7 +56,13 @@ export async function signUpWithEmail(email: string, password: string): Promise<
     return fallbackSuccess(email);
   }
 
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: buildAuthRedirectUrl("/verify/phone"),
+    },
+  });
   if (error) {
     return fallbackError(error.message);
   }
@@ -65,6 +71,25 @@ export async function signUpWithEmail(email: string, password: string): Promise<
     data: { user: data.user ? { id: data.user.id, email: data.user.email, phone: data.user.phone } : null },
     error: null,
   };
+}
+
+export function buildAuthRedirectUrl(next = "/verify/phone") {
+  const origin = getAppOrigin();
+  const url = new URL("/auth/callback", origin);
+  url.searchParams.set("next", next);
+  return url.toString();
+}
+
+function getAppOrigin() {
+  const configuredUrl = import.meta.env.VITE_APP_URL?.trim();
+  if (configuredUrl) return configuredUrl.replace(/\/$/, "");
+
+  if (typeof window !== "undefined") {
+    const isLocalhost = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+    if (isLocalhost || import.meta.env.DEV) return window.location.origin;
+  }
+
+  return "https://app.sikacircle.com";
 }
 
 export async function signOut(): Promise<{ error: { message: string } | null }> {
