@@ -1,8 +1,8 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
-import { Coins, Mail, Lock, User as UserIcon, Phone } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState, type FormEvent } from "react";
+import { Coins, Mail, Lock, User as UserIcon, Phone, Send } from "lucide-react";
 import { Field } from "./login";
-import { signUpWithEmail } from "@/lib/auth";
+import { resendSignupVerificationEmail, signUpWithEmail } from "@/lib/auth";
 import { upsertProfile } from "@/lib/db";
 
 export const Route = createFileRoute("/register")({
@@ -10,18 +10,32 @@ export const Route = createFileRoute("/register")({
 });
 
 function RegisterPage() {
-  const navigate = useNavigate();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [verificationEmail, setVerificationEmail] = useState("");
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+
+    const timer = window.setInterval(() => {
+      setCooldown((value) => Math.max(0, value - 1));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [cooldown]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
     setError(null);
+    setMessage(null);
 
     const result = await signUpWithEmail(email, password);
     if (result.error) {
@@ -43,7 +57,33 @@ function RegisterPage() {
     }
 
     setLoading(false);
-    navigate({ to: "/verify/phone" });
+    setVerificationEmail(email.trim());
+    setMessage("Check your email to confirm your account. After confirmation, you will be sent to phone verification.");
+    setCooldown(60);
+  };
+
+  const handleResendVerification = async () => {
+    const targetEmail = (verificationEmail || email).trim();
+    if (!targetEmail || cooldown > 0) return;
+
+    setResending(true);
+    setError(null);
+    setMessage(null);
+
+    const result = await resendSignupVerificationEmail(targetEmail);
+    setResending(false);
+
+    if (result.error) {
+      setError(result.error.message);
+      if (result.error.message.includes("Too many verification emails")) {
+        setCooldown(60);
+      }
+      return;
+    }
+
+    setVerificationEmail(targetEmail);
+    setMessage("Verification email sent. Please check your inbox.");
+    setCooldown(60);
   };
 
   return (
@@ -103,6 +143,20 @@ function RegisterPage() {
         </label>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
+        {message && (
+          <div className="rounded-2xl border border-primary/20 bg-secondary p-4 text-sm text-primary">
+            <p className="font-semibold">{message}</p>
+            <button
+              type="button"
+              disabled={resending || cooldown > 0}
+              onClick={handleResendVerification}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-primary/30 bg-background py-2.5 text-xs font-semibold text-primary disabled:opacity-50"
+            >
+              <Send className="h-3.5 w-3.5" />
+              {resending ? "Sending..." : cooldown > 0 ? `Resend in ${cooldown}s` : "Resend verification email"}
+            </button>
+          </div>
+        )}
 
         <button
           type="submit"

@@ -21,7 +21,13 @@ export interface UserProfile extends AuthUser {
 
 export type AuthResponse = {
   data: { user: AuthUser | null };
-  error: { message: string } | null;
+  error: AuthErrorMessage | null;
+};
+
+export type AuthErrorMessage = {
+  message: string;
+  code?: string;
+  originalMessage?: string;
 };
 
 async function fallbackSuccess(email: string): Promise<AuthResponse> {
@@ -42,7 +48,12 @@ export async function signInWithPassword(email: string, password: string): Promi
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
-    return fallbackError(error.message);
+    console.warn("supabase_auth_signin_failed", {
+      message: error.message,
+      code: error.code,
+      status: error.status,
+    });
+    return { data: { user: null }, error: mapAuthError(error) };
   }
 
   return {
@@ -64,12 +75,85 @@ export async function signUpWithEmail(email: string, password: string): Promise<
     },
   });
   if (error) {
-    return fallbackError(error.message);
+    console.warn("supabase_auth_signup_failed", {
+      email,
+      message: error.message,
+      code: error.code,
+      status: error.status,
+    });
+    return { data: { user: null }, error: mapAuthError(error) };
   }
 
   return {
     data: { user: data.user ? { id: data.user.id, email: data.user.email, phone: data.user.phone } : null },
     error: null,
+  };
+}
+
+export async function resendSignupVerificationEmail(email: string): Promise<{ error: AuthErrorMessage | null }> {
+  if (!isSupabaseConfigured) {
+    return { error: null };
+  }
+
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: {
+      emailRedirectTo: buildAuthRedirectUrl("/verify/phone"),
+    },
+  });
+
+  if (error) {
+    console.warn("supabase_auth_resend_signup_failed", {
+      email,
+      message: error.message,
+      code: error.code,
+      status: error.status,
+    });
+    return { error: mapAuthError(error) };
+  }
+
+  return { error: null };
+}
+
+export function mapAuthError(error: { message?: string; code?: string; status?: number }): AuthErrorMessage {
+  const message = error.message ?? "";
+  const normalized = message.toLowerCase();
+  const code = error.code?.toLowerCase();
+
+  if (
+    code === "user_already_exists" ||
+    code === "email_exists" ||
+    normalized.includes("user already registered") ||
+    normalized.includes("already registered") ||
+    normalized.includes("already exists")
+  ) {
+    return {
+      message: "An account with this email already exists. Please sign in.",
+      code: error.code,
+      originalMessage: message,
+    };
+  }
+
+  if (
+    error.status === 429 ||
+    code === "over_email_send_rate_limit" ||
+    code === "email_rate_limit_exceeded" ||
+    normalized.includes("email rate limit") ||
+    normalized.includes("rate limit") ||
+    normalized.includes("too many")
+  ) {
+    return {
+      message: "Too many verification emails have been requested. Please wait and try again later.",
+      code: error.code,
+      originalMessage: message,
+    };
+  }
+
+  return {
+    message: message || "Unable to complete authentication. Please try again.",
+    code: error.code,
+    originalMessage: message,
   };
 }
 
