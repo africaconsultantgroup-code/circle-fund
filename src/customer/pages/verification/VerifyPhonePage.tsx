@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Phone, MessageSquare, Loader2, ShieldAlert } from "lucide-react";
 import { requestPhoneOtp, verifyPhoneOtp } from "@/lib/db";
@@ -14,6 +14,9 @@ export function VerifyPhonePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const otpInputRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const otpCode = otp.join("");
+  const otpComplete = otpCode.length === 6;
 
   const handleRequestOtp = async () => {
     setError("");
@@ -49,19 +52,20 @@ export function VerifyPhonePage() {
     });
     setMessage(resultMessage(data, "Hubtel OTP sent. Enter the code to verify your phone."));
     setStep("otp");
+    setTimeout(() => otpInputRefs.current[0]?.focus(), 50);
   };
 
   const handleVerifyOtp = async () => {
     setError("");
     setMessage("");
 
-    if (otp.join("").trim().length < 4) {
-      setError("Enter the OTP you received.");
+    if (!otpComplete) {
+      setError("Enter the 6-digit OTP you received.");
       return;
     }
 
     setIsSaving(true);
-    const { data, error } = await verifyPhoneOtp(phoneNumber, otp.join(""), otpReference);
+    const { data, error } = await verifyPhoneOtp(phoneNumber, otpCode, otpReference);
     setIsSaving(false);
 
     if (error) {
@@ -110,18 +114,22 @@ export function VerifyPhonePage() {
               {otp.map((v, i) => (
                 <input
                   key={i}
+                  ref={(element) => {
+                    otpInputRefs.current[i] = element;
+                  }}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete={i === 0 ? "one-time-code" : "off"}
                   maxLength={1}
                   value={v}
-                  onChange={(e) => {
-                    const next = [...otp];
-                    next[i] = e.target.value.slice(-1);
-                    setOtp(next);
-                  }}
+                  onChange={(event) => handleOtpChange(i, event.target.value)}
+                  onKeyDown={(event) => handleOtpKeyDown(i, event)}
+                  onPaste={(event) => handleOtpPaste(i, event)}
                   className="h-14 rounded-2xl border border-input bg-muted/40 text-center font-display text-xl font-bold outline-none focus:border-primary"
                 />
               ))}
             </div>
-            <button disabled={isSaving} onClick={handleVerifyOtp} className="mt-auto rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card disabled:opacity-50">
+            <button disabled={isSaving || !otpComplete} onClick={handleVerifyOtp} className="mt-auto rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card disabled:opacity-50">
               {isSaving ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Submitting</span> : "Verify OTP"}
             </button>
             <button onClick={() => navigate({ to: "/verify/status" })} className="rounded-2xl border border-border py-4 font-display text-base font-semibold text-muted-foreground">
@@ -147,6 +155,58 @@ export function VerifyPhonePage() {
       </div>
     </div>
   );
+
+  function handleOtpChange(index: number, value: string) {
+    const digits = value.replace(/\D/g, "");
+    if (!digits) {
+      setOtp((current) => {
+        const next = [...current];
+        next[index] = "";
+        return next;
+      });
+      return;
+    }
+
+    setOtp((current) => {
+      const next = [...current];
+      digits.slice(0, 6 - index).split("").forEach((digit, offset) => {
+        next[index + offset] = digit;
+      });
+      return next;
+    });
+
+    const nextIndex = Math.min(index + digits.length, 5);
+    otpInputRefs.current[nextIndex]?.focus();
+  }
+
+  function handleOtpKeyDown(index: number, event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Backspace" && !otp[index] && index > 0) {
+      event.preventDefault();
+      setOtp((current) => {
+        const next = [...current];
+        next[index - 1] = "";
+        return next;
+      });
+      otpInputRefs.current[index - 1]?.focus();
+    }
+  }
+
+  function handleOtpPaste(index: number, event: ClipboardEvent<HTMLInputElement>) {
+    event.preventDefault();
+    const digits = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!digits) return;
+    const startIndex = digits.length === 6 ? 0 : index;
+
+    setOtp((current) => {
+      const next = [...current];
+      digits.slice(0, 6 - startIndex).split("").forEach((digit, offset) => {
+        next[startIndex + offset] = digit;
+      });
+      return next;
+    });
+
+    otpInputRefs.current[Math.min(startIndex + digits.length, 5)]?.focus();
+  }
 }
 
 function resultMessage(data: unknown, fallback: string) {

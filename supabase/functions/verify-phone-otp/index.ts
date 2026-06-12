@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
     const reference = providerReference("phone_verify");
     const { data: existingVerification, error: existingVerificationError } = await serviceClient
       .from("user_verifications")
-      .select("user_id, phone_number, ghana_card_verified, face_verified, verification_status, otp_status, otp_code_hash, otp_expires_at, otp_reference")
+      .select("user_id, phone_number, phone_verified, ghana_card_verified, face_verified, verification_status, otp_status, otp_code_hash, otp_expires_at, otp_reference")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -60,6 +60,23 @@ Deno.serve(async (req) => {
     });
 
     if (!existingVerification?.otp_code_hash || !existingVerification.otp_expires_at) {
+      if (existingVerification?.phone_verified && existingVerification.otp_status === "verified") {
+        console.log("verify_phone_otp_already_verified", {
+          userId: user.id,
+          requestedOtpReference: typeof otpReference === "string" ? otpReference : null,
+          savedOtpReference: existingVerification.otp_reference,
+          phoneNumber: existingVerification.phone_number ?? normalizedPhoneNumber,
+          databaseRecordFound: true,
+        });
+
+        return json({
+          ok: true,
+          status: existingVerification.verification_status,
+          providerReference: reference,
+          message: "Phone number already verified. Taking you to the next verification step.",
+        });
+      }
+
       console.warn("verify_phone_otp_no_active_request", {
         userId: user.id,
         requestedOtpReference: typeof otpReference === "string" ? otpReference : null,
@@ -198,6 +215,7 @@ async function markOtpFailed(serviceClient: any, userId: string, phoneNumber: st
 function resolveAggregateStatus(existingVerification: {
   user_id: string;
   phone_number: string | null;
+  phone_verified: boolean;
   ghana_card_verified: boolean;
   face_verified: boolean;
   verification_status: string;
