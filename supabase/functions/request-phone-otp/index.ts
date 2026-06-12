@@ -93,16 +93,16 @@ function generateOtp() {
 }
 
 async function sendHubtelOtp(phoneNumber: string, otp: string, reference: string) {
-  const sendUrl = Deno.env.get("HUBTEL_SMS_SEND_URL") ?? Deno.env.get("HUBTEL_OTP_SEND_URL") ?? "";
+  const sendUrl = "https://smsc.hubtel.com/v1/messages/send";
   const senderId = Deno.env.get("HUBTEL_SENDER_ID") ?? "";
   const clientId = Deno.env.get("HUBTEL_CLIENT_ID") ?? "";
   const clientSecret = Deno.env.get("HUBTEL_CLIENT_SECRET") ?? "";
 
-  if (!sendUrl || !senderId || !clientId || !clientSecret) {
+  if (!senderId || !clientId || !clientSecret) {
     return {
       ok: false,
       status: 500,
-      error: "Hubtel OTP is not configured. Set HUBTEL_SMS_SEND_URL, HUBTEL_CLIENT_ID, HUBTEL_CLIENT_SECRET, and HUBTEL_SENDER_ID in Supabase Edge Function secrets.",
+      error: "Hubtel OTP is not configured. Set HUBTEL_CLIENT_ID, HUBTEL_CLIENT_SECRET, and HUBTEL_SENDER_ID in Supabase Edge Function secrets.",
     };
   }
 
