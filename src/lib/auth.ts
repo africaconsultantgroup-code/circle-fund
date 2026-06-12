@@ -20,7 +20,7 @@ export interface UserProfile extends AuthUser {
 }
 
 export type AuthResponse = {
-  data: { user: AuthUser | null };
+  data: { user: AuthUser | null; hasSession?: boolean };
   error: AuthErrorMessage | null;
 };
 
@@ -32,7 +32,7 @@ export type AuthErrorMessage = {
 
 async function fallbackSuccess(email: string): Promise<AuthResponse> {
   return {
-    data: { user: { id: 'local-user', email, phone: null } },
+    data: { user: { id: 'local-user', email, phone: null }, hasSession: true },
     error: null,
   };
 }
@@ -70,9 +70,6 @@ export async function signUpWithEmail(email: string, password: string): Promise<
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: {
-      emailRedirectTo: buildAuthRedirectUrl("/verify/phone"),
-    },
   });
   if (error) {
     console.warn("supabase_auth_signup_failed", {
@@ -85,35 +82,12 @@ export async function signUpWithEmail(email: string, password: string): Promise<
   }
 
   return {
-    data: { user: data.user ? { id: data.user.id, email: data.user.email, phone: data.user.phone } : null },
+    data: {
+      user: data.user ? { id: data.user.id, email: data.user.email, phone: data.user.phone } : null,
+      hasSession: Boolean(data.session),
+    },
     error: null,
   };
-}
-
-export async function resendSignupVerificationEmail(email: string): Promise<{ error: AuthErrorMessage | null }> {
-  if (!isSupabaseConfigured) {
-    return { error: null };
-  }
-
-  const { error } = await supabase.auth.resend({
-    type: "signup",
-    email,
-    options: {
-      emailRedirectTo: buildAuthRedirectUrl("/verify/phone"),
-    },
-  });
-
-  if (error) {
-    console.warn("supabase_auth_resend_signup_failed", {
-      email,
-      message: error.message,
-      code: error.code,
-      status: error.status,
-    });
-    return { error: mapAuthError(error) };
-  }
-
-  return { error: null };
 }
 
 export function mapAuthError(error: { message?: string; code?: string; status?: number }): AuthErrorMessage {
@@ -144,7 +118,7 @@ export function mapAuthError(error: { message?: string; code?: string; status?: 
     normalized.includes("too many")
   ) {
     return {
-      message: "Too many verification emails have been requested. Please wait and try again later.",
+      message: "Too many account verification requests have been made. Please wait and try again later.",
       code: error.code,
       originalMessage: message,
     };
@@ -155,25 +129,6 @@ export function mapAuthError(error: { message?: string; code?: string; status?: 
     code: error.code,
     originalMessage: message,
   };
-}
-
-export function buildAuthRedirectUrl(next = "/verify/phone") {
-  const origin = getAppOrigin();
-  const url = new URL("/auth/callback", origin);
-  url.searchParams.set("next", next);
-  return url.toString();
-}
-
-function getAppOrigin() {
-  const configuredUrl = import.meta.env.VITE_APP_URL?.trim();
-  if (configuredUrl) return configuredUrl.replace(/\/$/, "");
-
-  if (typeof window !== "undefined") {
-    const isLocalhost = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
-    if (isLocalhost || import.meta.env.DEV) return window.location.origin;
-  }
-
-  return "https://app.sikacircle.com";
 }
 
 export async function signOut(): Promise<{ error: { message: string } | null }> {
