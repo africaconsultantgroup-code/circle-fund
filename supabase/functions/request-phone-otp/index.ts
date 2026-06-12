@@ -18,8 +18,23 @@ Deno.serve(async (req) => {
     }
 
     const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
+    if (!isValidGhanaInternationalNumber(normalizedPhoneNumber)) {
+      console.warn("request_phone_otp_invalid_recipient_format", {
+        userId: user.id,
+        rawPhoneNumber: phoneNumber,
+        normalizedPhoneNumber,
+      });
+      return json({
+        ok: false,
+        error: "SMS delivery failed. Invalid recipient format.",
+        reason: "invalid_recipient_format",
+        normalizedPhoneNumber,
+      }, 400);
+    }
+
     console.log("request_phone_otp_started", {
       userId: user.id,
+      normalizedPhoneNumber,
       phoneLast4: normalizedPhoneNumber.slice(-4),
     });
     const now = new Date();
@@ -57,6 +72,7 @@ Deno.serve(async (req) => {
     if (!hubtelResult.ok) {
       console.error("request_phone_otp_hubtel_send_failed", {
         userId: user.id,
+        normalizedPhoneNumber,
         status: hubtelResult.status,
         error: hubtelResult.error,
       });
@@ -95,6 +111,7 @@ Deno.serve(async (req) => {
     console.log("request_phone_otp_sent", {
       userId: user.id,
       providerReference: reference,
+      normalizedPhoneNumber,
       phoneLast4: normalizedPhoneNumber.slice(-4),
     });
 
@@ -113,7 +130,12 @@ function normalizePhoneNumber(phoneNumber: string) {
   const compact = phoneNumber.replace(/\D/g, "");
   if (compact.startsWith("0")) return `233${compact.slice(1)}`;
   if (compact.startsWith("233")) return compact;
+  if (compact.length === 9) return `233${compact}`;
   return compact;
+}
+
+function isValidGhanaInternationalNumber(phoneNumber: string) {
+  return /^233\d{9}$/.test(phoneNumber);
 }
 
 function generateOtp() {
@@ -139,6 +161,14 @@ async function sendHubtelOtp(phoneNumber: string, otp: string, reference: string
     Authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
   };
 
+  if (!isValidGhanaInternationalNumber(phoneNumber)) {
+    return {
+      ok: false,
+      status: 400,
+      error: "SMS delivery failed. Invalid recipient format.",
+    };
+  }
+
   const response = await fetch(sendUrl, {
     method: "POST",
     headers,
@@ -151,14 +181,32 @@ async function sendHubtelOtp(phoneNumber: string, otp: string, reference: string
     }),
   });
 
-  if (!response.ok) {
-    const text = await response.text();
+  const responseText = await response.text();
+  const hubtelStatus = readHubtelStatus(responseText);
+  if (!response.ok || hubtelStatus === "rejected") {
     return {
       ok: false,
-      status: 502,
-      error: text || "Hubtel rejected the OTP request.",
+      status: hubtelStatus === "rejected" ? 400 : 502,
+      error: hubtelStatus === "rejected"
+        ? "SMS delivery failed. Invalid recipient format."
+        : responseText || "Hubtel rejected the OTP request.",
     };
   }
 
   return { ok: true, status: 200, error: "" };
+}
+
+function readHubtelStatus(responseText: string) {
+  const text = responseText.toLowerCase();
+  if (text.includes("rejected") || text.includes("invalid recipient")) return "rejected";
+
+  try {
+    const body = JSON.parse(responseText);
+    const status = String(body.Status ?? body.status ?? body.MessageStatus ?? body.messageStatus ?? "").toLowerCase();
+    if (status === "rejected") return "rejected";
+  } catch {
+    // Hubtel may return non-JSON for transport failures; the text check above handles common rejection bodies.
+  }
+
+  return "";
 }

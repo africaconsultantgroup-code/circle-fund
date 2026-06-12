@@ -18,8 +18,23 @@ Deno.serve(async (req) => {
     }
 
     const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
+    if (!isValidGhanaInternationalNumber(normalizedPhoneNumber)) {
+      console.warn("verify_phone_otp_invalid_recipient_format", {
+        userId: user.id,
+        rawPhoneNumber: phoneNumber,
+        normalizedPhoneNumber,
+      });
+      return json({
+        ok: false,
+        error: "Invalid phone number format.",
+        reason: "invalid_recipient_format",
+        normalizedPhoneNumber,
+      }, 400);
+    }
+
     console.log("verify_phone_otp_started", {
       userId: user.id,
+      normalizedPhoneNumber,
       phoneLast4: normalizedPhoneNumber.slice(-4),
       hasOtpReference: typeof otpReference === "string",
     });
@@ -99,6 +114,7 @@ Deno.serve(async (req) => {
     console.log("verify_phone_otp_success", {
       userId: user.id,
       providerReference: reference,
+      normalizedPhoneNumber,
     });
 
     return json({
@@ -119,7 +135,12 @@ function normalizePhoneNumber(phoneNumber: string) {
   const compact = phoneNumber.replace(/\D/g, "");
   if (compact.startsWith("0")) return `233${compact.slice(1)}`;
   if (compact.startsWith("233")) return compact;
+  if (compact.length === 9) return `233${compact}`;
   return compact;
+}
+
+function isValidGhanaInternationalNumber(phoneNumber: string) {
+  return /^233\d{9}$/.test(phoneNumber);
 }
 
 async function markOtpFailed(serviceClient: any, userId: string, phoneNumber: string) {
