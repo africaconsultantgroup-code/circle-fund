@@ -10,6 +10,10 @@ export type UserVerification = Database['public']['Tables']['user_verifications'
 export type Contribution = Database['public']['Tables']['contributions']['Row'];
 export type Payout = Database['public']['Tables']['payouts']['Row'];
 export type Transaction = Database['public']['Tables']['transactions']['Row'];
+export type PersonalSusuPlan = Database['public']['Tables']['personal_susu_plans']['Row'];
+export type PersonalSusuPlanInsert = Database['public']['Tables']['personal_susu_plans']['Insert'];
+export type PersonalSusuDeposit = Database['public']['Tables']['personal_susu_deposits']['Row'];
+export type PersonalSusuDepositInsert = Database['public']['Tables']['personal_susu_deposits']['Insert'];
 
 export async function getProfileByUserId(userId: string) {
   return supabase.from('profiles').select('*').eq('user_id', userId).single();
@@ -271,4 +275,38 @@ export async function listCircleContributions(circleId: string) {
 
 export async function listCirclePayouts(circleId: string) {
   return supabase.from('payouts').select('*').eq('circle_id', circleId).order('payout_date', { ascending: false });
+}
+
+export async function listPersonalSusuPlans(userId: string) {
+  return supabase
+    .from('personal_susu_plans')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+}
+
+export async function getPersonalSusuPlan(planId: string, userId: string) {
+  return supabase
+    .from('personal_susu_plans')
+    .select('*')
+    .eq('id', planId)
+    .eq('user_id', userId)
+    .single();
+}
+
+export async function createPersonalSusuPlan(payload: PersonalSusuPlanInsert) {
+  return supabase.from('personal_susu_plans').insert(payload).select('*').single();
+}
+
+export async function listPersonalSusuDeposits(planId: string, userId: string) {
+  return supabase
+    .from('personal_susu_deposits')
+    .select('*')
+    .eq('plan_id', planId)
+    .eq('user_id', userId)
+    .order('deposited_at', { ascending: false });
+}
+
+export async function createPersonalSusuDeposit(payload: PersonalSusuDepositInsert) {
+  return supabase.from('personal_susu_deposits').insert(payload).select('*').single();
 }

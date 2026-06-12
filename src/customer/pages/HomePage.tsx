@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowUpRight, Bell, Plus, TrendingUp, Users, Wallet, ChevronRight, LogIn, ShieldCheck, ShieldAlert } from "lucide-react";
+import { ArrowUpRight, Bell, Plus, TrendingUp, Users, Wallet, ChevronRight, LogIn, ShieldCheck, ShieldAlert, PiggyBank, LockKeyhole } from "lucide-react";
 import { currentUser, formatGHS, notifications, trustScore, riskAlerts } from "@/lib/mock-data";
 import { TrustBadge } from "@/components/verification-badge";
 import { SavingsPlanner } from "@/components/savings-planner";
@@ -127,6 +127,22 @@ export function HomePage() {
         defaultTargetAmount={nextCircle?.amount ?? 1000}
         defaultDueDate={toDateInputValue(nextCircle?.nextPayoutDate)}
       />
+
+      <section className="mt-7 px-5">
+        <SectionHeader title="Personal Susu" actionTo="/piggy-bag" actionLabel="Open" />
+        <Link to="/piggy-bag" className="mt-3 flex items-center gap-3 rounded-3xl border border-border bg-card p-4 shadow-card">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary text-primary">
+            <PiggyBank className="h-5 w-5" />
+          </span>
+          <div className="flex-1">
+            <p className="font-display text-sm font-semibold">Piggy Bag</p>
+            <p className="text-[11px] text-muted-foreground">Create a locked savings goal and track progress.</p>
+          </div>
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+            <LockKeyhole className="h-4 w-4" />
+          </span>
+        </Link>
+      </section>
 
       <section className="mt-7 px-5">
         <SectionHeader title="Up next" actionTo="/payments" actionLabel="See all" />

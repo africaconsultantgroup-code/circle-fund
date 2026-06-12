@@ -29,9 +29,12 @@ import { Route as VerifyMomoRouteImport } from './routes/verify.momo'
 import { Route as VerifyGuarantorRouteImport } from './routes/verify.guarantor'
 import { Route as VerifyGhanaCardRouteImport } from './routes/verify.ghana-card'
 import { Route as PayoutIdRouteImport } from './routes/payout.$id'
+import { Route as PiggyBagIdRouteImport } from './routes/piggy-bag.$id'
+import { Route as PiggyBagCreateRouteImport } from './routes/piggy-bag.create'
 import { Route as PaymentIdRouteImport } from './routes/payment.$id'
 import { Route as CircleIdRouteImport } from './routes/circle.$id'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
+import { Route as AppPiggyBagRouteImport } from './routes/_app/piggy-bag'
 import { Route as AppProfileRouteImport } from './routes/_app/profile'
 import { Route as AppPaymentsRouteImport } from './routes/_app/payments'
 import { Route as AppNotificationsRouteImport } from './routes/_app/notifications'
@@ -141,6 +144,16 @@ const PayoutIdRoute = PayoutIdRouteImport.update({
   path: '/payout/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PiggyBagIdRoute = PiggyBagIdRouteImport.update({
+  id: '/piggy-bag/$id',
+  path: '/piggy-bag/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PiggyBagCreateRoute = PiggyBagCreateRouteImport.update({
+  id: '/piggy-bag/create',
+  path: '/piggy-bag/create',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PaymentIdRoute = PaymentIdRouteImport.update({
   id: '/payment/$id',
   path: '/payment/$id',
@@ -155,6 +168,11 @@ const AdminLoginRoute = AdminLoginRouteImport.update({
   id: '/admin/login',
   path: '/admin/login',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppPiggyBagRoute = AppPiggyBagRouteImport.update({
+  id: '/piggy-bag',
+  path: '/piggy-bag',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppProfileRoute = AppProfileRouteImport.update({
   id: '/profile',
@@ -225,7 +243,10 @@ export interface FileRoutesByFullPath {
   '/admin/login': typeof AdminLoginRoute
   '/circle/$id': typeof CircleIdRouteWithChildren
   '/payment/$id': typeof PaymentIdRoute
+  '/piggy-bag/create': typeof PiggyBagCreateRoute
+  '/piggy-bag/$id': typeof PiggyBagIdRoute
   '/payout/$id': typeof PayoutIdRoute
+  '/piggy-bag': typeof AppPiggyBagRoute
   '/verify/ghana-card': typeof VerifyGhanaCardRoute
   '/verify/guarantor': typeof VerifyGuarantorRoute
   '/verify/momo': typeof VerifyMomoRoute
@@ -258,7 +279,10 @@ export interface FileRoutesByTo {
   '/admin/login': typeof AdminLoginRoute
   '/circle/$id': typeof CircleIdRouteWithChildren
   '/payment/$id': typeof PaymentIdRoute
+  '/piggy-bag/create': typeof PiggyBagCreateRoute
+  '/piggy-bag/$id': typeof PiggyBagIdRoute
   '/payout/$id': typeof PayoutIdRoute
+  '/piggy-bag': typeof AppPiggyBagRoute
   '/verify/ghana-card': typeof VerifyGhanaCardRoute
   '/verify/guarantor': typeof VerifyGuarantorRoute
   '/verify/momo': typeof VerifyMomoRoute
@@ -294,7 +318,10 @@ export interface FileRoutesById {
   '/admin/login': typeof AdminLoginRoute
   '/circle/$id': typeof CircleIdRouteWithChildren
   '/payment/$id': typeof PaymentIdRoute
+  '/piggy-bag/create': typeof PiggyBagCreateRoute
+  '/piggy-bag/$id': typeof PiggyBagIdRoute
   '/payout/$id': typeof PayoutIdRoute
+  '/_app/piggy-bag': typeof AppPiggyBagRoute
   '/verify/ghana-card': typeof VerifyGhanaCardRoute
   '/verify/guarantor': typeof VerifyGuarantorRoute
   '/verify/momo': typeof VerifyMomoRoute
@@ -329,7 +356,10 @@ export interface FileRouteTypes {
     | '/admin/login'
     | '/circle/$id'
     | '/payment/$id'
+    | '/piggy-bag/create'
+    | '/piggy-bag/$id'
     | '/payout/$id'
+    | '/piggy-bag'
     | '/verify/ghana-card'
     | '/verify/guarantor'
     | '/verify/momo'
@@ -362,7 +392,10 @@ export interface FileRouteTypes {
     | '/admin/login'
     | '/circle/$id'
     | '/payment/$id'
+    | '/piggy-bag/create'
+    | '/piggy-bag/$id'
     | '/payout/$id'
+    | '/piggy-bag'
     | '/verify/ghana-card'
     | '/verify/guarantor'
     | '/verify/momo'
@@ -397,7 +430,10 @@ export interface FileRouteTypes {
     | '/admin/login'
     | '/circle/$id'
     | '/payment/$id'
+    | '/piggy-bag/create'
+    | '/piggy-bag/$id'
     | '/payout/$id'
+    | '/_app/piggy-bag'
     | '/verify/ghana-card'
     | '/verify/guarantor'
     | '/verify/momo'
@@ -428,6 +464,8 @@ export interface RootRouteChildren {
   AdminLoginRoute: typeof AdminLoginRoute
   CircleIdRoute: typeof CircleIdRouteWithChildren
   PaymentIdRoute: typeof PaymentIdRoute
+  PiggyBagCreateRoute: typeof PiggyBagCreateRoute
+  PiggyBagIdRoute: typeof PiggyBagIdRoute
   PayoutIdRoute: typeof PayoutIdRoute
   VerifyGhanaCardRoute: typeof VerifyGhanaCardRoute
   VerifyGuarantorRoute: typeof VerifyGuarantorRoute
@@ -581,6 +619,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PayoutIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/piggy-bag/$id': {
+      id: '/piggy-bag/$id'
+      path: '/piggy-bag/$id'
+      fullPath: '/piggy-bag/$id'
+      preLoaderRoute: typeof PiggyBagIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/piggy-bag/create': {
+      id: '/piggy-bag/create'
+      path: '/piggy-bag/create'
+      fullPath: '/piggy-bag/create'
+      preLoaderRoute: typeof PiggyBagCreateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/payment/$id': {
       id: '/payment/$id'
       path: '/payment/$id'
@@ -607,6 +659,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof AppProfileRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/piggy-bag': {
+      id: '/_app/piggy-bag'
+      path: '/piggy-bag'
+      fullPath: '/piggy-bag'
+      preLoaderRoute: typeof AppPiggyBagRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/payments': {
@@ -694,6 +753,7 @@ interface AppRouteChildren {
   AppHomeRoute: typeof AppHomeRoute
   AppNotificationsRoute: typeof AppNotificationsRoute
   AppPaymentsRoute: typeof AppPaymentsRoute
+  AppPiggyBagRoute: typeof AppPiggyBagRoute
   AppProfileRoute: typeof AppProfileRoute
 }
 
@@ -702,6 +762,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppHomeRoute: AppHomeRoute,
   AppNotificationsRoute: AppNotificationsRoute,
   AppPaymentsRoute: AppPaymentsRoute,
+  AppPiggyBagRoute: AppPiggyBagRoute,
   AppProfileRoute: AppProfileRoute,
 }
 
@@ -736,6 +797,8 @@ const rootRouteChildren: RootRouteChildren = {
   AdminLoginRoute: AdminLoginRoute,
   CircleIdRoute: CircleIdRouteWithChildren,
   PaymentIdRoute: PaymentIdRoute,
+  PiggyBagCreateRoute: PiggyBagCreateRoute,
+  PiggyBagIdRoute: PiggyBagIdRoute,
   PayoutIdRoute: PayoutIdRoute,
   VerifyGhanaCardRoute: VerifyGhanaCardRoute,
   VerifyGuarantorRoute: VerifyGuarantorRoute,

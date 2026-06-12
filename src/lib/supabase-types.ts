@@ -11,6 +11,10 @@ export type VerificationStatus = 'not_started' | 'pending' | 'verified' | 'faile
 export type OtpStatus = 'not_started' | 'pending' | 'verified' | 'failed';
 export type AccountStatus = 'active' | 'pending' | 'suspended' | 'disabled';
 export type UserRole = 'customer' | 'admin';
+export type PersonalSusuFrequency = 'daily' | 'weekly' | 'biweekly' | 'monthly';
+export type PersonalSusuDurationUnit = 'weeks' | 'months';
+export type PersonalSusuPlanStatus = 'active' | 'completed' | 'cancelled';
+export type PersonalSusuPaymentStatus = 'pending' | 'paid' | 'failed';
 
 export interface Database {
   public: {
@@ -315,6 +319,81 @@ export interface Database {
           description?: string | null;
           reference?: string | null;
           updated_at?: string | null;
+        };
+      };
+      personal_susu_plans: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          target_amount: number;
+          frequency: PersonalSusuFrequency;
+          duration: number;
+          duration_unit: PersonalSusuDurationUnit;
+          start_date: string;
+          end_date: string;
+          status: PersonalSusuPlanStatus;
+          locked_until: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          target_amount: number;
+          frequency: PersonalSusuFrequency;
+          duration: number;
+          duration_unit?: PersonalSusuDurationUnit;
+          start_date: string;
+          end_date: string;
+          status?: PersonalSusuPlanStatus;
+          locked_until: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          name?: string;
+          target_amount?: number;
+          frequency?: PersonalSusuFrequency;
+          duration?: number;
+          duration_unit?: PersonalSusuDurationUnit;
+          start_date?: string;
+          end_date?: string;
+          status?: PersonalSusuPlanStatus;
+          locked_until?: string;
+          updated_at?: string;
+        };
+      };
+      personal_susu_deposits: {
+        Row: {
+          id: string;
+          plan_id: string;
+          user_id: string;
+          amount: number;
+          payment_status: PersonalSusuPaymentStatus;
+          provider: string | null;
+          transaction_reference: string | null;
+          deposited_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          plan_id: string;
+          user_id: string;
+          amount: number;
+          payment_status?: PersonalSusuPaymentStatus;
+          provider?: string | null;
+          transaction_reference?: string | null;
+          deposited_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          amount?: number;
+          payment_status?: PersonalSusuPaymentStatus;
+          provider?: string | null;
+          transaction_reference?: string | null;
+          deposited_at?: string;
         };
       };
     };
