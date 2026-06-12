@@ -110,10 +110,9 @@ Deno.serve(async (req) => {
 });
 
 function normalizePhoneNumber(phoneNumber: string) {
-  const compact = phoneNumber.replace(/[\s()-]/g, "");
-  if (compact.startsWith("+")) return compact;
-  if (compact.startsWith("0")) return `+233${compact.slice(1)}`;
-  if (compact.startsWith("233")) return `+${compact}`;
+  const compact = phoneNumber.replace(/\D/g, "");
+  if (compact.startsWith("0")) return `233${compact.slice(1)}`;
+  if (compact.startsWith("233")) return compact;
   return compact;
 }
 
