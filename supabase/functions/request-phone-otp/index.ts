@@ -13,10 +13,15 @@ Deno.serve(async (req) => {
 
     const { phoneNumber } = await req.json();
     if (typeof phoneNumber !== "string" || phoneNumber.trim().length < 8) {
+      console.warn("request_phone_otp_invalid_phone", { userId: user.id });
       return json({ error: "A valid phone number is required." }, 400);
     }
 
     const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
+    console.log("request_phone_otp_started", {
+      userId: user.id,
+      phoneLast4: normalizedPhoneNumber.slice(-4),
+    });
     const now = new Date();
     const reference = providerReference("phone_otp");
     const status = "pending";
@@ -40,13 +45,25 @@ Deno.serve(async (req) => {
       .update({ phone: normalizedPhoneNumber, updated_at: now.toISOString() })
       .eq("user_id", user.id);
 
-    if (profileError) return json({ error: profileError.message }, 500);
+    if (profileError) {
+      console.error("request_phone_otp_profile_update_failed", {
+        userId: user.id,
+        error: profileError.message,
+      });
+      return json({ error: profileError.message, reason: "profile_update_failed" }, 500);
+    }
 
     const hubtelResult = await sendHubtelOtp(normalizedPhoneNumber, otp, reference);
     if (!hubtelResult.ok) {
+      console.error("request_phone_otp_hubtel_send_failed", {
+        userId: user.id,
+        status: hubtelResult.status,
+        error: hubtelResult.error,
+      });
       return json({
         ok: false,
         error: hubtelResult.error,
+        reason: "hubtel_send_failed",
       }, hubtelResult.status);
     }
 
@@ -67,7 +84,19 @@ Deno.serve(async (req) => {
         updated_at: now.toISOString(),
       }, { onConflict: "user_id" });
 
-    if (upsertError) return json({ error: upsertError.message }, 500);
+    if (upsertError) {
+      console.error("request_phone_otp_upsert_failed", {
+        userId: user.id,
+        error: upsertError.message,
+      });
+      return json({ error: upsertError.message, reason: "verification_upsert_failed" }, 500);
+    }
+
+    console.log("request_phone_otp_sent", {
+      userId: user.id,
+      providerReference: reference,
+      phoneLast4: normalizedPhoneNumber.slice(-4),
+    });
 
     return json({
       status: nextStatus,

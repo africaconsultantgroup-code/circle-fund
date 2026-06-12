@@ -13,10 +13,16 @@ Deno.serve(async (req) => {
 
     const { phoneNumber, otp, otpReference } = await req.json();
     if (typeof phoneNumber !== "string" || typeof otp !== "string" || otp.trim().length !== 6) {
+      console.warn("verify_phone_otp_invalid_payload", { userId: user.id });
       return json({ error: "A phone number and OTP are required." }, 400);
     }
 
     const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
+    console.log("verify_phone_otp_started", {
+      userId: user.id,
+      phoneLast4: normalizedPhoneNumber.slice(-4),
+      hasOtpReference: typeof otpReference === "string",
+    });
     const now = new Date();
     const reference = providerReference("phone_verify");
     const { data: existingVerification, error: existingVerificationError } = await serviceClient
@@ -27,22 +33,26 @@ Deno.serve(async (req) => {
 
     if (existingVerificationError) return json({ error: existingVerificationError.message }, 500);
     if (!existingVerification?.otp_code_hash || !existingVerification.otp_expires_at) {
-      return json({ ok: false, error: "No active OTP request found. Please request a new code." }, 400);
+      console.warn("verify_phone_otp_no_active_request", { userId: user.id });
+      return json({ ok: false, error: "No active OTP request found. Please request a new code.", reason: "otp_request_missing" }, 400);
     }
 
     if (typeof otpReference === "string" && existingVerification.otp_reference && otpReference !== existingVerification.otp_reference) {
-      return json({ ok: false, error: "Invalid OTP. Please try again." }, 400);
+      console.warn("verify_phone_otp_reference_mismatch", { userId: user.id });
+      return json({ ok: false, error: "Invalid OTP. Please try again.", reason: "otp_reference_mismatch" }, 400);
     }
 
     if (new Date(existingVerification.otp_expires_at).getTime() < now.getTime()) {
       await markOtpFailed(serviceClient, user.id, normalizedPhoneNumber);
-      return json({ ok: false, error: "OTP expired. Please request a new code." }, 400);
+      console.warn("verify_phone_otp_expired", { userId: user.id });
+      return json({ ok: false, error: "OTP expired. Please request a new code.", reason: "otp_expired" }, 400);
     }
 
     const otpHash = await hashSensitiveValue(`${normalizedPhoneNumber}:${otp.trim()}`);
     if (otpHash !== existingVerification.otp_code_hash) {
       await markOtpFailed(serviceClient, user.id, normalizedPhoneNumber);
-      return json({ ok: false, error: "Invalid OTP. Please try again." }, 400);
+      console.warn("verify_phone_otp_invalid_code", { userId: user.id });
+      return json({ ok: false, error: "Invalid OTP. Please try again.", reason: "otp_invalid" }, 400);
     }
 
     const status = resolveAggregateStatus(existingVerification);
@@ -52,7 +62,13 @@ Deno.serve(async (req) => {
       .update({ phone: normalizedPhoneNumber, updated_at: now.toISOString() })
       .eq("user_id", user.id);
 
-    if (profileError) return json({ error: profileError.message }, 500);
+    if (profileError) {
+      console.error("verify_phone_otp_profile_update_failed", {
+        userId: user.id,
+        error: profileError.message,
+      });
+      return json({ error: profileError.message, reason: "profile_update_failed" }, 500);
+    }
 
     const { error: upsertError } = await serviceClient
       .from("user_verifications")
@@ -72,7 +88,18 @@ Deno.serve(async (req) => {
         updated_at: now.toISOString(),
       }, { onConflict: "user_id" });
 
-    if (upsertError) return json({ error: upsertError.message }, 500);
+    if (upsertError) {
+      console.error("verify_phone_otp_upsert_failed", {
+        userId: user.id,
+        error: upsertError.message,
+      });
+      return json({ error: upsertError.message, reason: "verification_upsert_failed" }, 500);
+    }
+
+    console.log("verify_phone_otp_success", {
+      userId: user.id,
+      providerReference: reference,
+    });
 
     return json({
       ok: true,

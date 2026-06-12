@@ -24,14 +24,35 @@ export async function getUserVerification(userId: string) {
 }
 
 export async function requestPhoneOtp(phoneNumber: string) {
-  return supabase.functions.invoke('request-phone-otp', {
+  return invokeAuthedFunction('request-phone-otp', {
     body: { phoneNumber },
   });
 }
 
 export async function verifyPhoneOtp(phoneNumber: string, otp: string, otpReference?: string | null) {
-  return supabase.functions.invoke('verify-phone-otp', {
+  return invokeAuthedFunction('verify-phone-otp', {
     body: { phoneNumber, otp, otpReference },
+  });
+}
+
+async function invokeAuthedFunction<T = unknown>(functionName: string, options: { body: Record<string, unknown> }) {
+  const { data: sessionResult, error: sessionError } = await supabase.auth.getSession();
+  const accessToken = sessionResult.session?.access_token;
+
+  if (sessionError || !accessToken) {
+    return {
+      data: null as T | null,
+      error: {
+        message: sessionError?.message ?? 'Your sign-in session is still loading or has expired. Please sign in again.',
+      },
+    };
+  }
+
+  return supabase.functions.invoke<T>(functionName, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
   });
 }
 

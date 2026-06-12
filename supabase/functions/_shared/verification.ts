@@ -12,14 +12,72 @@ export async function getAuthedServiceClient(req: Request) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const authorization = req.headers.get("Authorization") ?? "";
+
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+    console.error("auth_config_missing", {
+      hasSupabaseUrl: Boolean(supabaseUrl),
+      hasAnonKey: Boolean(anonKey),
+      hasServiceRoleKey: Boolean(serviceRoleKey),
+    });
+    return {
+      user: null,
+      serviceClient: null,
+      error: json({
+        ok: false,
+        error: "Auth configuration is missing in the Edge Function environment.",
+        reason: "missing_supabase_function_secrets",
+      }, 500),
+    };
+  }
+
+  if (!authorization) {
+    console.warn("auth_header_missing");
+    return {
+      user: null,
+      serviceClient: null,
+      error: json({
+        ok: false,
+        error: "Missing Authorization header. Please sign in again before requesting an OTP.",
+        reason: "missing_authorization_header",
+      }, 401),
+    };
+  }
+
+  if (!authorization.toLowerCase().startsWith("bearer ")) {
+    console.warn("auth_header_invalid_scheme");
+    return {
+      user: null,
+      serviceClient: null,
+      error: json({
+        ok: false,
+        error: "Invalid Authorization header. Please sign in again before requesting an OTP.",
+        reason: "invalid_authorization_header",
+      }, 401),
+    };
+  }
 
   const authClient = createClient(supabaseUrl, anonKey, {
-    global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
+    global: { headers: { Authorization: authorization } },
   });
   const { data, error } = await authClient.auth.getUser();
   if (error || !data.user) {
-    return { user: null, serviceClient: null, error: json({ error: "Unauthorized" }, 401) };
+    console.warn("auth_get_user_failed", {
+      errorMessage: error?.message ?? null,
+      hasUser: Boolean(data.user),
+    });
+    return {
+      user: null,
+      serviceClient: null,
+      error: json({
+        ok: false,
+        error: error?.message ?? "No authenticated Supabase user found for this session.",
+        reason: error ? "auth_get_user_failed" : "auth_user_missing",
+      }, 401),
+    };
   }
+
+  console.log("auth_get_user_success", { userId: data.user.id });
 
   const serviceClient = createClient(supabaseUrl, serviceRoleKey);
   return { user: data.user, serviceClient, error: null };

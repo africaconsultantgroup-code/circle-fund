@@ -145,8 +145,11 @@ async function describeFunctionError(error: unknown) {
 
   if (errorLike.context instanceof Response) {
     try {
-      const body = await errorLike.context.clone().json() as { error?: unknown };
+      const body = await errorLike.context.clone().json() as { error?: unknown; message?: unknown; reason?: unknown; code?: unknown };
       if (typeof body.error === "string") return body.error;
+      if (typeof body.message === "string") return body.message;
+      if (typeof body.reason === "string") return body.reason;
+      if (typeof body.code === "string") return body.code;
     } catch {
       return errorLike.message ?? "Phone verification failed.";
     }
