@@ -97,11 +97,29 @@ export function VerifyPhonePage() {
       return;
     }
 
+    const response = data as {
+      updatedVerification?: {
+        phone_verified?: boolean;
+        otp_status?: string;
+        otp_verified_at?: string | null;
+        phone_number?: string | null;
+      };
+    } | null;
+
+    console.log("verify_phone_otp_frontend_success", {
+      updatedVerification: response?.updatedVerification ?? null,
+    });
     setMessage(resultMessage(data, "Phone verified. Taking you to the next verification step."));
-    setTimeout(() => {
-      navigate({ to: "/verify/ghana-card" });
-    }, 600);
-    loadVerificationFlowSummary().then(setFlowSummary);
+    const summary = await loadVerificationFlowSummary();
+    console.log("verify_phone_otp_frontend_refreshed_state", {
+      phoneVerified: summary.verification?.phone_verified ?? null,
+      otpStatus: summary.verification?.otp_status ?? null,
+      otpVerifiedAt: summary.verification?.otp_verified_at ?? null,
+      phoneNumber: summary.verification?.phone_number ?? null,
+      nextRequiredStep: summary.nextStep.to,
+    });
+    setFlowSummary(summary);
+    navigate({ to: "/verify/ghana-card" });
   };
 
   return (

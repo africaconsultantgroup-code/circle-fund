@@ -154,26 +154,41 @@ Deno.serve(async (req) => {
       return json({ error: profileError.message, reason: "profile_update_failed" }, 500);
     }
 
+    const verificationPatch = {
+      phone_number: storedPhoneNumber,
+      phone_verified: true,
+      phone_verified_at: now.toISOString(),
+      otp_status: "verified",
+      otp_reference: existingVerification.otp_reference ?? reference,
+      otp_verified_at: now.toISOString(),
+      otp_code_hash: null,
+      otp_expires_at: null,
+      verification_provider: "hubtel_otp",
+      provider_reference: reference,
+      verification_status: status,
+      failure_reason: null,
+      updated_at: now.toISOString(),
+    };
+
+    console.log("verify_phone_otp_update_attempt", {
+      userId: user.id,
+      verificationRecordId: existingVerification.id,
+      updatePayload: {
+        phone_number: verificationPatch.phone_number,
+        phone_verified: verificationPatch.phone_verified,
+        phone_verified_at: verificationPatch.phone_verified_at,
+        otp_status: verificationPatch.otp_status,
+        otp_verified_at: verificationPatch.otp_verified_at,
+      },
+    });
+
     const { data: verifiedRecord, error: updateError } = await serviceClient
       .from("user_verifications")
-      .update({
-        phone_number: storedPhoneNumber,
-        phone_verified: true,
-        phone_verified_at: now.toISOString(),
-        otp_status: "verified",
-        otp_reference: existingVerification.otp_reference ?? reference,
-        otp_verified_at: now.toISOString(),
-        otp_code_hash: null,
-        otp_expires_at: null,
-        verification_provider: "hubtel_otp",
-        provider_reference: reference,
-        verification_status: status,
-        failure_reason: null,
-        updated_at: now.toISOString(),
-      })
+      .update(verificationPatch)
+      .eq("id", existingVerification.id)
       .eq("user_id", user.id)
       .select("id, user_id, phone_number, phone_verified, phone_verified_at, otp_status, otp_verified_at, otp_reference, verification_status")
-      .single();
+      .maybeSingle();
 
     if (updateError) {
       console.error("verify_phone_otp_update_failed", {
@@ -182,6 +197,14 @@ Deno.serve(async (req) => {
         error: updateError.message,
       });
       return json({ error: updateError.message, reason: "verification_update_failed" }, 500);
+    }
+
+    if (!verifiedRecord) {
+      console.error("verify_phone_otp_row_not_updated", {
+        userId: user.id,
+        verificationRecordId: existingVerification.id,
+      });
+      return json({ error: "Verification row not updated", reason: "verification_row_not_updated" }, 500);
     }
 
     console.log("verify_phone_otp_update_result", {
@@ -260,6 +283,7 @@ Deno.serve(async (req) => {
       phoneVerifiedAt: refreshedVerification.phone_verified_at,
       otpStatus: refreshedVerification.otp_status,
       otpVerifiedAt: refreshedVerification.otp_verified_at,
+      updatedVerification: refreshedVerification,
       providerReference: reference,
       message: status === "verified"
         ? "Phone number verified. Verification is complete."
