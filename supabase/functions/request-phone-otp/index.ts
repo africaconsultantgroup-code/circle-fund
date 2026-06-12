@@ -94,25 +94,22 @@ function generateOtp() {
 
 async function sendHubtelOtp(phoneNumber: string, otp: string, reference: string) {
   const sendUrl = Deno.env.get("HUBTEL_SMS_SEND_URL") ?? Deno.env.get("HUBTEL_OTP_SEND_URL") ?? "";
-  const senderId = Deno.env.get("HUBTEL_SENDER_ID") ?? "SikaCircle";
+  const senderId = Deno.env.get("HUBTEL_SENDER_ID") ?? "";
   const clientId = Deno.env.get("HUBTEL_CLIENT_ID") ?? "";
   const clientSecret = Deno.env.get("HUBTEL_CLIENT_SECRET") ?? "";
-  const bearerToken = Deno.env.get("HUBTEL_BEARER_TOKEN") ?? "";
 
-  if (!sendUrl || (!bearerToken && (!clientId || !clientSecret))) {
+  if (!sendUrl || !senderId || !clientId || !clientSecret) {
     return {
       ok: false,
       status: 500,
-      error: "Hubtel OTP is not configured. Set HUBTEL_SMS_SEND_URL and Hubtel credentials in Supabase secrets.",
+      error: "Hubtel OTP is not configured. Set HUBTEL_SMS_SEND_URL, HUBTEL_CLIENT_ID, HUBTEL_CLIENT_SECRET, and HUBTEL_SENDER_ID in Supabase Edge Function secrets.",
     };
   }
 
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (bearerToken) {
-    headers.Authorization = `Bearer ${bearerToken}`;
-  } else {
-    headers.Authorization = `Basic ${btoa(`${clientId}:${clientSecret}`)}`;
-  }
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+  };
 
   const response = await fetch(sendUrl, {
     method: "POST",
