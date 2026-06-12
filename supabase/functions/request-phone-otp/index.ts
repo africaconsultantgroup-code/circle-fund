@@ -53,7 +53,6 @@ Deno.serve(async (req) => {
 
     if (existingVerificationError) return json({ error: existingVerificationError.message }, 500);
 
-    const phoneAlreadyVerified = existingVerification?.phone_verified === true;
     const nextStatus = existingVerification?.verification_status === "verified" ? "verified" : status;
 
     const { error: profileError } = await serviceClient
@@ -69,14 +68,59 @@ Deno.serve(async (req) => {
       return json({ error: profileError.message, reason: "profile_update_failed" }, 500);
     }
 
+    const { data: savedVerification, error: upsertError } = await serviceClient
+      .from("user_verifications")
+      .upsert({
+        user_id: user.id,
+        phone_number: normalizedPhoneNumber,
+        phone_verified: false,
+        otp_status: status,
+        otp_reference: reference,
+        otp_code_hash: otpHash,
+        otp_expires_at: expiresAt.toISOString(),
+        verification_provider: "hubtel_otp",
+        provider_reference: reference,
+        verification_status: nextStatus,
+        failure_reason: failureReason,
+        updated_at: now.toISOString(),
+      }, { onConflict: "user_id" })
+      .select("user_id, phone_number, otp_reference, otp_status, otp_expires_at, otp_code_hash")
+      .single();
+
+    if (upsertError) {
+      console.error("request_phone_otp_upsert_failed", {
+        userId: user.id,
+        otpReference: reference,
+        phoneNumber: normalizedPhoneNumber,
+        expiryTime: expiresAt.toISOString(),
+        error: upsertError.message,
+      });
+      return json({ error: upsertError.message, reason: "verification_upsert_failed" }, 500);
+    }
+
+    console.log("request_phone_otp_record_saved", {
+      userId: savedVerification.user_id,
+      otpReference: savedVerification.otp_reference,
+      phoneNumber: savedVerification.phone_number,
+      expiryTime: savedVerification.otp_expires_at,
+      databaseRecordFound: Boolean(savedVerification),
+      hasOtpHash: Boolean(savedVerification.otp_code_hash),
+      otpStatus: savedVerification.otp_status,
+    });
+
     const hubtelResult = await sendHubtelOtp(normalizedPhoneNumber, otp, reference);
     if (!hubtelResult.ok) {
       console.error("request_phone_otp_hubtel_send_failed", {
         userId: user.id,
-        normalizedPhoneNumber,
+        otpReference: reference,
+        phoneNumber: normalizedPhoneNumber,
+        expiryTime: expiresAt.toISOString(),
         status: hubtelResult.status,
         error: hubtelResult.error,
       });
+
+      await markOtpDeliveryFailed(serviceClient, user.id, normalizedPhoneNumber);
+
       return json({
         ok: false,
         error: hubtelResult.error,
@@ -86,35 +130,11 @@ Deno.serve(async (req) => {
       }, hubtelResult.status);
     }
 
-    const { error: upsertError } = await serviceClient
-      .from("user_verifications")
-      .upsert({
-        user_id: user.id,
-        phone_number: normalizedPhoneNumber,
-        phone_verified: phoneAlreadyVerified,
-        otp_status: phoneAlreadyVerified ? "verified" : status,
-        otp_reference: reference,
-        otp_code_hash: phoneAlreadyVerified ? null : otpHash,
-        otp_expires_at: phoneAlreadyVerified ? null : expiresAt.toISOString(),
-        verification_provider: "hubtel_otp",
-        provider_reference: reference,
-        verification_status: nextStatus,
-        failure_reason: phoneAlreadyVerified ? null : failureReason,
-        updated_at: now.toISOString(),
-      }, { onConflict: "user_id" });
-
-    if (upsertError) {
-      console.error("request_phone_otp_upsert_failed", {
-        userId: user.id,
-        error: upsertError.message,
-      });
-      return json({ error: upsertError.message, reason: "verification_upsert_failed" }, 500);
-    }
-
     console.log("request_phone_otp_sent", {
       userId: user.id,
-      providerReference: reference,
-      normalizedPhoneNumber,
+      otpReference: reference,
+      phoneNumber: normalizedPhoneNumber,
+      expiryTime: expiresAt.toISOString(),
       phoneLast4: normalizedPhoneNumber.slice(-4),
     });
 
@@ -145,6 +165,21 @@ function isValidGhanaInternationalNumber(phoneNumber: string) {
 
 function generateOtp() {
   return String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, "0");
+}
+
+async function markOtpDeliveryFailed(serviceClient: any, userId: string, phoneNumber: string) {
+  await serviceClient
+    .from("user_verifications")
+    .update({
+      phone_number: phoneNumber,
+      phone_verified: false,
+      otp_status: "failed",
+      otp_code_hash: null,
+      otp_expires_at: null,
+      failure_reason: "SMS delivery failed. Invalid recipient format.",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId);
 }
 
 async function sendHubtelOtp(phoneNumber: string, otp: string, reference: string) {

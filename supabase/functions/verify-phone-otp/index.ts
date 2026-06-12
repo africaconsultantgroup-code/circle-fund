@@ -34,6 +34,7 @@ Deno.serve(async (req) => {
 
     console.log("verify_phone_otp_started", {
       userId: user.id,
+      otpReference: typeof otpReference === "string" ? otpReference : null,
       normalizedPhoneNumber,
       phoneLast4: normalizedPhoneNumber.slice(-4),
       hasOtpReference: typeof otpReference === "string",
@@ -42,31 +43,67 @@ Deno.serve(async (req) => {
     const reference = providerReference("phone_verify");
     const { data: existingVerification, error: existingVerificationError } = await serviceClient
       .from("user_verifications")
-      .select("ghana_card_verified, face_verified, verification_status, otp_code_hash, otp_expires_at, otp_reference")
+      .select("user_id, phone_number, ghana_card_verified, face_verified, verification_status, otp_status, otp_code_hash, otp_expires_at, otp_reference")
       .eq("user_id", user.id)
       .maybeSingle();
 
     if (existingVerificationError) return json({ error: existingVerificationError.message }, 500);
+    console.log("verify_phone_otp_record_lookup", {
+      userId: user.id,
+      requestedOtpReference: typeof otpReference === "string" ? otpReference : null,
+      savedOtpReference: existingVerification?.otp_reference ?? null,
+      phoneNumber: existingVerification?.phone_number ?? normalizedPhoneNumber,
+      expiryTime: existingVerification?.otp_expires_at ?? null,
+      databaseRecordFound: Boolean(existingVerification),
+      hasOtpHash: Boolean(existingVerification?.otp_code_hash),
+      otpStatus: existingVerification?.otp_status ?? null,
+    });
+
     if (!existingVerification?.otp_code_hash || !existingVerification.otp_expires_at) {
-      console.warn("verify_phone_otp_no_active_request", { userId: user.id });
+      console.warn("verify_phone_otp_no_active_request", {
+        userId: user.id,
+        requestedOtpReference: typeof otpReference === "string" ? otpReference : null,
+        savedOtpReference: existingVerification?.otp_reference ?? null,
+        phoneNumber: existingVerification?.phone_number ?? normalizedPhoneNumber,
+        expiryTime: existingVerification?.otp_expires_at ?? null,
+        databaseRecordFound: Boolean(existingVerification),
+        hasOtpHash: Boolean(existingVerification?.otp_code_hash),
+      });
       return json({ ok: false, error: "No active OTP request found. Please request a new code.", reason: "otp_request_missing" }, 400);
     }
 
     if (typeof otpReference === "string" && existingVerification.otp_reference && otpReference !== existingVerification.otp_reference) {
-      console.warn("verify_phone_otp_reference_mismatch", { userId: user.id });
+      console.warn("verify_phone_otp_reference_mismatch", {
+        userId: user.id,
+        requestedOtpReference: otpReference,
+        savedOtpReference: existingVerification.otp_reference,
+        phoneNumber: existingVerification.phone_number ?? normalizedPhoneNumber,
+        expiryTime: existingVerification.otp_expires_at,
+      });
       return json({ ok: false, error: "Invalid OTP. Please try again.", reason: "otp_reference_mismatch" }, 400);
     }
 
     if (new Date(existingVerification.otp_expires_at).getTime() < now.getTime()) {
-      await markOtpFailed(serviceClient, user.id, normalizedPhoneNumber);
-      console.warn("verify_phone_otp_expired", { userId: user.id });
+      await markOtpFailed(serviceClient, user.id, existingVerification.phone_number ?? normalizedPhoneNumber);
+      console.warn("verify_phone_otp_expired", {
+        userId: user.id,
+        otpReference: existingVerification.otp_reference,
+        phoneNumber: existingVerification.phone_number ?? normalizedPhoneNumber,
+        expiryTime: existingVerification.otp_expires_at,
+      });
       return json({ ok: false, error: "OTP expired. Please request a new code.", reason: "otp_expired" }, 400);
     }
 
-    const otpHash = await hashSensitiveValue(`${normalizedPhoneNumber}:${otp.trim()}`);
+    const storedPhoneNumber = existingVerification.phone_number ?? normalizedPhoneNumber;
+    const otpHash = await hashSensitiveValue(`${storedPhoneNumber}:${otp.trim()}`);
     if (otpHash !== existingVerification.otp_code_hash) {
-      await markOtpFailed(serviceClient, user.id, normalizedPhoneNumber);
-      console.warn("verify_phone_otp_invalid_code", { userId: user.id });
+      await markOtpFailed(serviceClient, user.id, storedPhoneNumber);
+      console.warn("verify_phone_otp_invalid_code", {
+        userId: user.id,
+        otpReference: existingVerification.otp_reference,
+        phoneNumber: storedPhoneNumber,
+        expiryTime: existingVerification.otp_expires_at,
+      });
       return json({ ok: false, error: "Invalid OTP. Please try again.", reason: "otp_invalid" }, 400);
     }
 
@@ -74,7 +111,7 @@ Deno.serve(async (req) => {
 
     const { error: profileError } = await serviceClient
       .from("profiles")
-      .update({ phone: normalizedPhoneNumber, updated_at: now.toISOString() })
+      .update({ phone: storedPhoneNumber, updated_at: now.toISOString() })
       .eq("user_id", user.id);
 
     if (profileError) {
@@ -89,7 +126,7 @@ Deno.serve(async (req) => {
       .from("user_verifications")
       .upsert({
         user_id: user.id,
-        phone_number: normalizedPhoneNumber,
+        phone_number: storedPhoneNumber,
         phone_verified: true,
         otp_status: "verified",
         otp_reference: existingVerification.otp_reference ?? reference,
@@ -114,7 +151,9 @@ Deno.serve(async (req) => {
     console.log("verify_phone_otp_success", {
       userId: user.id,
       providerReference: reference,
-      normalizedPhoneNumber,
+      otpReference: existingVerification.otp_reference,
+      phoneNumber: storedPhoneNumber,
+      expiryTime: existingVerification.otp_expires_at,
     });
 
     return json({
@@ -157,9 +196,15 @@ async function markOtpFailed(serviceClient: any, userId: string, phoneNumber: st
 }
 
 function resolveAggregateStatus(existingVerification: {
+  user_id: string;
+  phone_number: string | null;
   ghana_card_verified: boolean;
   face_verified: boolean;
   verification_status: string;
+  otp_status: string;
+  otp_code_hash: string | null;
+  otp_expires_at: string | null;
+  otp_reference: string | null;
 } | null) {
   if (
     existingVerification?.ghana_card_verified &&
