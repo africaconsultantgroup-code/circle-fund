@@ -17,14 +17,36 @@ Deno.serve(async (req) => {
     const { user, serviceClient, error } = await getAuthedServiceClient(req);
     if (error) return error;
 
+    const { data: authUserResult, error: authUserError } = await serviceClient.auth.admin.getUserById(user.id);
+    const authEmail = authUserError ? user.email ?? null : authUserResult.user?.email ?? user.email ?? null;
+
     const { data: adminProfile, error: adminProfileError } = await serviceClient
       .from("profiles")
       .select("role, account_status")
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
+
+    console.log("admin_mark_test_user_verified_authorization", {
+      authUserId: user.id,
+      email: authEmail,
+      resolvedRole: adminProfile?.role ?? null,
+      accountStatus: adminProfile?.account_status ?? null,
+      profileFound: Boolean(adminProfile),
+      profileError: adminProfileError?.message ?? null,
+      allowed: adminProfile?.role === "admin" && adminProfile.account_status === "active",
+      expectedRole: "admin",
+      checkedTable: "public.profiles",
+      checkedField: "role",
+    });
 
     if (adminProfileError || adminProfile?.role !== "admin" || adminProfile.account_status !== "active") {
-      return json({ error: "Admin access required." }, 403);
+      return json({
+        error: "Admin access required.",
+        authUserId: user.id,
+        email: authEmail,
+        resolvedRole: adminProfile?.role ?? null,
+        accountStatus: adminProfile?.account_status ?? null,
+      }, 403);
     }
 
     const body = await req.json();
