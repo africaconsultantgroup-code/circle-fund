@@ -16,3 +16,12 @@ export async function requireVerifiedPhone() {
     throw redirect({ to: "/verify/phone" });
   }
 }
+
+export async function requireAuth() {
+  if (!isSupabaseConfigured) return;
+
+  const user = await getCurrentUser();
+  if (!user) {
+    throw redirect({ to: "/login" });
+  }
+}

@@ -66,6 +66,15 @@ Deno.serve(async (req) => {
           ? existingVerification
           : await repairVerifiedPhoneStatus(serviceClient, user.id, existingVerification.phone_number ?? normalizedPhoneNumber, now);
 
+        await serviceClient
+          .from("profiles")
+          .update({
+            phone: repairedRecord.phone_number ?? normalizedPhoneNumber,
+            phone_otp_verification_status: "verified",
+            updated_at: now.toISOString(),
+          })
+          .eq("user_id", user.id);
+
         console.log("verify_phone_otp_already_verified", {
           userId: user.id,
           verificationRecordId: repairedRecord.id,
@@ -143,7 +152,11 @@ Deno.serve(async (req) => {
 
     const { error: profileError } = await serviceClient
       .from("profiles")
-      .update({ phone: storedPhoneNumber, updated_at: now.toISOString() })
+      .update({
+        phone: storedPhoneNumber,
+        phone_otp_verification_status: "verified",
+        updated_at: now.toISOString(),
+      })
       .eq("user_id", user.id);
 
     if (profileError) {
@@ -255,6 +268,7 @@ Deno.serve(async (req) => {
       verificationRecordId: refreshedVerification.id,
       phoneNumber: refreshedVerification.phone_number,
       phoneVerified: refreshedVerification.phone_verified,
+      phoneVerificationStatus: "verified",
       phoneVerifiedAt: refreshedVerification.phone_verified_at,
       otpStatus: refreshedVerification.otp_status,
       otpVerifiedAt: refreshedVerification.otp_verified_at,

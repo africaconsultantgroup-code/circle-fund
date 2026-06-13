@@ -109,6 +109,12 @@ export function VerifyPhonePage() {
     console.log("verify_phone_otp_frontend_success", {
       updatedVerification: response?.updatedVerification ?? null,
     });
+
+    if (!response?.updatedVerification?.phone_verified || response.updatedVerification.otp_status !== "verified") {
+      setError("Phone verification did not update your account. Please request a new OTP and try again.");
+      return;
+    }
+
     setMessage(resultMessage(data, "Phone verified. Taking you to the next verification step."));
     const summary = await loadVerificationFlowSummary();
     console.log("verify_phone_otp_frontend_refreshed_state", {

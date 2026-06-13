@@ -57,7 +57,11 @@ Deno.serve(async (req) => {
 
     const { error: profileError } = await serviceClient
       .from("profiles")
-      .update({ phone: normalizedPhoneNumber, updated_at: now.toISOString() })
+      .update({
+        phone: normalizedPhoneNumber,
+        phone_otp_verification_status: "pending",
+        updated_at: now.toISOString(),
+      })
       .eq("user_id", user.id);
 
     if (profileError) {
