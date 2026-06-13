@@ -70,7 +70,6 @@ Deno.serve(async (req) => {
           .from("profiles")
           .update({
             phone: repairedRecord.phone_number ?? normalizedPhoneNumber,
-            phone_otp_verification_status: "verified",
             updated_at: now.toISOString(),
           })
           .eq("user_id", user.id);
@@ -154,7 +153,6 @@ Deno.serve(async (req) => {
       .from("profiles")
       .update({
         phone: storedPhoneNumber,
-        phone_otp_verification_status: "verified",
         updated_at: now.toISOString(),
       })
       .eq("user_id", user.id);
@@ -268,7 +266,6 @@ Deno.serve(async (req) => {
       verificationRecordId: refreshedVerification.id,
       phoneNumber: refreshedVerification.phone_number,
       phoneVerified: refreshedVerification.phone_verified,
-      phoneVerificationStatus: "verified",
       phoneVerifiedAt: refreshedVerification.phone_verified_at,
       otpStatus: refreshedVerification.otp_status,
       otpVerifiedAt: refreshedVerification.otp_verified_at,

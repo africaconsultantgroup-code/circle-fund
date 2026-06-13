@@ -10,7 +10,6 @@ export interface UserProfile extends AuthUser {
   full_name: string | null;
   avatar_url: string | null;
   ghana_card_verification_status?: string;
-  phone_otp_verification_status?: string;
   selfie_image_url?: string | null;
   profile_completed?: boolean;
   account_status?: string;
@@ -176,7 +175,6 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
     full_name: data.full_name,
     avatar_url: data.avatar_url,
     ghana_card_verification_status: data.ghana_card_verification_status,
-    phone_otp_verification_status: data.phone_otp_verification_status,
     selfie_image_url: data.selfie_image_url,
     profile_completed: data.profile_completed,
     account_status: data.account_status,
@@ -192,7 +190,6 @@ export async function upsertUserProfile(profile: {
   phone?: string | null;
   avatar_url?: string | null;
   ghana_card_verification_status?: string;
-  phone_otp_verification_status?: string;
   selfie_image_url?: string | null;
   profile_completed?: boolean;
   account_status?: string;

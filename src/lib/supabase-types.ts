@@ -27,7 +27,6 @@ export interface Database {
           phone: string | null;
           avatar_url: string | null;
           ghana_card_verification_status: LegacyVerificationStatus;
-          phone_otp_verification_status: LegacyVerificationStatus;
           selfie_image_url: string | null;
           profile_completed: boolean;
           account_status: AccountStatus;
@@ -42,7 +41,6 @@ export interface Database {
           phone?: string | null;
           avatar_url?: string | null;
           ghana_card_verification_status?: LegacyVerificationStatus;
-          phone_otp_verification_status?: LegacyVerificationStatus;
           selfie_image_url?: string | null;
           profile_completed?: boolean;
           account_status?: AccountStatus;
@@ -55,7 +53,6 @@ export interface Database {
           phone?: string | null;
           avatar_url?: string | null;
           ghana_card_verification_status?: LegacyVerificationStatus;
-          phone_otp_verification_status?: LegacyVerificationStatus;
           selfie_image_url?: string | null;
           profile_completed?: boolean;
           account_status?: AccountStatus;

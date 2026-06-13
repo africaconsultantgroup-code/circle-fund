@@ -59,7 +59,6 @@ Deno.serve(async (req) => {
       .from("profiles")
       .update({
         phone: normalizedPhoneNumber,
-        phone_otp_verification_status: "pending",
         updated_at: now.toISOString(),
       })
       .eq("user_id", user.id);
