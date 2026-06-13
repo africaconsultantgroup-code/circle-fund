@@ -1,89 +1,214 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
-import { getCircle, pendingApprovals, tierFromScore } from "@/lib/mock-data";
-import { VerificationBadge, TrustBadge } from "@/components/verification-badge";
-import { Check, X, Phone, IdCard, ScanFace, Smartphone, UserCheck } from "lucide-react";
-import { requireVerifiedPhone } from "@/lib/phone-guard";
+import { Check, Loader2, ShieldAlert, UserCheck, Users, X } from "lucide-react";
+import { getCurrentUser, type AuthUser } from "@/lib/auth";
+import { getCircleById, listCircleMembers, manageCircleMember, type Circle, type CircleMemberDetails } from "@/lib/db";
+import { requireAuth } from "@/lib/phone-guard";
 
 export const Route = createFileRoute("/circle/$id/approvals")({
-  beforeLoad: requireVerifiedPhone,
-  loader: ({ params }) => {
-    const c = getCircle(params.id);
-    if (!c) throw notFound();
-    return c;
-  },
+  beforeLoad: requireAuth,
   component: ApprovalsPage,
 });
 
 function ApprovalsPage() {
-  const c = Route.useLoaderData();
+  const { id } = Route.useParams();
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [circle, setCircle] = useState<Circle | null>(null);
+  const [members, setMembers] = useState<CircleMemberDetails[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const currentMember = useMemo(() => members.find((member) => member.user_id === user?.id), [members, user?.id]);
+  const isAdmin = Boolean(circle?.owner_id === user?.id || (currentMember?.status === "approved" && ["creator", "admin"].includes(currentMember.role)));
+  const pendingMembers = members.filter((member) => member.status === "pending");
+  const approvedMembers = members.filter((member) => member.status === "approved");
+
+  useEffect(() => {
+    void loadApprovals();
+  }, [id]);
+
+  async function loadApprovals() {
+    setLoading(true);
+    setError("");
+
+    const currentUser = await getCurrentUser();
+    setUser(currentUser);
+    if (!currentUser) {
+      setError("Please sign in to view members.");
+      setLoading(false);
+      return;
+    }
+
+    const [circleResult, membersResult] = await Promise.all([
+      getCircleById(id),
+      listCircleMembers(id),
+    ]);
+
+    if (circleResult.error || !circleResult.data) {
+      setError("Circle not found or you do not have access.");
+      setLoading(false);
+      return;
+    }
+
+    setCircle(circleResult.data);
+    setMembers((membersResult.data ?? []) as CircleMemberDetails[]);
+    if (membersResult.error) {
+      setError(membersResult.error.message);
+    }
+    setLoading(false);
+  }
+
+  async function handleAction(member: CircleMemberDetails, action: "approve" | "reject") {
+    setMessage("");
+    setError("");
+
+    const { error: actionError } = await manageCircleMember(member.membership_id, action);
+    if (actionError) {
+      setError(actionError.message);
+      return;
+    }
+
+    setMessage(action === "approve" ? "Member approved." : "Member rejected.");
+    await loadApprovals();
+  }
+
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
-      <PageHeader title="Member approvals" subtitle={c.name} back="/circles" />
+      <PageHeader title="Member approvals" subtitle={circle?.name ?? "Circle members"} back="/circles" />
 
-      <div className="flex flex-1 flex-col gap-3 p-5">
-        <div className="rounded-3xl bg-gradient-card p-4 text-primary-foreground">
-          <p className="text-[11px] uppercase tracking-wider text-primary-foreground/70">Pending requests</p>
-          <p className="mt-1 font-display text-2xl font-bold">{pendingApprovals.length}</p>
-          <p className="text-[11px] text-primary-foreground/70">Review verification & trust before approval.</p>
+      {loading ? (
+        <div className="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading members
         </div>
+      ) : (
+        <div className="flex flex-1 flex-col gap-5 p-5">
+          {error && (
+            <div className="flex items-center gap-2 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-destructive">
+              <ShieldAlert className="h-4 w-4" />
+              <p className="text-[11px] font-medium">{error}</p>
+            </div>
+          )}
+          {message && (
+            <div className="flex items-center gap-2 rounded-2xl border border-success/30 bg-success/10 px-4 py-3 text-success">
+              <UserCheck className="h-4 w-4" />
+              <p className="text-[11px] font-medium">{message}</p>
+            </div>
+          )}
 
-        <ul className="flex flex-col gap-3">
-          {pendingApprovals.map((a) => {
-            const tier = tierFromScore(a.trustScore);
-            return (
-              <li key={a.id} className="rounded-3xl border border-border bg-card p-4 shadow-card">
-                <div className="flex items-start gap-3">
-                  <img src={a.avatar} alt="" className="h-12 w-12 rounded-2xl bg-secondary" />
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <p className="font-display text-sm font-semibold">{a.name}</p>
-                      <span className="text-[10px] text-muted-foreground">{a.appliedAt}</span>
-                    </div>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                      <TrustBadge tier={tier} score={a.trustScore} />
-                      <span className="text-[11px] text-muted-foreground">· {a.activeCircles} active</span>
-                    </div>
-                  </div>
-                </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Metric label="Pending" value={pendingMembers.length} />
+            <Metric label="Approved" value={approvedMembers.length} />
+          </div>
 
-                <div className="mt-3 grid grid-cols-3 gap-1.5">
-                  <Mini icon={<Phone className="h-3 w-3" />} status={a.verification.phone} label="Phone" />
-                  <Mini icon={<IdCard className="h-3 w-3" />} status={a.verification.ghanaCard} label="Card" />
-                  <Mini icon={<ScanFace className="h-3 w-3" />} status={a.verification.selfie} label="Selfie" />
-                  <Mini icon={<Smartphone className="h-3 w-3" />} status={a.verification.momo} label="MoMo" />
-                  <Mini icon={<UserCheck className="h-3 w-3" />} status={a.verification.guarantor} label="Guarantor" />
-                  <Mini icon={<UserCheck className="h-3 w-3" />} status={a.verification.riskProfile} label="Risk" />
-                </div>
+          {isAdmin && (
+            <MemberSection
+              title="Pending members"
+              empty="No pending member requests."
+              members={pendingMembers}
+              isAdmin={isAdmin}
+              showActions
+              onAction={handleAction}
+            />
+          )}
 
-                {tier === "low" && (
-                  <p className="mt-3 rounded-xl bg-destructive/10 px-3 py-2 text-[11px] font-medium text-destructive">
-                    ⚠ Low trust score — approval not recommended for this circle value.
-                  </p>
-                )}
+          {!isAdmin && currentMember?.status === "pending" && (
+            <StatusNotice text="Waiting for admin approval." />
+          )}
+          {!isAdmin && currentMember?.status === "rejected" && (
+            <StatusNotice text="Your request was not approved." danger />
+          )}
 
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <button className="flex items-center justify-center gap-1.5 rounded-2xl border border-border bg-card py-2.5 text-sm font-medium text-destructive">
-                    <X className="h-4 w-4" /> Decline
-                  </button>
-                  <button className="flex items-center justify-center gap-1.5 rounded-2xl bg-gradient-primary py-2.5 text-sm font-semibold text-primary-foreground shadow-card">
-                    <Check className="h-4 w-4" /> Approve
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+          {(isAdmin || currentMember?.status === "approved") && (
+            <MemberSection
+              title="Approved members"
+              empty="No approved members yet."
+              members={approvedMembers}
+              isAdmin={isAdmin}
+              showActions={false}
+              onAction={handleAction}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-function Mini({ icon, status, label }: { icon: React.ReactNode; status: any; label: string }) {
+function MemberSection({
+  title,
+  empty,
+  members,
+  isAdmin,
+  showActions,
+  onAction,
+}: {
+  title: string;
+  empty: string;
+  members: CircleMemberDetails[];
+  isAdmin: boolean;
+  showActions: boolean;
+  onAction: (member: CircleMemberDetails, action: "approve" | "reject") => void;
+}) {
   return (
-    <div className="flex flex-col items-center gap-1 rounded-xl bg-muted/50 p-2">
-      <span className="text-muted-foreground">{icon}</span>
-      <VerificationBadge status={status} label={label} />
+    <section>
+      <div className="flex items-center gap-2">
+        <Users className="h-4 w-4 text-primary" />
+        <h2 className="font-display text-base font-semibold">{title}</h2>
+      </div>
+      {members.length === 0 ? (
+        <div className="mt-3 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">{empty}</div>
+      ) : (
+        <ul className="mt-3 flex flex-col gap-3">
+          {members.map((member) => (
+            <li key={member.membership_id} className="rounded-2xl border border-border bg-card p-4 shadow-card">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">{member.full_name ?? "Member"}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">{member.phone ?? "No phone"} - {member.country ?? "No country"} - {member.preferred_currency ?? "GHS"}</p>
+                  <p className="text-[11px] text-muted-foreground">Joined {formatDate(member.joined_at)} - {member.role}</p>
+                </div>
+                <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-[color:var(--gold-foreground)]">{member.status}</span>
+              </div>
+              {isAdmin && showActions && member.status === "pending" && (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button onClick={() => onAction(member, "reject")} className="flex items-center justify-center gap-1.5 rounded-xl border border-destructive/30 py-2 text-[11px] font-semibold text-destructive">
+                    <X className="h-3.5 w-3.5" /> Reject
+                  </button>
+                  <button onClick={() => onAction(member, "approve")} className="flex items-center justify-center gap-1.5 rounded-xl bg-gradient-primary py-2 text-[11px] font-semibold text-primary-foreground">
+                    <Check className="h-3.5 w-3.5" /> Approve
+                  </button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-1 font-display text-2xl font-bold">{value}</p>
     </div>
   );
+}
+
+function StatusNotice({ text, danger = false }: { text: string; danger?: boolean }) {
+  return (
+    <div className={`rounded-2xl border px-4 py-3 text-sm ${danger ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-gold/40 bg-gold/10 text-[color:var(--gold-foreground)]"}`}>
+      {text}
+    </div>
+  );
+}
+
+function formatDate(value: string | null) {
+  if (!value) return "not set";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "not set";
+  return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }

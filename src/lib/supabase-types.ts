@@ -1,8 +1,8 @@
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
 export type CircleStatus = 'active' | 'paused' | 'completed' | 'cancelled';
-export type MemberStatus = 'active' | 'pending' | 'left' | 'removed';
-export type ContributionStatus = 'pending' | 'processed' | 'failed';
+export type MemberStatus = 'pending' | 'approved' | 'rejected' | 'removed';
+export type ContributionStatus = 'pending' | 'processed' | 'failed' | 'unpaid' | 'paid' | 'late';
 export type PayoutStatus = 'pending' | 'completed' | 'failed';
 export type TransactionType = 'contribution' | 'payout' | 'refund' | 'fee' | 'adjustment';
 export type TransactionStatus = 'pending' | 'completed' | 'failed';
@@ -132,6 +132,8 @@ export interface Database {
           status: MemberStatus;
           joined_at: string | null;
           invited_by: string | null;
+          approved_at: string | null;
+          approved_by: string | null;
           created_at: string | null;
           updated_at: string | null;
         };
@@ -143,6 +145,8 @@ export interface Database {
           status?: MemberStatus;
           joined_at?: string | null;
           invited_by?: string | null;
+          approved_at?: string | null;
+          approved_by?: string | null;
           created_at?: string | null;
           updated_at?: string | null;
         };
@@ -151,6 +155,8 @@ export interface Database {
           status?: MemberStatus;
           joined_at?: string | null;
           invited_by?: string | null;
+          approved_at?: string | null;
+          approved_by?: string | null;
           updated_at?: string | null;
         };
       };
@@ -235,9 +241,12 @@ export interface Database {
           user_id: string;
           amount: number;
           contribution_date: string | null;
+          due_date: string | null;
           method: string | null;
           status: ContributionStatus;
           reference: string | null;
+          paid_at: string | null;
+          payment_reference: string | null;
           created_at: string | null;
           updated_at: string | null;
         };
@@ -247,18 +256,24 @@ export interface Database {
           user_id: string;
           amount: number;
           contribution_date?: string | null;
+          due_date?: string | null;
           method?: string | null;
           status?: ContributionStatus;
           reference?: string | null;
+          paid_at?: string | null;
+          payment_reference?: string | null;
           created_at?: string | null;
           updated_at?: string | null;
         };
         Update: {
           amount?: number;
           contribution_date?: string | null;
+          due_date?: string | null;
           method?: string | null;
           status?: ContributionStatus;
           reference?: string | null;
+          paid_at?: string | null;
+          payment_reference?: string | null;
           updated_at?: string | null;
         };
       };
@@ -431,6 +446,44 @@ export interface Database {
       circle_member_count: {
         Args: { check_circle_id: string };
         Returns: number;
+      };
+      circle_pending_member_count: {
+        Args: { check_circle_id: string };
+        Returns: number;
+      };
+      get_circle_members: {
+        Args: { check_circle_id: string };
+        Returns: Array<{
+          membership_id: string;
+          circle_id: string;
+          user_id: string;
+          role: string;
+          status: string;
+          joined_at: string | null;
+          approved_at: string | null;
+          approved_by: string | null;
+          full_name: string | null;
+          phone: string | null;
+          country: string | null;
+          preferred_currency: string | null;
+        }>;
+      };
+      manage_circle_member: {
+        Args: { check_membership_id: string; action: string };
+        Returns: Database['public']['Tables']['circle_members']['Row'];
+      };
+      get_circle_contribution_status: {
+        Args: { check_circle_id: string };
+        Returns: Array<{
+          contribution_id: string;
+          user_id: string;
+          full_name: string | null;
+          expected_amount: number;
+          due_date: string | null;
+          status: string;
+          paid_at: string | null;
+          payment_reference: string | null;
+        }>;
       };
       current_user_is_admin: {
         Args: Record<PropertyKey, never>;

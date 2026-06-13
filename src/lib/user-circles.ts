@@ -1,5 +1,5 @@
 import { getCurrentUser } from "@/lib/auth";
-import { listCirclesForUser, type Circle } from "@/lib/db";
+import { countCircleMembers, countPendingCircleMembers, listCirclesForUser, type Circle } from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { circles as mockCircles } from "@/lib/mock-data";
 import type { CurrencyCode } from "@/lib/supabase-types";
@@ -13,6 +13,7 @@ export type UserCircle = {
   baseCurrency: CurrencyCode;
   frequency: string;
   memberCount: number;
+  pendingMemberCount: number;
   maxMembers: number;
   currentCycle: number;
   totalCycles: number;
@@ -35,6 +36,7 @@ export function mockUserCircles(): UserCircle[] {
     baseCurrency: "GHS",
     frequency: circle.frequency,
     memberCount: circle.members.length,
+    pendingMemberCount: 0,
     maxMembers: 15,
     currentCycle: circle.currentCycle,
     totalCycles: circle.totalCycles,
@@ -63,7 +65,22 @@ export async function loadUserCircles(): Promise<{ data: UserCircle[]; error: st
     .map((row) => Array.isArray(row.circles) ? row.circles[0] : row.circles)
     .filter((circle): circle is Circle => Boolean(circle));
 
-  return { data: circles.map(toUserCircle), error: null };
+  const mapped = await Promise.all(
+    circles.map(async (circle) => {
+      const userCircle = toUserCircle(circle);
+      const [approvedResult, pendingResult] = await Promise.all([
+        countCircleMembers(circle.id),
+        countPendingCircleMembers(circle.id),
+      ]);
+      return {
+        ...userCircle,
+        memberCount: approvedResult.count ?? userCircle.memberCount,
+        pendingMemberCount: pendingResult.count ?? 0,
+      };
+    }),
+  );
+
+  return { data: mapped, error: null };
 }
 
 export function toUserCircle(circle: Circle): UserCircle {
@@ -79,7 +96,8 @@ export function toUserCircle(circle: Circle): UserCircle {
     amount,
     baseCurrency: circle.base_currency ?? "GHS",
     frequency: circle.frequency ?? "monthly",
-    memberCount: 1,
+    memberCount: 0,
+    pendingMemberCount: 0,
     maxMembers,
     currentCycle: 0,
     totalCycles: maxMembers,

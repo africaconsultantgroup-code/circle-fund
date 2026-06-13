@@ -14,6 +14,8 @@ export type PersonalSusuPlan = Database['public']['Tables']['personal_susu_plans
 export type PersonalSusuPlanInsert = Database['public']['Tables']['personal_susu_plans']['Insert'];
 export type PersonalSusuDeposit = Database['public']['Tables']['personal_susu_deposits']['Row'];
 export type PersonalSusuDepositInsert = Database['public']['Tables']['personal_susu_deposits']['Insert'];
+export type CircleMemberDetails = Database['public']['Functions']['get_circle_members']['Returns'][number];
+export type CircleContributionStatus = Database['public']['Functions']['get_circle_contribution_status']['Returns'][number];
 
 export async function getProfileByUserId(userId: string) {
   return supabase.from('profiles').select('*').eq('user_id', userId).single();
@@ -156,6 +158,14 @@ export async function countCircleMembers(circleId: string) {
   };
 }
 
+export async function countPendingCircleMembers(circleId: string) {
+  const result = await supabase.rpc('circle_pending_member_count', { check_circle_id: circleId });
+  return {
+    count: typeof result.data === 'number' ? result.data : null,
+    error: result.error,
+  };
+}
+
 export async function getCircleMembership(circleId: string, userId: string) {
   return supabase
     .from('circle_members')
@@ -210,9 +220,11 @@ export async function createCircleWithCreator(payload: CircleInsert, userId: str
   const memberResult = await createCircleMember({
     circle_id: circleResult.data.id,
     user_id: userId,
-    role: 'admin',
-    status: 'active',
+    role: 'creator',
+    status: 'approved',
     invited_by: userId,
+    approved_by: userId,
+    approved_at: new Date().toISOString(),
   });
 
   if (memberResult.error) {
@@ -271,7 +283,7 @@ export async function joinCircle(circleId: string, userId: string) {
     circle_id: circleId,
     user_id: userId,
     role: 'member',
-    status: 'active',
+    status: 'pending',
   });
 }
 
@@ -289,7 +301,11 @@ export function normalizeInviteToken(inviteToken: string) {
 }
 
 export async function listCircleMembers(circleId: string) {
-  return supabase.from('circle_members').select('*').eq('circle_id', circleId).order('joined_at', { ascending: true });
+  return supabase.rpc('get_circle_members', { check_circle_id: circleId });
+}
+
+export async function manageCircleMember(membershipId: string, action: 'approve' | 'reject' | 'remove') {
+  return supabase.rpc('manage_circle_member', { check_membership_id: membershipId, action });
 }
 
 export async function addContribution(payload: {
@@ -338,7 +354,7 @@ export async function listTransactionsForUser(userId: string) {
 }
 
 export async function listCircleContributions(circleId: string) {
-  return supabase.from('contributions').select('*').eq('circle_id', circleId).order('contribution_date', { ascending: false });
+  return supabase.rpc('get_circle_contribution_status', { check_circle_id: circleId });
 }
 
 export async function listCirclePayouts(circleId: string) {

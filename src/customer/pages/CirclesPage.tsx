@@ -116,6 +116,9 @@ export function CirclesPage() {
                     <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">{c.category}</span>
                   </div>
                   <p className="text-[11px] text-muted-foreground">{c.memberCount}/{c.maxMembers} members - {formatCurrency(c.amount, c.baseCurrency)}/{c.frequency}</p>
+                  {c.pendingMemberCount > 0 && (
+                    <p className="text-[10px] font-semibold text-[color:var(--gold-foreground)]">{c.pendingMemberCount} pending request{c.pendingMemberCount === 1 ? "" : "s"}</p>
+                  )}
                 </div>
               </div>
               <div className="mt-3 flex items-center gap-3">

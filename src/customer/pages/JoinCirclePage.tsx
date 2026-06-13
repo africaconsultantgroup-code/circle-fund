@@ -98,7 +98,7 @@ export function JoinCirclePage() {
         return;
       }
 
-      setSuccess("You have joined this circle. Opening circle details.");
+      setSuccess("Join request sent. Opening circle details.");
       setTimeout(() => navigate({ to: "/circle/$id", params: { id: data.circle_id } }), 700);
     } catch (error) {
       setJoinError(error instanceof Error ? error.message : "We could not join this circle. Please try again.");

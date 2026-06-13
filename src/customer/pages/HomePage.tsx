@@ -210,6 +210,9 @@ export function HomePage() {
                   <p className="text-[11px] text-muted-foreground">
                     {c.memberCount} members - {formatCurrency(c.amount, c.baseCurrency)}/{c.frequency}
                   </p>
+                  {c.pendingMemberCount > 0 && (
+                    <p className="text-[10px] font-semibold text-[color:var(--gold-foreground)]">{c.pendingMemberCount} pending request{c.pendingMemberCount === 1 ? "" : "s"}</p>
+                  )}
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
                     <div className="h-full rounded-full bg-gradient-gold" style={{ width: `${(c.currentCycle / c.totalCycles) * 100}%` }} />
                   </div>
