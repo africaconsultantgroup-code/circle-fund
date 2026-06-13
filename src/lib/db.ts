@@ -56,7 +56,12 @@ export async function getCurrentUserVerification() {
     };
   }
 
-  const { data, error } = await getUserVerification(userId);
+  const { data, error } = await supabase
+    .from('user_verifications')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+
   console.log('verification_fetch_current_user_result', {
     currentUserId: userId,
     verificationRecordFound: Boolean(data),
