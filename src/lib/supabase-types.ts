@@ -468,6 +468,25 @@ export interface Database {
           preferred_currency: string | null;
         }>;
       };
+      get_circle_access: {
+        Args: { check_circle_id: string };
+        Returns: Array<{
+          found: boolean;
+          access_granted: boolean;
+          id: string | null;
+          owner_id: string | null;
+          name: string | null;
+          description: string | null;
+          contribution_amount: number | null;
+          base_currency: CurrencyCode | null;
+          frequency: string | null;
+          max_members: number | null;
+          invite_code: string | null;
+          invite_token: string | null;
+          start_date: string | null;
+          status: CircleStatus | null;
+        }>;
+      };
       manage_circle_member: {
         Args: { check_membership_id: string; action: string };
         Returns: Database['public']['Tables']['circle_members']['Row'];

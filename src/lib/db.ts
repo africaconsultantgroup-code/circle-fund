@@ -16,6 +16,7 @@ export type PersonalSusuDeposit = Database['public']['Tables']['personal_susu_de
 export type PersonalSusuDepositInsert = Database['public']['Tables']['personal_susu_deposits']['Insert'];
 export type CircleMemberDetails = Database['public']['Functions']['get_circle_members']['Returns'][number];
 export type CircleContributionStatus = Database['public']['Functions']['get_circle_contribution_status']['Returns'][number];
+export type CircleAccess = Database['public']['Functions']['get_circle_access']['Returns'][number];
 
 export async function getProfileByUserId(userId: string) {
   return supabase.from('profiles').select('*').eq('user_id', userId).single();
@@ -138,6 +139,14 @@ export async function createCircle(payload: CircleInsert) {
 
 export async function getCircleById(circleId: string) {
   return supabase.from('circles').select('*').eq('id', circleId).single();
+}
+
+export async function getCircleAccessById(circleId: string) {
+  const result = await supabase.rpc('get_circle_access', { check_circle_id: circleId });
+  return {
+    data: result.data?.[0] ?? null,
+    error: result.error,
+  };
 }
 
 export async function getCircleByInviteToken(inviteToken: string) {

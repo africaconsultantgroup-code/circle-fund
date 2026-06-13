@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Check, Loader2, ShieldAlert, UserCheck, Users, X } from "lucide-react";
 import { getCurrentUser, type AuthUser } from "@/lib/auth";
-import { getCircleById, listCircleMembers, manageCircleMember, type Circle, type CircleMemberDetails } from "@/lib/db";
+import { getCircleAccessById, listCircleMembers, manageCircleMember, type CircleAccess, type CircleMemberDetails } from "@/lib/db";
 import { requireAuth } from "@/lib/phone-guard";
 
 export const Route = createFileRoute("/circle/$id/approvals")({
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/circle/$id/approvals")({
 function ApprovalsPage() {
   const { id } = Route.useParams();
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [circle, setCircle] = useState<Circle | null>(null);
+  const [circle, setCircle] = useState<CircleAccess | null>(null);
   const [members, setMembers] = useState<CircleMemberDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -41,16 +41,28 @@ function ApprovalsPage() {
       return;
     }
 
-    const [circleResult, membersResult] = await Promise.all([
-      getCircleById(id),
-      listCircleMembers(id),
-    ]);
+    const circleResult = await getCircleAccessById(id);
 
-    if (circleResult.error || !circleResult.data) {
-      setError("Circle not found or you do not have access.");
+    if (circleResult.error) {
+      setError(circleResult.error.message);
       setLoading(false);
       return;
     }
+
+    if (!circleResult.data?.found) {
+      setError("Circle not found.");
+      setLoading(false);
+      return;
+    }
+
+    if (!circleResult.data.access_granted) {
+      setCircle(circleResult.data);
+      setError("Access denied.");
+      setLoading(false);
+      return;
+    }
+
+    const membersResult = await listCircleMembers(id);
 
     setCircle(circleResult.data);
     setMembers((membersResult.data ?? []) as CircleMemberDetails[]);
