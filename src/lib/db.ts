@@ -41,18 +41,30 @@ export async function getUserVerification(userId: string) {
 }
 
 export async function getCurrentUserVerification() {
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  const sessionUserId = sessionData.session?.user.id ?? null;
   const { data: authData, error: authError } = await supabase.auth.getUser();
   const userId = authData.user?.id ?? null;
 
-  if (authError || !userId) {
+  console.log('verification_fetch_auth_context', {
+    sessionUserId,
+    authUserId: userId,
+    sessionError: sessionError?.message ?? null,
+    authError: authError?.message ?? null,
+    hasAccessToken: Boolean(sessionData.session?.access_token),
+  });
+
+  if (sessionError || authError || !userId) {
     console.warn('verification_fetch_auth_user_missing', {
+      sessionUserId,
       userId,
+      sessionError: sessionError?.message ?? null,
       error: authError?.message ?? null,
     });
     return {
       userId,
       data: null as UserVerification | null,
-      error: authError ? { message: authError.message } : { message: 'No authenticated user.' },
+      error: sessionError || authError ? { message: sessionError?.message ?? authError?.message ?? 'Authentication failed.' } : { message: 'No authenticated user.' },
     };
   }
 
@@ -63,10 +75,11 @@ export async function getCurrentUserVerification() {
     .maybeSingle();
 
   console.log('verification_fetch_current_user_result', {
+    sessionUserId,
     currentUserId: userId,
     verificationRecordFound: Boolean(data),
-    fetchedVerification: data,
-    fetchError: error?.message ?? null,
+    returnedData: data,
+    queryError: error?.message ?? null,
   });
 
   return { userId, data: data ?? null, error: error ? { message: error.message } : null };
