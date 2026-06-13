@@ -28,6 +28,12 @@ function LoginPage() {
       return;
     }
 
+    const redirectTo = new URLSearchParams(window.location.search).get("redirect");
+    if (redirectTo?.startsWith("/")) {
+      window.location.assign(redirectTo);
+      return;
+    }
+
     navigate({ to: "/home" });
   };
 

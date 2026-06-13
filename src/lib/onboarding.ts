@@ -75,20 +75,20 @@ export async function getCircleEligibility(): Promise<CircleEligibility> {
     rpcError: rpcError?.message ?? null,
   });
 
-  if ((verification?.verification_status !== "verified") && (rpcError || !allowed)) {
+  if (rpcError || !allowed) {
     return blocked(user.id, [{
       key: "account",
-      message: rpcError?.message ?? "Complete verification before creating or joining a circle.",
-      actionLabel: "Continue verification",
-      to: "/verify/status",
+      message: rpcError?.message ?? "Circle access is available after signing in.",
+      actionLabel: "Refresh",
+      to: "/circles",
     }]);
   }
 
   if (error || !profile) {
-    return { isEligible: true, userId: user.id, issues: [], message: "Verification complete. Circle actions are available." };
+    return { isEligible: true, userId: user.id, issues: [], message: "You can create and join circles. Verification may be required before contributions start." };
   }
 
-  return { isEligible: true, userId: user.id, issues: [], message: "Verification complete. Circle actions are available." };
+  return { isEligible: true, userId: user.id, issues: [], message: "You can create and join circles. Verification may be required before contributions start." };
 }
 
 export function getProfileEligibilityIssues(profile: Profile, verification: UserVerification | null): EligibilityIssue[] {
@@ -193,7 +193,7 @@ export async function getVerificationGateSummary(): Promise<VerificationGateSumm
   const steps = buildVerificationSteps(profile ?? null, verification ?? null);
   const formsComplete = steps.every((step) => step.accepted);
   const isEligible = formsComplete || verification?.verification_status === "verified";
-  const canUseCircleActions = isEligible;
+  const canUseCircleActions = true;
   const nextStep = steps.find((step) => !step.accepted) ?? statusStep(formsComplete);
 
   return {
@@ -201,10 +201,8 @@ export async function getVerificationGateSummary(): Promise<VerificationGateSumm
     canUseCircleActions,
     formsComplete,
     message: isEligible
-      ? "Verification complete. You can create and join circles."
-      : formsComplete
-        ? "Verification forms complete. Waiting for admin approval."
-        : nextStep.description,
+      ? "Verification complete. Circle actions are available."
+      : "You can create and join circles while verification is under review. Verification may be required before contributions start.",
     nextStep: {
       to: nextStep.to,
       label: nextStep.label,

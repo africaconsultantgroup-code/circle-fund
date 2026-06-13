@@ -85,7 +85,7 @@ export function toUserCircle(circle: Circle): UserCircle {
     totalCycles: maxMembers,
     nextRecipient: "Pending",
     nextPayoutDate: circle.start_date ? new Date(circle.start_date).toLocaleDateString() : "Not set",
-    inviteToken: circle.invite_token ?? null,
+    inviteToken: circle.invite_code ?? circle.invite_token ?? null,
   };
 }
 

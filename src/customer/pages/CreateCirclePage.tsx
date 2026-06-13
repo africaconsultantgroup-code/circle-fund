@@ -1,9 +1,8 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
-import { Users, Repeat, Calendar, FileText, ShieldCheck, ShieldAlert, CheckCircle2, Loader2, Copy } from "lucide-react";
+import { Users, Repeat, Calendar, FileText, ShieldCheck, ShieldAlert, CheckCircle2, Loader2, Copy, MessageCircle } from "lucide-react";
 import { createCircleWithCreator, generateInviteToken, getProfileByUserId } from "@/lib/db";
-import { trustScore } from "@/lib/mock-data";
 import { getCircleEligibility, type CircleEligibility } from "@/lib/onboarding";
 import { currencyOptions, formatCurrency } from "@/lib/diaspora";
 import type { CurrencyCode } from "@/lib/supabase-types";
@@ -27,9 +26,7 @@ export function CreateCirclePage() {
   const [eligibility, setEligibility] = useState<CircleEligibility | null>(null);
   const [isCheckingEligibility, setIsCheckingEligibility] = useState(true);
   const eligible = Boolean(eligibility?.isEligible);
-  const overValue = amount * members > trustScore.maxCircleValue;
-  const atCircleLimit = trustScore.activeCircles >= trustScore.maxCircles;
-  const blocked = isCheckingEligibility || !eligible || overValue || atCircleLimit;
+  const blocked = isCheckingEligibility || !eligible;
 
   useEffect(() => {
     let isMounted = true;
@@ -93,6 +90,7 @@ export function CreateCirclePage() {
           frequency,
           max_members: members,
           invite_token: inviteToken,
+          invite_code: inviteToken,
           start_date: new Date(`${startDate}T00:00:00`).toISOString(),
           status: "active",
         },
@@ -104,7 +102,7 @@ export function CreateCirclePage() {
         return;
       }
 
-      const link = `${window.location.origin}/join-circle?code=${encodeURIComponent(data.invite_token)}`;
+      const link = `${window.location.origin}/join-circle?code=${encodeURIComponent(data.invite_code ?? data.invite_token)}`;
       setInviteLink(link);
       setCreatedCircleName(data.name);
       setSuccess("Circle created successfully. You have been added as admin/creator.");
@@ -135,22 +133,10 @@ export function CreateCirclePage() {
             </div>
           </Link>
         )}
-        {eligible && overValue && (
-          <div className="flex items-center gap-3 rounded-2xl border border-gold/40 bg-gold/10 p-4 text-[color:var(--gold-foreground)]">
-            <ShieldAlert className="h-5 w-5" />
-            <p className="text-[11px] font-medium">Pool exceeds your trust limit. Increase your score to unlock higher-value circles.</p>
-          </div>
-        )}
-        {eligible && atCircleLimit && (
-          <div className="flex items-center gap-3 rounded-2xl border border-gold/40 bg-gold/10 p-4 text-[color:var(--gold-foreground)]">
-            <ShieldAlert className="h-5 w-5" />
-            <p className="text-[11px] font-medium">You're at your active circles limit ({trustScore.maxCircles}). Finish a circle to create a new one.</p>
-          </div>
-        )}
         {eligible && (
-          <div className="flex items-center gap-2 rounded-2xl bg-success/10 px-4 py-2.5 text-success">
+          <div className="flex items-center gap-2 rounded-2xl border border-gold/40 bg-gold/10 px-4 py-2.5 text-[color:var(--gold-foreground)]">
             <ShieldCheck className="h-4 w-4" />
-            <p className="text-[11px] font-medium">Phone verified - you can create a circle.</p>
+            <p className="text-[11px] font-medium">You can create a circle for testing. Verification may be required before contributions start.</p>
           </div>
         )}
 
@@ -236,7 +222,7 @@ export function CreateCirclePage() {
                 <p className="mt-1 font-display text-sm font-semibold">{createdCircleName}</p>
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Invite link</p>
                 <p className="mt-1 break-all font-mono text-[11px]">{inviteLink}</p>
-                <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="mt-3 grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => void navigator.clipboard?.writeText(inviteLink)}
@@ -244,6 +230,14 @@ export function CreateCirclePage() {
                   >
                     <Copy className="h-3.5 w-3.5" /> Copy link
                   </button>
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(`Join my SikaCircle "${createdCircleName}": ${inviteLink}`)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-center gap-2 rounded-xl border border-border py-2 text-[11px] font-semibold text-primary"
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                  </a>
                   <button
                     type="button"
                     onClick={() => navigate({ to: "/circles" })}

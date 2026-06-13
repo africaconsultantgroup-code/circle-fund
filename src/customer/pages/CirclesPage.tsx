@@ -92,7 +92,15 @@ export function CirclesPage() {
         )}
         {!isLoading && !error && circles.length === 0 && (
           <li className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
-            No circles yet. Create your first circle to get started.
+            <p>No circles yet. Create your first circle or join one with an invite link.</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Link to="/create-circle" className="rounded-xl bg-gradient-primary px-3 py-2 text-center text-[11px] font-semibold text-primary-foreground">
+                Create Circle
+              </Link>
+              <Link to="/join-circle" className="rounded-xl border border-border px-3 py-2 text-center text-[11px] font-semibold text-primary">
+                Join Circle
+              </Link>
+            </div>
           </li>
         )}
         {circles.map((c) => (

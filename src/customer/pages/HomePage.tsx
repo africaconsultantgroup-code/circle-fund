@@ -1,8 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowUpRight, Bell, Plus, TrendingUp, Users, Wallet, ChevronRight, LogIn, ShieldCheck, ShieldAlert, PiggyBank, LockKeyhole } from "lucide-react";
-import { currentUser, formatGHS, notifications, trustScore, riskAlerts } from "@/lib/mock-data";
-import { TrustBadge } from "@/components/verification-badge";
+import { currentUser, formatGHS, notifications } from "@/lib/mock-data";
 import { SavingsPlanner } from "@/components/savings-planner";
 import { loadUserCircles, type UserCircle } from "@/lib/user-circles";
 import { getVerificationGateSummary, type VerificationGateSummary } from "@/lib/onboarding";
@@ -85,13 +84,11 @@ export function HomePage() {
 
       <div className="mt-5 px-5">
         <VerificationStatusCard gateSummary={gateSummary} />
-        {riskAlerts.length > 0 && (
-          <Link to="/risk-alert" className="mt-2 flex items-center gap-2 rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-2.5 text-destructive">
+        <Link to="/risk-alert" className="mt-2 flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-2.5 text-muted-foreground shadow-card">
             <ShieldAlert className="h-4 w-4" />
-            <p className="flex-1 text-[11px] font-medium">{riskAlerts.length} risk alerts need attention</p>
+            <p className="flex-1 text-[11px] font-medium">No active risk alerts</p>
             <ChevronRight className="h-4 w-4" />
           </Link>
-        )}
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-3 px-5">
@@ -185,9 +182,17 @@ export function HomePage() {
               {circleError}
             </li>
           )}
-          {!circleError && circles.length === 0 && (
+            {!circleError && circles.length === 0 && (
             <li className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
-              Your circles will appear here after creation.
+              <p>Your circles will appear here after creation or joining.</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Link to="/create-circle" className="rounded-xl bg-gradient-primary px-3 py-2 text-center text-[11px] font-semibold text-primary-foreground">
+                  Create Circle
+                </Link>
+                <Link to="/join-circle" className="rounded-xl border border-border px-3 py-2 text-center text-[11px] font-semibold text-primary">
+                  Join Circle
+                </Link>
+              </div>
             </li>
           )}
           {circles.slice(0, 2).map((c) => (
@@ -233,11 +238,10 @@ function VerificationStatusCard({ gateSummary }: { gateSummary: VerificationGate
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <p className="font-display text-sm font-semibold">Verification status</p>
-            {complete && <TrustBadge tier={trustScore.tier} score={trustScore.score} />}
           </div>
           {complete && <p className="text-[11px] text-muted-foreground">Verification complete. Create and join circles are unlocked.</p>}
-          {!complete && formsComplete && <p className="text-[11px] text-muted-foreground">Verification forms complete. Create and join circles are unlocked.</p>}
-          {!complete && !formsComplete && <p className="text-[11px] text-muted-foreground">Continue verification to create or join circles.</p>}
+          {!complete && formsComplete && <p className="text-[11px] text-muted-foreground">Verification forms complete. Circle actions are available while review is pending.</p>}
+          {!complete && !formsComplete && <p className="text-[11px] text-muted-foreground">Circle actions are available for testing. Verification may be required before contributions start.</p>}
         </div>
         <Link to={complete || formsComplete ? "/verify/status" : gateSummary?.nextStep.to ?? "/verify"} className="text-xs font-semibold text-primary">
           {complete ? "Status" : formsComplete ? "Review" : "Continue"}

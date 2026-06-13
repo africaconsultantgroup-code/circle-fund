@@ -139,15 +139,21 @@ export async function getCircleById(circleId: string) {
 }
 
 export async function getCircleByInviteToken(inviteToken: string) {
-  return supabase.from('circles').select('*').eq('invite_token', normalizeInviteToken(inviteToken)).eq('status', 'active').single();
+  const code = normalizeInviteToken(inviteToken);
+  return supabase
+    .from('circles')
+    .select('*')
+    .or(`invite_token.eq.${code},invite_code.eq.${code}`)
+    .eq('status', 'active')
+    .single();
 }
 
 export async function countCircleMembers(circleId: string) {
-  return supabase
-    .from('circle_members')
-    .select('id', { count: 'exact', head: true })
-    .eq('circle_id', circleId)
-    .in('status', ['active', 'pending']);
+  const result = await supabase.rpc('circle_member_count', { check_circle_id: circleId });
+  return {
+    count: typeof result.data === 'number' ? result.data : null,
+    error: result.error,
+  };
 }
 
 export async function getCircleMembership(circleId: string, userId: string) {
@@ -177,18 +183,22 @@ export async function createCircleWithCreator(payload: CircleInsert, userId: str
     return { data: null, error: eligibilityResult.error ?? { message: 'Please sign in before creating a circle.' } };
   }
 
+  const initialInviteToken = payload.invite_code ?? payload.invite_token ?? generateInviteToken();
   let circleResult = await createCircle({
     ...payload,
     owner_id: userId,
-    invite_token: payload.invite_token ?? generateInviteToken(),
+    invite_token: initialInviteToken,
+    invite_code: initialInviteToken,
     max_members: Math.min(Math.max(payload.max_members ?? 15, 2), 15),
   });
 
-  for (let attempt = 0; circleResult.error && /invite_token|duplicate key|unique/i.test(circleResult.error.message) && attempt < 2; attempt += 1) {
+  for (let attempt = 0; circleResult.error && /invite_token|invite_code|duplicate key|unique/i.test(circleResult.error.message) && attempt < 2; attempt += 1) {
+    const nextInviteToken = generateInviteToken();
     circleResult = await createCircle({
       ...payload,
       owner_id: userId,
-      invite_token: generateInviteToken(),
+      invite_token: nextInviteToken,
+      invite_code: nextInviteToken,
       max_members: Math.min(Math.max(payload.max_members ?? 15, 2), 15),
     });
   }
@@ -261,7 +271,7 @@ export async function joinCircle(circleId: string, userId: string) {
     circle_id: circleId,
     user_id: userId,
     role: 'member',
-    status: 'pending',
+    status: 'active',
   });
 }
 

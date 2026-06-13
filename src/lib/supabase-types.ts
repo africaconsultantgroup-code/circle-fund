@@ -81,6 +81,7 @@ export interface Database {
           base_currency: CurrencyCode;
           frequency: string | null;
           max_members: number;
+          invite_code: string | null;
           invite_token: string;
           start_date: string | null;
           end_date: string | null;
@@ -98,6 +99,7 @@ export interface Database {
           base_currency?: CurrencyCode;
           frequency?: string | null;
           max_members?: number;
+          invite_code?: string | null;
           invite_token?: string;
           start_date?: string | null;
           end_date?: string | null;
@@ -113,6 +115,7 @@ export interface Database {
           base_currency?: CurrencyCode;
           frequency?: string | null;
           max_members?: number;
+          invite_code?: string | null;
           invite_token?: string;
           start_date?: string | null;
           end_date?: string | null;
@@ -424,6 +427,10 @@ export interface Database {
       circle_has_member_capacity: {
         Args: { check_circle_id: string };
         Returns: boolean;
+      };
+      circle_member_count: {
+        Args: { check_circle_id: string };
+        Returns: number;
       };
       current_user_is_admin: {
         Args: Record<PropertyKey, never>;
