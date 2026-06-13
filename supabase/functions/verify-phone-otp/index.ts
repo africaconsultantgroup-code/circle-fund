@@ -66,14 +66,6 @@ Deno.serve(async (req) => {
           ? existingVerification
           : await repairVerifiedPhoneStatus(serviceClient, user.id, existingVerification.phone_number ?? normalizedPhoneNumber, now);
 
-        await serviceClient
-          .from("profiles")
-          .update({
-            phone: repairedRecord.phone_number ?? normalizedPhoneNumber,
-            updated_at: now.toISOString(),
-          })
-          .eq("user_id", user.id);
-
         console.log("verify_phone_otp_already_verified", {
           userId: user.id,
           verificationRecordId: repairedRecord.id,
@@ -91,6 +83,7 @@ Deno.serve(async (req) => {
           phoneVerified: repairedRecord.phone_verified,
           otpStatus: repairedRecord.otp_status,
           otpVerifiedAt: repairedRecord.otp_verified_at,
+          updatedVerification: repairedRecord,
           providerReference: reference,
           message: "Phone number already verified. Taking you to the next verification step.",
         });
@@ -148,25 +141,7 @@ Deno.serve(async (req) => {
     }
 
     const status = resolveAggregateStatus(existingVerification);
-
-    const { error: profileError } = await serviceClient
-      .from("profiles")
-      .update({
-        phone: storedPhoneNumber,
-        updated_at: now.toISOString(),
-      })
-      .eq("user_id", user.id);
-
-    if (profileError) {
-      console.error("verify_phone_otp_profile_update_failed", {
-        userId: user.id,
-        error: profileError.message,
-      });
-      return json({ error: profileError.message, reason: "profile_update_failed" }, 500);
-    }
-
     const verificationPatch = {
-      user_id: user.id,
       phone_number: storedPhoneNumber,
       phone_verified: true,
       phone_verified_at: now.toISOString(),
@@ -185,7 +160,8 @@ Deno.serve(async (req) => {
     console.log("verify_phone_otp_update_attempt", {
       userId: user.id,
       verificationRecordId: existingVerification.id,
-      updateMode: "service_role_upsert_by_user_id",
+      table: "public.user_verifications",
+      updateMode: "service_role_update_by_user_id",
       updatePayload: {
         phone_number: verificationPatch.phone_number,
         phone_verified: verificationPatch.phone_verified,
@@ -197,9 +173,19 @@ Deno.serve(async (req) => {
 
     const { data: verifiedRecord, error: updateError } = await serviceClient
       .from("user_verifications")
-      .upsert(verificationPatch, { onConflict: "user_id" })
+      .update(verificationPatch)
+      .eq("user_id", user.id)
       .select("id, user_id, phone_number, phone_verified, phone_verified_at, otp_status, otp_verified_at, otp_reference, verification_status")
       .maybeSingle();
+
+    console.log("verify_phone_otp_update_result_raw", {
+      userId: user.id,
+      verificationRecordId: existingVerification.id,
+      updatedRecordFound: Boolean(verifiedRecord),
+      updateError: updateError?.message ?? null,
+      phoneVerified: verifiedRecord?.phone_verified ?? null,
+      otpStatus: verifiedRecord?.otp_status ?? null,
+    });
 
     if (updateError) {
       console.error("verify_phone_otp_update_failed", {
@@ -214,6 +200,7 @@ Deno.serve(async (req) => {
       console.error("verify_phone_otp_row_not_updated", {
         userId: user.id,
         verificationRecordId: existingVerification.id,
+        table: "public.user_verifications",
       });
       return json({ error: "Verification row not updated", reason: "verification_row_not_updated" }, 500);
     }

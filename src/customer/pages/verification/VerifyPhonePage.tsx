@@ -99,6 +99,8 @@ export function VerifyPhonePage() {
 
     const response = data as {
       updatedVerification?: {
+        id?: string;
+        user_id?: string;
         phone_verified?: boolean;
         otp_status?: string;
         otp_verified_at?: string | null;
@@ -107,6 +109,8 @@ export function VerifyPhonePage() {
     } | null;
 
     console.log("verify_phone_otp_frontend_success", {
+      currentUserId: response?.updatedVerification?.user_id ?? null,
+      verificationRecordId: response?.updatedVerification?.id ?? null,
       updatedVerification: response?.updatedVerification ?? null,
     });
 
@@ -115,9 +119,11 @@ export function VerifyPhonePage() {
       return;
     }
 
-    setMessage(resultMessage(data, "Phone verified. Taking you to the next verification step."));
     const summary = await loadVerificationFlowSummary();
     console.log("verify_phone_otp_frontend_refreshed_state", {
+      currentUserId: summary.userId,
+      verificationRecordFound: Boolean(summary.verification),
+      verificationRecordId: summary.verification?.id ?? null,
       phoneVerified: summary.verification?.phone_verified ?? null,
       otpStatus: summary.verification?.otp_status ?? null,
       otpVerifiedAt: summary.verification?.otp_verified_at ?? null,
@@ -125,6 +131,13 @@ export function VerifyPhonePage() {
       nextRequiredStep: summary.nextStep.to,
     });
     setFlowSummary(summary);
+
+    if (!summary.verification?.phone_verified || summary.verification.otp_status !== "verified") {
+      setError("Phone verification was accepted, but the saved status did not refresh. Please try again.");
+      return;
+    }
+
+    setMessage(resultMessage(data, "Phone verified. Taking you to the next verification step."));
     navigate({ to: "/verify/ghana-card" });
   };
 
