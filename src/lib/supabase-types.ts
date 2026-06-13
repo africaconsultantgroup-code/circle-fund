@@ -451,6 +451,10 @@ export interface Database {
         Args: { check_circle_id: string };
         Returns: number;
       };
+      user_has_circle_membership: {
+        Args: { check_circle_id: string; check_user_id: string };
+        Returns: boolean;
+      };
       get_circle_members: {
         Args: { check_circle_id: string };
         Returns: Array<{
