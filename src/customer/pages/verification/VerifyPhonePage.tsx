@@ -27,6 +27,17 @@ export function VerifyPhonePage() {
       if (!isMounted) return;
 
       setFlowSummary(summary);
+      console.log("verify_phone_page_initial_verification_fetch", {
+        currentUserId: summary.userId,
+        verificationRecordFound: Boolean(summary.verification),
+        fetchedVerification: summary.verification,
+        isFullyVerified: summary.isFullyVerified,
+        nextRequiredStep: summary.nextStep.to,
+      });
+      if (summary.isFullyVerified) {
+        navigate({ to: "/home" });
+        return;
+      }
       if (summary.verification?.phone_verified && summary.verification.otp_status === "verified") {
         const nextStep = !hasAcceptedGhanaCardVerification(summary.verification)
           ? "/verify/ghana-card"
@@ -138,7 +149,7 @@ export function VerifyPhonePage() {
     }
 
     setMessage(resultMessage(data, "Phone verified. Taking you to the next verification step."));
-    navigate({ to: "/verify/ghana-card" });
+    navigate({ to: summary.isFullyVerified ? "/home" : "/verify/ghana-card" });
   };
 
   return (
@@ -278,10 +289,11 @@ function VerificationDebug({ summary }: { summary: VerificationFlowSummary }) {
   return (
     <div className="rounded-2xl border border-border bg-muted/40 p-4 text-[11px] text-muted-foreground">
       <p className="font-semibold text-foreground">Verification debug</p>
-      <p className="mt-1">phone_verified: <span className="font-mono text-foreground">{String(Boolean(verification?.phone_verified))}</span></p>
-      <p>otp_status: <span className="font-mono text-foreground">{verification?.otp_status ?? "not_started"}</span></p>
-      <p>ghana_card_status: <span className="font-mono text-foreground">{ghanaCardStepStatus(verification ?? null)}</span></p>
-      <p>selfie_status: <span className="font-mono text-foreground">{faceStepStatus(verification ?? null)}</span></p>
+      <p className="mt-1">record_found: <span className="font-mono text-foreground">{String(Boolean(verification))}</span></p>
+      <p>phone_verified: <span className="font-mono text-foreground">{verification ? String(verification.phone_verified) : "missing"}</span></p>
+      <p>otp_status: <span className="font-mono text-foreground">{verification?.otp_status ?? "missing"}</span></p>
+      <p>ghana_card_status: <span className="font-mono text-foreground">{verification ? ghanaCardStepStatus(verification) : "missing"}</span></p>
+      <p>selfie_status: <span className="font-mono text-foreground">{verification ? faceStepStatus(verification) : "missing"}</span></p>
       <p>next_required_step: <span className="font-mono text-foreground">{summary.nextStep.to}</span></p>
     </div>
   );

@@ -24,7 +24,47 @@ export async function upsertProfile(profile: Partial<Profile> & { user_id: strin
 }
 
 export async function getUserVerification(userId: string) {
-  return supabase.from('user_verifications').select('*').eq('user_id', userId).maybeSingle();
+  const result = await supabase
+    .from('user_verifications')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  console.log('verification_fetch_by_user_id', {
+    userId,
+    verificationRecordFound: Boolean(result.data),
+    verification: result.data,
+    error: result.error?.message ?? null,
+  });
+
+  return result;
+}
+
+export async function getCurrentUserVerification() {
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  const userId = authData.user?.id ?? null;
+
+  if (authError || !userId) {
+    console.warn('verification_fetch_auth_user_missing', {
+      userId,
+      error: authError?.message ?? null,
+    });
+    return {
+      userId,
+      data: null as UserVerification | null,
+      error: authError ? { message: authError.message } : { message: 'No authenticated user.' },
+    };
+  }
+
+  const { data, error } = await getUserVerification(userId);
+  console.log('verification_fetch_current_user_result', {
+    currentUserId: userId,
+    verificationRecordFound: Boolean(data),
+    fetchedVerification: data,
+    fetchError: error?.message ?? null,
+  });
+
+  return { userId, data: data ?? null, error: error ? { message: error.message } : null };
 }
 
 export async function requestPhoneOtp(phoneNumber: string) {

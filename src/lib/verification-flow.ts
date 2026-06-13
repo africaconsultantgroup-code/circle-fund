@@ -1,5 +1,5 @@
 import { getCurrentUser } from "@/lib/auth";
-import { getProfileByUserId, getUserVerification, type Profile, type UserVerification } from "@/lib/db";
+import { getCurrentUserVerification, getProfileByUserId, type Profile, type UserVerification } from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import type { VerificationStatus } from "@/lib/supabase-types";
 
@@ -37,10 +37,22 @@ export async function loadVerificationFlowSummary(): Promise<VerificationFlowSum
     return emptySummary("Please sign in to start verification.");
   }
 
-  const [{ data: profile, error: profileError }, { data: verification, error: verificationError }] = await Promise.all([
+  const [{ data: profile, error: profileError }, verificationResult] = await Promise.all([
     getProfileByUserId(user.id),
-    getUserVerification(user.id),
+    getCurrentUserVerification(),
   ]);
+  const verification = verificationResult.data;
+  const verificationError = verificationResult.error;
+
+  console.log("verification_flow_summary_fetch", {
+    currentUserId: user.id,
+    verificationFetchUserId: verificationResult.userId,
+    verificationRecordFound: Boolean(verification),
+    fetchedVerification: verification,
+    profileRecordFound: Boolean(profile),
+    profileError: profileError?.message ?? null,
+    verificationError: verificationError?.message ?? null,
+  });
 
   const steps = buildVerificationSteps(profile ?? null, verification ?? null);
   const completedCount = steps.filter((step) => step.accepted).length;
@@ -63,11 +75,12 @@ export async function loadVerificationFlowSummary(): Promise<VerificationFlowSum
 }
 
 export function buildVerificationSteps(profile: Profile | null, verification: UserVerification | null): VerificationStepSummary[] {
-  const profileAccepted = Boolean(profile?.profile_completed);
-  const phoneAccepted = Boolean(verification?.phone_verified && verification.otp_status === "verified");
+  const aggregateVerified = verification?.verification_status === "verified";
+  const profileAccepted = Boolean(profile?.profile_completed || aggregateVerified);
+  const phoneAccepted = Boolean((verification?.phone_verified && verification.otp_status === "verified") || aggregateVerified);
   const ghanaCardAccepted = hasAcceptedGhanaCardVerification(verification);
   const faceAccepted = hasAcceptedFaceVerification(verification);
-  const accountAccepted = profile?.account_status === "active";
+  const accountAccepted = Boolean(profile?.account_status === "active" || aggregateVerified);
 
   return [
     {
@@ -126,6 +139,7 @@ export function statusStep(isComplete: boolean): VerificationStepSummary {
 
 export function hasAcceptedGhanaCardVerification(verification: UserVerification | null) {
   return Boolean(
+    verification?.verification_status === "verified" ||
     verification?.ghana_card_verified ||
     (verification?.ghana_card_number_hash && reviewStatusAllowsEligibility(stepStatusOrAggregate(verification.ghana_card_status, verification.verification_status))),
   );
@@ -133,12 +147,14 @@ export function hasAcceptedGhanaCardVerification(verification: UserVerification 
 
 export function hasAcceptedFaceVerification(verification: UserVerification | null) {
   return Boolean(
+    verification?.verification_status === "verified" ||
     verification?.face_verified ||
     (verification?.selfie_uploaded && reviewStatusAllowsEligibility(stepStatusOrAggregate(verification.face_status, verification.verification_status))),
   );
 }
 
 export function ghanaCardStepStatus(verification: UserVerification | null): VerificationStatus {
+  if (verification?.verification_status === "verified") return "verified";
   if (verification?.ghana_card_verified) return "verified";
   return submittedStatus(
     Boolean(verification?.ghana_card_number_hash),
@@ -147,6 +163,7 @@ export function ghanaCardStepStatus(verification: UserVerification | null): Veri
 }
 
 export function faceStepStatus(verification: UserVerification | null): VerificationStatus {
+  if (verification?.verification_status === "verified") return "verified";
   if (verification?.face_verified) return "verified";
   return submittedStatus(
     Boolean(verification?.selfie_uploaded),
@@ -159,6 +176,8 @@ function reviewStatusAllowsEligibility(status: VerificationStatus | null | undef
 }
 
 export function isUserFullyVerified(profile: Profile | null, verification: UserVerification | null) {
+  if (verification?.verification_status === "verified") return true;
+
   return Boolean(
     profile?.profile_completed &&
     profile.account_status === "active" &&
@@ -171,6 +190,7 @@ export function isUserFullyVerified(profile: Profile | null, verification: UserV
 }
 
 function phoneStatus(hasPhoneSubmission: boolean, verification: UserVerification | null): VerificationStatus {
+  if (verification?.verification_status === "verified") return "verified";
   if (verification?.phone_verified) return "verified";
   if (!hasPhoneSubmission) return "not_started";
   if (verification?.verification_status === "failed") return "failed";

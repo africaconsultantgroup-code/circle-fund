@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowRight, CheckCircle2, Clock, Home, Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
@@ -6,6 +6,7 @@ import { VerificationBadge } from "@/components/verification-badge";
 import { faceStepStatus, ghanaCardStepStatus, loadVerificationFlowSummary, type VerificationFlowSummary } from "@/lib/verification-flow";
 
 export function VerifyStatusPage() {
+  const navigate = useNavigate();
   const [summary, setSummary] = useState<VerificationFlowSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -14,14 +15,24 @@ export function VerifyStatusPage() {
 
     loadVerificationFlowSummary().then((result) => {
       if (!isMounted) return;
+      console.log("verify_status_page_verification_fetch", {
+        currentUserId: result.userId,
+        verificationRecordFound: Boolean(result.verification),
+        fetchedVerification: result.verification,
+        isFullyVerified: result.isFullyVerified,
+        nextRequiredStep: result.nextStep.to,
+      });
       setSummary(result);
       setIsLoading(false);
+      if (result.isFullyVerified) {
+        navigate({ to: "/home" });
+      }
     });
 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [navigate]);
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
@@ -120,10 +131,11 @@ function VerificationDebug({ summary }: { summary: VerificationFlowSummary }) {
   return (
     <div className="rounded-2xl border border-border bg-muted/40 p-4 text-[11px] text-muted-foreground">
       <p className="font-semibold text-foreground">Verification debug</p>
-      <p className="mt-1">phone_verified: <span className="font-mono text-foreground">{String(Boolean(verification?.phone_verified))}</span></p>
-      <p>otp_status: <span className="font-mono text-foreground">{verification?.otp_status ?? "not_started"}</span></p>
-      <p>ghana_card_status: <span className="font-mono text-foreground">{ghanaCardStepStatus(verification ?? null)}</span></p>
-      <p>selfie_status: <span className="font-mono text-foreground">{faceStepStatus(verification ?? null)}</span></p>
+      <p className="mt-1">record_found: <span className="font-mono text-foreground">{String(Boolean(verification))}</span></p>
+      <p>phone_verified: <span className="font-mono text-foreground">{verification ? String(verification.phone_verified) : "missing"}</span></p>
+      <p>otp_status: <span className="font-mono text-foreground">{verification?.otp_status ?? "missing"}</span></p>
+      <p>ghana_card_status: <span className="font-mono text-foreground">{verification ? ghanaCardStepStatus(verification) : "missing"}</span></p>
+      <p>selfie_status: <span className="font-mono text-foreground">{verification ? faceStepStatus(verification) : "missing"}</span></p>
       <p>next_required_step: <span className="font-mono text-foreground">{summary.nextStep.to}</span></p>
     </div>
   );

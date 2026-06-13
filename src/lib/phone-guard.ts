@@ -1,6 +1,6 @@
 import { redirect } from "@tanstack/react-router";
 import { getCurrentUser } from "@/lib/auth";
-import { getUserVerification } from "@/lib/db";
+import { getCurrentUserVerification } from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
 export async function requireVerifiedPhone() {
@@ -11,8 +11,15 @@ export async function requireVerifiedPhone() {
     throw redirect({ to: "/login" });
   }
 
-  const { data, error } = await getUserVerification(user.id);
-  if (error || !data?.phone_verified || data.otp_status !== "verified") {
+  const { data, error } = await getCurrentUserVerification();
+  console.log("phone_guard_verification_fetch", {
+    currentUserId: user.id,
+    verificationRecordFound: Boolean(data),
+    fetchedVerification: data,
+    error: error?.message ?? null,
+  });
+
+  if (error || !(data?.phone_verified && data.otp_status === "verified") && data?.verification_status !== "verified") {
     throw redirect({ to: "/verify/phone" });
   }
 }

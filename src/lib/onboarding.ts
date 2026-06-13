@@ -1,5 +1,5 @@
 import { getCurrentUser } from "@/lib/auth";
-import { getProfileByUserId, getUserVerification, type Profile, type UserVerification } from "@/lib/db";
+import { getCurrentUserVerification, getProfileByUserId, type Profile, type UserVerification } from "@/lib/db";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { buildVerificationSteps, faceStepStatus, ghanaCardStepStatus, hasAcceptedFaceVerification, hasAcceptedGhanaCardVerification, isUserFullyVerified, statusStep } from "@/lib/verification-flow";
 import type { VerificationStatus } from "@/lib/supabase-types";
@@ -57,13 +57,25 @@ export async function getCircleEligibility(): Promise<CircleEligibility> {
     }]);
   }
 
-  const { data: profile, error } = await getProfileByUserId(user.id);
+  const [{ data: profile, error }, verificationResult] = await Promise.all([
+    getProfileByUserId(user.id),
+    getCurrentUserVerification(),
+  ]);
+  const verification = verificationResult.data;
 
   const { data: allowed, error: rpcError } = await supabase.rpc("user_passes_circle_onboarding", {
     check_user_id: user.id,
   });
 
-  if (rpcError || !allowed) {
+  console.log("circle_eligibility_verification_fetch", {
+    currentUserId: user.id,
+    verificationRecordFound: Boolean(verification),
+    fetchedVerification: verification,
+    rpcAllowed: allowed ?? null,
+    rpcError: rpcError?.message ?? null,
+  });
+
+  if ((verification?.verification_status !== "verified") && (rpcError || !allowed)) {
     return blocked(user.id, [{
       key: "account",
       message: rpcError?.message ?? "Complete verification before creating or joining a circle.",
@@ -165,15 +177,23 @@ export async function getVerificationGateSummary(): Promise<VerificationGateSumm
     return emptyGateSummary(false);
   }
 
-  const [{ data: profile }, { data: verification }] = await Promise.all([
+  const [{ data: profile }, verificationResult] = await Promise.all([
     getProfileByUserId(user.id),
-    getUserVerification(user.id),
+    getCurrentUserVerification(),
   ]);
+  const verification = verificationResult.data;
+
+  console.log("verification_gate_summary_fetch", {
+    currentUserId: user.id,
+    verificationFetchUserId: verificationResult.userId,
+    verificationRecordFound: Boolean(verification),
+    fetchedVerification: verification,
+  });
 
   const steps = buildVerificationSteps(profile ?? null, verification ?? null);
   const formsComplete = steps.every((step) => step.accepted);
-  const isEligible = formsComplete;
-  const canUseCircleActions = formsComplete;
+  const isEligible = formsComplete || verification?.verification_status === "verified";
+  const canUseCircleActions = isEligible;
   const nextStep = steps.find((step) => !step.accepted) ?? statusStep(formsComplete);
 
   return {
@@ -191,11 +211,11 @@ export async function getVerificationGateSummary(): Promise<VerificationGateSumm
       description: nextStep.description,
     },
     statuses: {
-      phone: verification?.phone_verified ? "verified" : "not_started",
+      phone: verification?.verification_status === "verified" || (verification?.phone_verified && verification.otp_status === "verified") ? "verified" : "not_started",
       ghanaCard: ghanaCardStepStatus(verification ?? null),
       face: faceStepStatus(verification ?? null),
-      profile: profile?.profile_completed ? "complete" : "incomplete",
-      account: profile?.account_status === "active" ? "active" : "inactive",
+      profile: profile?.profile_completed || verification?.verification_status === "verified" ? "complete" : "incomplete",
+      account: profile?.account_status === "active" || verification?.verification_status === "verified" ? "active" : "inactive",
     },
   };
 }
