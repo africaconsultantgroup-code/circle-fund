@@ -11,6 +11,7 @@ export type VerificationStatus = 'not_started' | 'pending' | 'verified' | 'faile
 export type OtpStatus = 'not_started' | 'pending' | 'verified' | 'failed';
 export type AccountStatus = 'active' | 'pending' | 'suspended' | 'disabled';
 export type UserRole = 'customer' | 'admin';
+export type CurrencyCode = 'GHS' | 'GBP' | 'USD' | 'EUR';
 export type PersonalSusuFrequency = 'daily' | 'weekly' | 'biweekly' | 'monthly';
 export type PersonalSusuDurationUnit = 'weeks' | 'months';
 export type PersonalSusuPlanStatus = 'active' | 'completed' | 'cancelled';
@@ -25,6 +26,9 @@ export interface Database {
           user_id: string;
           full_name: string | null;
           phone: string | null;
+          country: string | null;
+          preferred_currency: CurrencyCode;
+          expected_monthly_contribution: number | null;
           avatar_url: string | null;
           ghana_card_verification_status: LegacyVerificationStatus;
           selfie_image_url: string | null;
@@ -39,6 +43,9 @@ export interface Database {
           user_id: string;
           full_name?: string | null;
           phone?: string | null;
+          country?: string | null;
+          preferred_currency?: CurrencyCode;
+          expected_monthly_contribution?: number | null;
           avatar_url?: string | null;
           ghana_card_verification_status?: LegacyVerificationStatus;
           selfie_image_url?: string | null;
@@ -51,6 +58,9 @@ export interface Database {
         Update: {
           full_name?: string | null;
           phone?: string | null;
+          country?: string | null;
+          preferred_currency?: CurrencyCode;
+          expected_monthly_contribution?: number | null;
           avatar_url?: string | null;
           ghana_card_verification_status?: LegacyVerificationStatus;
           selfie_image_url?: string | null;
@@ -68,6 +78,7 @@ export interface Database {
           description: string | null;
           goal_amount: number | null;
           contribution_amount: number | null;
+          base_currency: CurrencyCode;
           frequency: string | null;
           max_members: number;
           invite_token: string;
@@ -84,6 +95,7 @@ export interface Database {
           description?: string | null;
           goal_amount?: number | null;
           contribution_amount?: number | null;
+          base_currency?: CurrencyCode;
           frequency?: string | null;
           max_members?: number;
           invite_token?: string;
@@ -98,6 +110,7 @@ export interface Database {
           description?: string | null;
           goal_amount?: number | null;
           contribution_amount?: number | null;
+          base_currency?: CurrencyCode;
           frequency?: string | null;
           max_members?: number;
           invite_token?: string;

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { CalendarDays, Calculator } from "lucide-react";
-import { formatGHS } from "@/lib/mock-data";
+import { formatCurrency } from "@/lib/diaspora";
+import type { CurrencyCode } from "@/lib/supabase-types";
 
 type Frequency = "daily" | "weekly" | "biweekly" | "monthly";
 
@@ -15,10 +16,12 @@ export function SavingsPlanner({
   defaultTargetAmount = 1000,
   defaultDueDate,
   defaultSavedAmount = 0,
+  currency = "GHS",
 }: {
   defaultTargetAmount?: number;
   defaultDueDate?: string;
   defaultSavedAmount?: number;
+  currency?: CurrencyCode;
 }) {
   const [targetAmount, setTargetAmount] = useState(defaultTargetAmount);
   const [savedAmount, setSavedAmount] = useState(defaultSavedAmount);
@@ -42,8 +45,8 @@ export function SavingsPlanner({
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <MoneyInput label="Target" value={targetAmount} onChange={setTargetAmount} />
-          <MoneyInput label="Saved" value={savedAmount} onChange={setSavedAmount} />
+          <MoneyInput label="Target" value={targetAmount} onChange={setTargetAmount} currency={currency} />
+          <MoneyInput label="Saved" value={savedAmount} onChange={setSavedAmount} currency={currency} />
           <div className="col-span-2">
             <label className="text-xs font-medium text-muted-foreground">Due date</label>
             <div className="mt-1.5 flex items-center gap-2 rounded-2xl border border-input bg-muted/40 px-3 py-3">
@@ -75,29 +78,29 @@ export function SavingsPlanner({
 
         <div className="mt-4 rounded-2xl bg-secondary p-4 text-primary">
           <p className="text-[11px] font-semibold uppercase tracking-wide">Selected plan</p>
-          <p className="mt-1 font-display text-2xl font-bold">{formatGHS(selectedAmount)}</p>
+          <p className="mt-1 font-display text-2xl font-bold">{formatCurrency(selectedAmount, currency)}</p>
           <p className="text-[11px] text-primary/75">Save this {frequencyLabels[frequency].toLowerCase()} until the due date.</p>
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2">
           <PlanMetric label="Days remaining" value={String(plan.daysRemaining)} />
-          <PlanMetric label="Total remaining" value={formatGHS(plan.remainingAmount)} />
-          <PlanMetric label="Daily" value={formatGHS(plan.amounts.daily)} />
-          <PlanMetric label="Weekly" value={formatGHS(plan.amounts.weekly)} />
-          <PlanMetric label="Biweekly" value={formatGHS(plan.amounts.biweekly)} />
-          <PlanMetric label="Monthly" value={formatGHS(plan.amounts.monthly)} />
+          <PlanMetric label="Total remaining" value={formatCurrency(plan.remainingAmount, currency)} />
+          <PlanMetric label="Daily" value={formatCurrency(plan.amounts.daily, currency)} />
+          <PlanMetric label="Weekly" value={formatCurrency(plan.amounts.weekly, currency)} />
+          <PlanMetric label="Biweekly" value={formatCurrency(plan.amounts.biweekly, currency)} />
+          <PlanMetric label="Monthly" value={formatCurrency(plan.amounts.monthly, currency)} />
         </div>
       </div>
     </section>
   );
 }
 
-function MoneyInput({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+function MoneyInput({ label, value, onChange, currency }: { label: string; value: number; onChange: (value: number) => void; currency: CurrencyCode }) {
   return (
     <div>
       <label className="text-xs font-medium text-muted-foreground">{label} amount</label>
       <div className="mt-1.5 flex items-center gap-2 rounded-2xl border border-input bg-muted/40 px-3 py-3">
-        <span className="text-xs font-semibold text-muted-foreground">GHS</span>
+        <span className="text-xs font-semibold text-muted-foreground">{currency}</span>
         <input
           type="number"
           min={0}

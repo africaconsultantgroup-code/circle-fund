@@ -1,9 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Plus, Search, LogIn, Loader2 } from "lucide-react";
-import { formatGHS } from "@/lib/mock-data";
 import { loadUserCircles, type UserCircle } from "@/lib/user-circles";
 import { getVerificationGateSummary, type VerificationGateSummary } from "@/lib/onboarding";
+import { formatCurrency } from "@/lib/diaspora";
 
 export function CirclesPage() {
   const [circles, setCircles] = useState<UserCircle[]>([]);
@@ -107,7 +107,7 @@ export function CirclesPage() {
                     <p className="font-display text-sm font-semibold">{c.name}</p>
                     <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">{c.category}</span>
                   </div>
-                  <p className="text-[11px] text-muted-foreground">{c.memberCount}/{c.maxMembers} members - {formatGHS(c.amount)}/{c.frequency}</p>
+                  <p className="text-[11px] text-muted-foreground">{c.memberCount}/{c.maxMembers} members - {formatCurrency(c.amount, c.baseCurrency)}/{c.frequency}</p>
                 </div>
               </div>
               <div className="mt-3 flex items-center gap-3">

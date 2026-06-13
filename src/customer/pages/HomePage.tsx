@@ -6,6 +6,7 @@ import { TrustBadge } from "@/components/verification-badge";
 import { SavingsPlanner } from "@/components/savings-planner";
 import { loadUserCircles, type UserCircle } from "@/lib/user-circles";
 import { getVerificationGateSummary, type VerificationGateSummary } from "@/lib/onboarding";
+import { formatCurrency } from "@/lib/diaspora";
 
 export function HomePage() {
   const [circles, setCircles] = useState<UserCircle[]>([]);
@@ -126,6 +127,7 @@ export function HomePage() {
       <SavingsPlanner
         defaultTargetAmount={nextCircle?.amount ?? 1000}
         defaultDueDate={toDateInputValue(nextCircle?.nextPayoutDate)}
+        currency={nextCircle?.baseCurrency ?? "GHS"}
       />
 
       <section className="mt-7 px-5">
@@ -154,7 +156,7 @@ export function HomePage() {
                 {nextCircle.frequency}
               </span>
             </div>
-            <p className="mt-2 font-display text-2xl font-bold">{formatGHS(nextCircle.amount * nextCircle.maxMembers)}</p>
+            <p className="mt-2 font-display text-2xl font-bold">{formatCurrency(nextCircle.amount * nextCircle.maxMembers, nextCircle.baseCurrency)}</p>
             <p className="text-xs text-muted-foreground">
               To {nextCircle.nextRecipient} - {nextCircle.nextPayoutDate}
             </p>
@@ -201,7 +203,7 @@ export function HomePage() {
                 <div className="flex-1">
                   <p className="font-display text-sm font-semibold">{c.name}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    {c.memberCount} members - {formatGHS(c.amount)}/{c.frequency}
+                    {c.memberCount} members - {formatCurrency(c.amount, c.baseCurrency)}/{c.frequency}
                   </p>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
                     <div className="h-full rounded-full bg-gradient-gold" style={{ width: `${(c.currentCycle / c.totalCycles) * 100}%` }} />

@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { listCirclesForUser, type Circle } from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { circles as mockCircles } from "@/lib/mock-data";
+import type { CurrencyCode } from "@/lib/supabase-types";
 
 export type UserCircle = {
   id: string;
@@ -9,6 +10,7 @@ export type UserCircle = {
   description: string | null;
   category: string;
   amount: number;
+  baseCurrency: CurrencyCode;
   frequency: string;
   memberCount: number;
   maxMembers: number;
@@ -30,6 +32,7 @@ export function mockUserCircles(): UserCircle[] {
     description: null,
     category: circle.category,
     amount: circle.amount,
+    baseCurrency: "GHS",
     frequency: circle.frequency,
     memberCount: circle.members.length,
     maxMembers: 15,
@@ -74,6 +77,7 @@ export function toUserCircle(circle: Circle): UserCircle {
     description: circle.description,
     category: extractCategory(circle.description),
     amount,
+    baseCurrency: circle.base_currency ?? "GHS",
     frequency: circle.frequency ?? "monthly",
     memberCount: 1,
     maxMembers,

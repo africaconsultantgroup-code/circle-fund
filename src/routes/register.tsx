@@ -1,9 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { Coins, Mail, Lock, User as UserIcon, Phone } from "lucide-react";
+import { Coins, Mail, Lock, User as UserIcon, Phone, Globe2, Banknote } from "lucide-react";
 import { Field } from "./login";
 import { signUpWithEmail } from "@/lib/auth";
 import { upsertProfile } from "@/lib/db";
+import { countryOptions, currencyOptions, normalizeInternationalPhoneNumber, validateInternationalPhoneNumber, type CountryCode } from "@/lib/diaspora";
+import type { CurrencyCode } from "@/lib/supabase-types";
 
 export const Route = createFileRoute("/register")({
   component: RegisterPage,
@@ -14,6 +16,9 @@ function RegisterPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [country, setCountry] = useState<CountryCode>("GH");
+  const [preferredCurrency, setPreferredCurrency] = useState<CurrencyCode>("GHS");
+  const [expectedMonthlyContribution, setExpectedMonthlyContribution] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +29,14 @@ function RegisterPage() {
     setLoading(true);
     setError(null);
     setMessage(null);
+
+    const countryOption = countryOptions.find((option) => option.code === country) ?? countryOptions[0];
+    const normalizedPhone = normalizeInternationalPhoneNumber(phone, country);
+    if (!validateInternationalPhoneNumber(normalizedPhone, country)) {
+      setLoading(false);
+      setError("Enter a valid phone number for your selected country.");
+      return;
+    }
 
     const result = await signUpWithEmail(email, password);
     if (result.error) {
@@ -42,8 +55,11 @@ function RegisterPage() {
       await upsertProfile({
         user_id: result.data.user.id,
         full_name: fullName.trim() || null,
-        phone: phone.trim() || null,
-        profile_completed: Boolean(fullName.trim() && phone.trim()),
+        phone: normalizedPhone,
+        country: countryOption.label,
+        preferred_currency: preferredCurrency,
+        expected_monthly_contribution: expectedMonthlyContribution ? Number(expectedMonthlyContribution) : null,
+        profile_completed: Boolean(fullName.trim() && normalizedPhone && countryOption.label),
         account_status: "active",
         role: "customer",
         updated_at: new Date().toISOString(),
@@ -88,10 +104,40 @@ function RegisterPage() {
         <Field
           icon={<Phone className="h-4 w-4" />}
           label="Phone"
-          placeholder="+233 24 555 0142"
+          placeholder={country === "GH" ? "0558196746" : `${countryOptionPlaceholder(country)} phone number`}
           name="phone"
           value={phone}
           onChange={(event) => setPhone(event.target.value)}
+        />
+        <div className="grid grid-cols-2 gap-3">
+          <SelectField
+            icon={<Globe2 className="h-4 w-4" />}
+            label="Country"
+            value={country}
+            onChange={(value) => {
+              const nextCountry = value as CountryCode;
+              const nextOption = countryOptions.find((option) => option.code === nextCountry) ?? countryOptions[0];
+              setCountry(nextCountry);
+              setPreferredCurrency(nextOption.currency);
+            }}
+            options={countryOptions.map((option) => ({ value: option.code, label: option.label }))}
+          />
+          <SelectField
+            icon={<Banknote className="h-4 w-4" />}
+            label="Currency"
+            value={preferredCurrency}
+            onChange={(value) => setPreferredCurrency(value as CurrencyCode)}
+            options={currencyOptions.map((currency) => ({ value: currency, label: currency }))}
+          />
+        </div>
+        <Field
+          icon={<Coins className="h-4 w-4" />}
+          label="Expected monthly contribution"
+          type="number"
+          placeholder="1000"
+          name="expectedMonthlyContribution"
+          value={expectedMonthlyContribution}
+          onChange={(event) => setExpectedMonthlyContribution(event.target.value)}
         />
         <Field
           icon={<Lock className="h-4 w-4" />}
@@ -133,4 +179,38 @@ function RegisterPage() {
       </p>
     </div>
   );
+}
+
+function SelectField({
+  icon,
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
+}) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <span className="flex items-center gap-2 rounded-2xl border border-input bg-muted/40 px-4 py-3.5 text-sm">
+        <span className="text-muted-foreground">{icon}</span>
+        <select value={value} onChange={(event) => onChange(event.target.value)} className="min-w-0 flex-1 appearance-none bg-transparent outline-none">
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </span>
+    </label>
+  );
+}
+
+function countryOptionPlaceholder(country: CountryCode) {
+  if (country === "GB") return "+44";
+  if (country === "US" || country === "CA") return "+1";
+  return "+";
 }

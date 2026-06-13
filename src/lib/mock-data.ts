@@ -14,6 +14,7 @@ export interface Circle {
   name: string;
   description: string;
   amount: number;
+  baseCurrency?: "GHS" | "GBP" | "USD" | "EUR";
   frequency: Frequency;
   inviteCode: string;
   currentCycle: number;
@@ -159,8 +160,12 @@ export const currentUser = {
   joined: "March 2026",
 };
 
-export const formatGHS = (n: number) =>
-  new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 0 }).format(n);
+export const formatCurrency = (n: number, currency = "GHS") => {
+  const locale = currency === "GBP" ? "en-GB" : currency === "EUR" ? "en-IE" : currency === "USD" ? "en-US" : "en-GH";
+  return new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
+};
+
+export const formatGHS = (n: number) => formatCurrency(n, "GHS");
 
 export const getCircle = (id: string) => circles.find((c) => c.id === id);
 

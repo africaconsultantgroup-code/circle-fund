@@ -2,9 +2,11 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Users, Repeat, Calendar, FileText, ShieldCheck, ShieldAlert, CheckCircle2, Loader2, Copy } from "lucide-react";
-import { createCircleWithCreator, generateInviteToken } from "@/lib/db";
+import { createCircleWithCreator, generateInviteToken, getProfileByUserId } from "@/lib/db";
 import { trustScore } from "@/lib/mock-data";
 import { getCircleEligibility, type CircleEligibility } from "@/lib/onboarding";
+import { currencyOptions, formatCurrency } from "@/lib/diaspora";
+import type { CurrencyCode } from "@/lib/supabase-types";
 
 export function CreateCirclePage() {
   const navigate = useNavigate();
@@ -13,6 +15,7 @@ export function CreateCirclePage() {
   const [category, setCategory] = useState("Family");
   const [members, setMembers] = useState(8);
   const [amount, setAmount] = useState(150);
+  const [baseCurrency, setBaseCurrency] = useState<CurrencyCode>("GHS");
   const [frequency, setFrequency] = useState<"weekly" | "biweekly" | "monthly">("monthly");
   const [startDate, setStartDate] = useState("2026-06-15");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -35,6 +38,11 @@ export function CreateCirclePage() {
       if (!isMounted) return;
       setEligibility(result);
       setIsCheckingEligibility(false);
+      if (result.userId) {
+        void getProfileByUserId(result.userId).then(({ data }) => {
+          if (data?.preferred_currency) setBaseCurrency(data.preferred_currency);
+        });
+      }
     });
 
     return () => {
@@ -80,6 +88,7 @@ export function CreateCirclePage() {
           name: name.trim(),
           description: description.trim() ? `${description.trim()} Category: ${category}` : `Category: ${category}`,
           contribution_amount: amount,
+          base_currency: baseCurrency,
           goal_amount: amount * members,
           frequency,
           max_members: members,
@@ -152,10 +161,11 @@ export function CreateCirclePage() {
         </Section>
 
         <Section icon={<Repeat className="h-4 w-4" />} title="Contribution">
+          <Select label="Base currency" options={currencyOptions} value={baseCurrency} onChange={(value) => setBaseCurrency(value as CurrencyCode)} />
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Amount (GHS)</label>
+            <label className="text-xs font-medium text-muted-foreground">Amount ({baseCurrency})</label>
             <div className="mt-1.5 flex items-center gap-2 rounded-2xl border border-input bg-muted/40 px-4 py-3.5">
-              <span className="text-sm font-semibold text-muted-foreground">GHS</span>
+              <span className="text-sm font-semibold text-muted-foreground">{baseCurrency}</span>
               <input
                 type="number"
                 min={1}
@@ -210,7 +220,7 @@ export function CreateCirclePage() {
 
         <div className="rounded-3xl bg-secondary p-4">
           <p className="text-xs uppercase tracking-wide text-primary">Estimated pool per cycle</p>
-          <p className="mt-1 font-display text-2xl font-bold text-primary">GHS {(amount * members).toLocaleString()}</p>
+          <p className="mt-1 font-display text-2xl font-bold text-primary">{formatCurrency(amount * members, baseCurrency)}</p>
           <p className="text-[11px] text-muted-foreground">Each member receives one payout over {members} {frequency === "weekly" ? "weeks" : frequency === "biweekly" ? "fortnights" : "months"}.</p>
         </div>
 

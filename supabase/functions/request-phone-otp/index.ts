@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
     }
 
     const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
-    if (!isValidGhanaInternationalNumber(normalizedPhoneNumber)) {
+    if (!isValidInternationalPhoneNumber(normalizedPhoneNumber)) {
       console.warn("request_phone_otp_invalid_recipient_format", {
         userId: user.id,
         rawPhoneNumber: phoneNumber,
@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
       });
       return json({
         ok: false,
-        error: "SMS delivery failed. Invalid recipient format.",
+        error: "Invalid phone number format.",
         reason: "invalid_recipient_format",
         rawPhoneNumber: phoneNumber,
         normalizedPhoneNumber,
@@ -41,10 +41,14 @@ Deno.serve(async (req) => {
     const now = new Date();
     const reference = providerReference("phone_otp");
     const status = "pending";
-    const otp = generateOtp();
+    const isGhanaNumber = normalizedPhoneNumber.startsWith("233");
+    const otp = isGhanaNumber ? generateOtp() : "123456";
     const expiresAt = new Date(now.getTime() + 10 * 60 * 1000);
     const otpHash = await hashSensitiveValue(`${normalizedPhoneNumber}:${otp}`);
-    const failureReason = "Hubtel OTP sent. Awaiting user verification.";
+    const provider = isGhanaNumber ? "hubtel_otp" : "sandbox_international_otp";
+    const failureReason = isGhanaNumber
+      ? "Hubtel OTP sent. Awaiting user verification."
+      : "Sandbox international OTP created. Awaiting user verification.";
     const { data: existingVerification, error: existingVerificationError } = await serviceClient
       .from("user_verifications")
       .select("phone_verified, verification_status, otp_status")
@@ -81,7 +85,7 @@ Deno.serve(async (req) => {
         otp_reference: reference,
         otp_code_hash: otpHash,
         otp_expires_at: expiresAt.toISOString(),
-        verification_provider: "hubtel_otp",
+        verification_provider: provider,
         provider_reference: reference,
         verification_status: nextStatus,
         failure_reason: failureReason,
@@ -111,26 +115,28 @@ Deno.serve(async (req) => {
       otpStatus: savedVerification.otp_status,
     });
 
-    const hubtelResult = await sendHubtelOtp(normalizedPhoneNumber, otp, reference);
-    if (!hubtelResult.ok) {
-      console.error("request_phone_otp_hubtel_send_failed", {
-        userId: user.id,
-        otpReference: reference,
-        phoneNumber: normalizedPhoneNumber,
-        expiryTime: expiresAt.toISOString(),
-        status: hubtelResult.status,
-        error: hubtelResult.error,
-      });
+    if (isGhanaNumber) {
+      const hubtelResult = await sendHubtelOtp(normalizedPhoneNumber, otp, reference);
+      if (!hubtelResult.ok) {
+        console.error("request_phone_otp_hubtel_send_failed", {
+          userId: user.id,
+          otpReference: reference,
+          phoneNumber: normalizedPhoneNumber,
+          expiryTime: expiresAt.toISOString(),
+          status: hubtelResult.status,
+          error: hubtelResult.error,
+        });
 
-      await markOtpDeliveryFailed(serviceClient, user.id, normalizedPhoneNumber);
+        await markOtpDeliveryFailed(serviceClient, user.id, normalizedPhoneNumber);
 
-      return json({
-        ok: false,
-        error: hubtelResult.error,
-        reason: "hubtel_send_failed",
-        rawPhoneNumber: phoneNumber,
-        normalizedPhoneNumber,
-      }, hubtelResult.status);
+        return json({
+          ok: false,
+          error: hubtelResult.error,
+          reason: "hubtel_send_failed",
+          rawPhoneNumber: phoneNumber,
+          normalizedPhoneNumber,
+        }, hubtelResult.status);
+      }
     }
 
     console.log("request_phone_otp_sent", {
@@ -146,7 +152,10 @@ Deno.serve(async (req) => {
       providerReference: reference,
       rawPhoneNumber: phoneNumber,
       normalizedPhoneNumber,
-      message: "Hubtel OTP sent. Enter the code to verify your phone.",
+      testOtp: isGhanaNumber ? undefined : "123456",
+      message: isGhanaNumber
+        ? "Hubtel OTP sent. Enter the code to verify your phone."
+        : "International sandbox OTP ready. Use 123456 to verify your phone.",
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error.";
@@ -159,7 +168,17 @@ function normalizePhoneNumber(phoneNumber: string) {
   if (compact.startsWith("0")) return `233${compact.slice(1)}`;
   if (compact.startsWith("233")) return compact;
   if (compact.length === 9) return `233${compact}`;
+  if (compact.startsWith("44")) return compact;
+  if (compact.startsWith("1") && compact.length === 11) return compact;
+  if (compact.length === 10) return `1${compact}`;
   return compact;
+}
+
+function isValidInternationalPhoneNumber(phoneNumber: string) {
+  return /^233\d{9}$/.test(phoneNumber)
+    || /^44\d{9,10}$/.test(phoneNumber)
+    || /^1\d{10}$/.test(phoneNumber)
+    || /^(?!233|44|1)\d{8,15}$/.test(phoneNumber);
 }
 
 function isValidGhanaInternationalNumber(phoneNumber: string) {

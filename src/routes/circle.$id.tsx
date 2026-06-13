@@ -2,12 +2,13 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { PageHeader } from "@/components/page-header";
 import { SavingsPlanner } from "@/components/savings-planner";
 import { Share2, Users, Calendar, CheckCircle2, Coins, UserCheck } from "lucide-react";
-import { getCircle, formatGHS, type Circle as CircleType } from "@/lib/mock-data";
+import { getCircle, type Circle as CircleType } from "@/lib/mock-data";
 import { pendingApprovals } from "@/lib/mock-data";
 import { getCircleById } from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { toUserCircle } from "@/lib/user-circles";
 import { requireVerifiedPhone } from "@/lib/phone-guard";
+import { formatCurrency } from "@/lib/diaspora";
 
 export const Route = createFileRoute("/circle/$id")({
   beforeLoad: requireVerifiedPhone,
@@ -27,6 +28,7 @@ export const Route = createFileRoute("/circle/$id")({
       category: circle.category,
       inviteCode: circle.inviteToken ?? "Pending",
       amount: circle.amount,
+      baseCurrency: circle.baseCurrency,
       frequency: circle.frequency,
       currentCycle: circle.currentCycle,
       totalCycles: circle.totalCycles,
@@ -49,6 +51,7 @@ export const Route = createFileRoute("/circle/$id")({
 
 function CircleDetails() {
   const c = Route.useLoaderData() as CircleType;
+  const baseCurrency = c.baseCurrency ?? "GHS";
   const pool = c.amount * c.members.length;
   const progress = (c.currentCycle / c.totalCycles) * 100;
 
@@ -67,8 +70,8 @@ function CircleDetails() {
           <span className="text-[10px] uppercase tracking-wide text-primary-foreground/70">Invite - {c.inviteCode}</span>
         </div>
         <p className="mt-4 text-xs uppercase tracking-wide text-primary-foreground/60">Pool per cycle</p>
-        <p className="mt-1 font-display text-3xl font-bold">{formatGHS(pool)}</p>
-        <p className="text-xs text-primary-foreground/70">{formatGHS(c.amount)} from each member - {c.frequency}</p>
+        <p className="mt-1 font-display text-3xl font-bold">{formatCurrency(pool, baseCurrency)}</p>
+        <p className="text-xs text-primary-foreground/70">{formatCurrency(c.amount, baseCurrency)} from each member - {c.frequency}</p>
 
         <div className="mt-5">
           <div className="flex justify-between text-[11px] text-primary-foreground/70">
@@ -107,7 +110,7 @@ function CircleDetails() {
         </Link>
       </div>
 
-      <SavingsPlanner defaultTargetAmount={c.amount} defaultDueDate={toDateInputValue(c.nextPayoutDate)} />
+      <SavingsPlanner defaultTargetAmount={c.amount} defaultDueDate={toDateInputValue(c.nextPayoutDate)} currency={baseCurrency} />
 
       <section className="px-5 pt-7">
         <h2 className="font-display text-base font-semibold">Payout timeline</h2>
@@ -133,7 +136,7 @@ function CircleDetails() {
                     {isNext && <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-semibold text-[color:var(--gold-foreground)]">Next</span>}
                     {done && <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success">Paid</span>}
                   </div>
-                  <p className="text-[11px] text-muted-foreground">{formatGHS(pool)} - Position {m.payoutPosition}</p>
+                  <p className="text-[11px] text-muted-foreground">{formatCurrency(pool, baseCurrency)} - Position {m.payoutPosition}</p>
                 </div>
               </li>
             );

@@ -4,11 +4,16 @@ import { CheckCircle2, Loader2, ShieldAlert, UserRound } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { getCurrentUser } from "@/lib/auth";
 import { getProfileByUserId, upsertProfile } from "@/lib/db";
+import { countryOptions, currencyOptions, countryForValue, normalizeInternationalPhoneNumber, validateInternationalPhoneNumber, type CountryCode } from "@/lib/diaspora";
+import type { CurrencyCode } from "@/lib/supabase-types";
 
 export function VerifyProfilePage() {
   const navigate = useNavigate();
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
+  const [country, setCountry] = useState<CountryCode>("GH");
+  const [preferredCurrency, setPreferredCurrency] = useState<CurrencyCode>("GHS");
+  const [expectedMonthlyContribution, setExpectedMonthlyContribution] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -30,6 +35,10 @@ export function VerifyProfilePage() {
       if (!isMounted) return;
       setFullName(data?.full_name ?? "");
       setPhone(data?.phone ?? user.phone ?? "");
+      const profileCountry = countryForValue(data?.country);
+      setCountry(profileCountry.code);
+      setPreferredCurrency(data?.preferred_currency ?? profileCountry.currency);
+      setExpectedMonthlyContribution(data?.expected_monthly_contribution ? String(data.expected_monthly_contribution) : "");
       setIsLoading(false);
     });
 
@@ -47,8 +56,10 @@ export function VerifyProfilePage() {
       return;
     }
 
-    if (phone.trim().length < 8) {
-      setError("Enter a valid phone number.");
+    const countryOption = countryOptions.find((option) => option.code === country) ?? countryOptions[0];
+    const normalizedPhone = normalizeInternationalPhoneNumber(phone, country);
+    if (!validateInternationalPhoneNumber(normalizedPhone, country)) {
+      setError("Enter a valid phone number for your selected country.");
       return;
     }
 
@@ -63,7 +74,10 @@ export function VerifyProfilePage() {
     const { error } = await upsertProfile({
       user_id: user.id,
       full_name: fullName.trim(),
-      phone: phone.trim(),
+      phone: normalizedPhone,
+      country: countryOption.label,
+      preferred_currency: preferredCurrency,
+      expected_monthly_contribution: expectedMonthlyContribution ? Number(expectedMonthlyContribution) : null,
       profile_completed: true,
       account_status: "active",
       role: "customer",
@@ -100,7 +114,25 @@ export function VerifyProfilePage() {
         ) : (
           <>
             <Field label="Full name" value={fullName} onChange={setFullName} placeholder="Ama Mensah" />
-            <Field label="Phone number" value={phone} onChange={setPhone} placeholder="0245550142" />
+            <Select
+              label="Country"
+              value={country}
+              onChange={(value) => {
+                const nextCountry = value as CountryCode;
+                const nextOption = countryOptions.find((option) => option.code === nextCountry) ?? countryOptions[0];
+                setCountry(nextCountry);
+                setPreferredCurrency(nextOption.currency);
+              }}
+              options={countryOptions.map((option) => ({ value: option.code, label: option.label }))}
+            />
+            <Field label="Phone number" value={phone} onChange={setPhone} placeholder={country === "GH" ? "0558196746" : "Include country code if needed"} />
+            <Select
+              label="Preferred currency"
+              value={preferredCurrency}
+              onChange={(value) => setPreferredCurrency(value as CurrencyCode)}
+              options={currencyOptions.map((currency) => ({ value: currency, label: currency }))}
+            />
+            <Field label="Expected monthly contribution" value={expectedMonthlyContribution} onChange={setExpectedMonthlyContribution} placeholder="1000" type="number" />
           </>
         )}
 
@@ -128,16 +160,30 @@ export function VerifyProfilePage() {
   );
 }
 
-function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {
+function Field({ label, value, onChange, placeholder, type = "text" }: { label: string; value: string; onChange: (value: string) => void; placeholder: string; type?: string }) {
   return (
     <div>
       <label className="text-xs font-medium text-muted-foreground">{label}</label>
       <input
+        type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         className="mt-1.5 w-full rounded-2xl border border-input bg-muted/40 px-4 py-3.5 text-sm outline-none placeholder:text-muted-foreground"
       />
+    </div>
+  );
+}
+
+function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) {
+  return (
+    <div>
+      <label className="text-xs font-medium text-muted-foreground">{label}</label>
+      <select value={value} onChange={(event) => onChange(event.target.value)} className="mt-1.5 w-full appearance-none rounded-2xl border border-input bg-muted/40 px-4 py-3.5 text-sm outline-none">
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
     </div>
   );
 }

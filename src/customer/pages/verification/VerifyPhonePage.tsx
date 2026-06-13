@@ -2,13 +2,15 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Phone, MessageSquare, Loader2, ShieldAlert } from "lucide-react";
-import { requestPhoneOtp, verifyPhoneOtp } from "@/lib/db";
+import { getProfileByUserId, requestPhoneOtp, verifyPhoneOtp } from "@/lib/db";
 import { ghanaCardStepStatus, faceStepStatus, hasAcceptedGhanaCardVerification, loadVerificationFlowSummary, type VerificationFlowSummary } from "@/lib/verification-flow";
+import { countryForValue, countryOptions, normalizeInternationalPhoneNumber, validateInternationalPhoneNumber, type CountryCode } from "@/lib/diaspora";
 
 export function VerifyPhonePage() {
   const navigate = useNavigate();
   const [step, setStep] = useState<"enter" | "otp">("enter");
-  const [phoneNumber, setPhoneNumber] = useState("0245550142");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [country, setCountry] = useState<CountryCode>("GH");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [otpReference, setOtpReference] = useState<string | null>(null);
   const [phoneDebug, setPhoneDebug] = useState<{ rawPhoneNumber: string; normalizedPhoneNumber: string } | null>(null);
@@ -27,6 +29,13 @@ export function VerifyPhonePage() {
       if (!isMounted) return;
 
       setFlowSummary(summary);
+      if (summary.userId) {
+        void getProfileByUserId(summary.userId).then(({ data }) => {
+          const profileCountry = countryForValue(data?.country);
+          setCountry(profileCountry.code);
+          setPhoneNumber(data?.phone ?? "");
+        });
+      }
       console.log("verify_phone_page_initial_verification_fetch", {
         currentUserId: summary.userId,
         verificationRecordFound: Boolean(summary.verification),
@@ -58,13 +67,18 @@ export function VerifyPhonePage() {
     setMessage("");
     setPhoneDebug(null);
 
-    if (phoneNumber.trim().length < 8) {
-      setError("Enter a valid phone number.");
+    const normalizedPhone = normalizeInternationalPhoneNumber(phoneNumber, country);
+    if (!validateInternationalPhoneNumber(normalizedPhone, country)) {
+      setError("Enter a valid phone number for your selected country.");
+      setPhoneDebug({
+        rawPhoneNumber: phoneNumber,
+        normalizedPhoneNumber: normalizedPhone,
+      });
       return;
     }
 
     setIsSaving(true);
-    const { data, error } = await requestPhoneOtp(phoneNumber);
+    const { data, error } = await requestPhoneOtp(normalizedPhone);
     setIsSaving(false);
 
     if (error) {
@@ -82,8 +96,8 @@ export function VerifyPhonePage() {
     const response = data as { providerReference?: string; rawPhoneNumber?: string; normalizedPhoneNumber?: string } | null;
     setOtpReference(response?.providerReference ?? null);
     setPhoneDebug({
-      rawPhoneNumber: response?.rawPhoneNumber ?? phoneNumber,
-      normalizedPhoneNumber: response?.normalizedPhoneNumber ?? "",
+      rawPhoneNumber: phoneNumber,
+      normalizedPhoneNumber: response?.normalizedPhoneNumber ?? normalizedPhone,
     });
     setMessage(resultMessage(data, "Hubtel OTP sent. Enter the code to verify your phone."));
     setStep("otp");
@@ -100,7 +114,8 @@ export function VerifyPhonePage() {
     }
 
     setIsSaving(true);
-    const { data, error } = await verifyPhoneOtp(phoneNumber, otpCode, otpReference);
+    const normalizedPhone = normalizeInternationalPhoneNumber(phoneNumber, country);
+    const { data, error } = await verifyPhoneOtp(normalizedPhone, otpCode, otpReference);
     setIsSaving(false);
 
     if (error) {
@@ -167,7 +182,15 @@ export function VerifyPhonePage() {
               <p className="mt-1 text-sm text-muted-foreground">SikaCircle sends your verification code through Hubtel.</p>
             </div>
             <div className="flex items-center gap-2 rounded-2xl border border-input bg-muted/40 px-4 py-3.5">
-              <span className="rounded-lg bg-card px-2 py-1 text-sm font-semibold">GH +233</span>
+              <select
+                value={country}
+                onChange={(event) => setCountry(event.target.value as CountryCode)}
+                className="rounded-lg bg-card px-2 py-1 text-sm font-semibold outline-none"
+              >
+                {countryOptions.map((option) => (
+                  <option key={option.code} value={option.code}>{option.code} {option.dialCode}</option>
+                ))}
+              </select>
               <input value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} className="flex-1 bg-transparent text-sm outline-none" />
             </div>
             <button disabled={isSaving} onClick={handleRequestOtp} className="mt-auto rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card disabled:opacity-50">
@@ -216,7 +239,7 @@ export function VerifyPhonePage() {
           <div className="rounded-2xl border border-border bg-muted/40 p-4 text-[11px] text-muted-foreground">
             <p className="font-semibold text-foreground">OTP debug</p>
             <p className="mt-1">Raw phone entered: <span className="font-mono text-foreground">{phoneDebug.rawPhoneNumber}</span></p>
-            <p>Normalized phone sent to Hubtel: <span className="font-mono text-foreground">{phoneDebug.normalizedPhoneNumber}</span></p>
+            <p>Normalized phone for OTP: <span className="font-mono text-foreground">{phoneDebug.normalizedPhoneNumber}</span></p>
           </div>
         )}
         {flowSummary && <VerificationDebug summary={flowSummary} />}

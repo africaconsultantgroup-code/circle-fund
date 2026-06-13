@@ -4,7 +4,8 @@ import { PageHeader } from "@/components/page-header";
 import { KeyRound, Link2, ScanLine, ShieldAlert, ShieldCheck, Loader2 } from "lucide-react";
 import { countCircleMembers, getCircleByInviteToken, joinCircle, normalizeInviteToken, type Circle } from "@/lib/db";
 import { getCircleEligibility, type CircleEligibility } from "@/lib/onboarding";
-import { formatGHS, trustScore } from "@/lib/mock-data";
+import { trustScore } from "@/lib/mock-data";
+import { formatCurrency } from "@/lib/diaspora";
 
 type CirclePreview = {
   circle: Circle;
@@ -170,7 +171,7 @@ export function JoinCirclePage() {
             <div className="mt-4 rounded-2xl bg-white/15 p-4">
               <p className="font-display text-base font-semibold">{preview.circle.name}</p>
               <p className="mt-1 text-xs text-primary-foreground/75">
-                {formatGHS(Number(preview.circle.contribution_amount ?? 0))} / {preview.circle.frequency ?? "monthly"}
+                {formatCurrency(Number(preview.circle.contribution_amount ?? 0), preview.circle.base_currency ?? "GHS")} / {preview.circle.frequency ?? "monthly"}
               </p>
               <p className="mt-2 text-[11px] text-primary-foreground/70">
                 {preview.memberCount}/{Math.min(preview.circle.max_members ?? 15, 15)} members
@@ -189,7 +190,9 @@ export function JoinCirclePage() {
               </span>
             ) : eligible ? "Join Circle" : "Sign in to join"}
           </button>
-          <p className="mt-3 text-[10px] text-primary-foreground/60">Trust score {trustScore.score} - max circle value GHS {trustScore.maxCircleValue.toLocaleString()}</p>
+          <p className="mt-3 text-[10px] text-primary-foreground/60">
+            Trust score {trustScore.score} - max circle value {formatCurrency(trustScore.maxCircleValue, preview?.circle.base_currency ?? "GHS")}
+          </p>
         </div>
 
         {joinError && (
