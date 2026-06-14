@@ -41,6 +41,7 @@ import { Route as AppNotificationsRouteImport } from './routes/_app/notification
 import { Route as AppHomeRouteImport } from './routes/_app/home'
 import { Route as AppCirclesRouteImport } from './routes/_app/circles'
 import { Route as AdminAdminIndexRouteImport } from './routes/_admin.admin.index'
+import { Route as AdminAdminDashboardRouteImport } from './routes/_admin.admin.dashboard'
 import { Route as AdminAdminCirclesRouteImport } from './routes/_admin.admin.circles'
 import { Route as CircleIdMembersRouteImport } from './routes/circle.$id.members'
 import { Route as CircleIdApprovalsRouteImport } from './routes/circle.$id.approvals'
@@ -205,6 +206,11 @@ const AdminAdminIndexRoute = AdminAdminIndexRouteImport.update({
   path: '/admin/',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAdminDashboardRoute = AdminAdminDashboardRouteImport.update({
+  id: '/admin/dashboard',
+  path: '/admin/dashboard',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminAdminCirclesRoute = AdminAdminCirclesRouteImport.update({
   id: '/admin/circles',
   path: '/admin/circles',
@@ -263,6 +269,7 @@ export interface FileRoutesByFullPath {
   '/verify/': typeof VerifyIndexRoute
   '/admin/users': typeof AdminAdminUsersRoute
   '/admin/verifications': typeof AdminAdminVerificationsRoute
+  '/admin/dashboard': typeof AdminAdminDashboardRoute
   '/admin/circles': typeof AdminAdminCirclesRoute
   '/circle/$id/approvals': typeof CircleIdApprovalsRoute
   '/circle/$id/members': typeof CircleIdMembersRoute
@@ -300,6 +307,7 @@ export interface FileRoutesByTo {
   '/verify': typeof VerifyIndexRoute
   '/admin/users': typeof AdminAdminUsersRoute
   '/admin/verifications': typeof AdminAdminVerificationsRoute
+  '/admin/dashboard': typeof AdminAdminDashboardRoute
   '/admin/circles': typeof AdminAdminCirclesRoute
   '/circle/$id/approvals': typeof CircleIdApprovalsRoute
   '/circle/$id/members': typeof CircleIdMembersRoute
@@ -340,6 +348,7 @@ export interface FileRoutesById {
   '/verify/': typeof VerifyIndexRoute
   '/_admin/admin/users': typeof AdminAdminUsersRoute
   '/_admin/admin/verifications': typeof AdminAdminVerificationsRoute
+  '/_admin/admin/dashboard': typeof AdminAdminDashboardRoute
   '/_admin/admin/circles': typeof AdminAdminCirclesRoute
   '/circle/$id/approvals': typeof CircleIdApprovalsRoute
   '/circle/$id/members': typeof CircleIdMembersRoute
@@ -379,6 +388,7 @@ export interface FileRouteTypes {
     | '/verify/'
     | '/admin/users'
     | '/admin/verifications'
+    | '/admin/dashboard'
     | '/admin/circles'
     | '/circle/$id/approvals'
     | '/circle/$id/members'
@@ -416,6 +426,7 @@ export interface FileRouteTypes {
     | '/verify'
     | '/admin/users'
     | '/admin/verifications'
+    | '/admin/dashboard'
     | '/admin/circles'
     | '/circle/$id/approvals'
     | '/circle/$id/members'
@@ -455,6 +466,7 @@ export interface FileRouteTypes {
     | '/verify/'
     | '/_admin/admin/users'
     | '/_admin/admin/verifications'
+    | '/_admin/admin/dashboard'
     | '/_admin/admin/circles'
     | '/circle/$id/approvals'
     | '/circle/$id/members'
@@ -722,6 +734,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdminCirclesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/_admin/admin/dashboard': {
+      id: '/_admin/admin/dashboard'
+      path: '/admin/dashboard'
+      fullPath: '/admin/dashboard'
+      preLoaderRoute: typeof AdminAdminDashboardRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/circle/$id/members': {
       id: '/circle/$id/members'
       path: '/members'
@@ -755,6 +774,7 @@ declare module '@tanstack/react-router' {
 
 interface AdminRouteChildren {
   AdminAdminCirclesRoute: typeof AdminAdminCirclesRoute
+  AdminAdminDashboardRoute: typeof AdminAdminDashboardRoute
   AdminAdminUsersRoute: typeof AdminAdminUsersRoute
   AdminAdminVerificationsRoute: typeof AdminAdminVerificationsRoute
   AdminAdminIndexRoute: typeof AdminAdminIndexRoute
@@ -762,6 +782,7 @@ interface AdminRouteChildren {
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAdminCirclesRoute: AdminAdminCirclesRoute,
+  AdminAdminDashboardRoute: AdminAdminDashboardRoute,
   AdminAdminUsersRoute: AdminAdminUsersRoute,
   AdminAdminVerificationsRoute: AdminAdminVerificationsRoute,
   AdminAdminIndexRoute: AdminAdminIndexRoute,
