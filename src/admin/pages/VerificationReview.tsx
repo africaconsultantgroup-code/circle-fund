@@ -41,8 +41,9 @@ export function VerificationReview() {
 
   return (
     <section>
-      <div>
-        <h1 className="font-display text-2xl font-bold tracking-tight">Verification Review</h1>
+      <div className="rounded-3xl border border-border bg-card p-5 shadow-card">
+        <p className="text-xs font-semibold uppercase tracking-wide text-primary">Operations Portal</p>
+        <h1 className="mt-2 font-display text-3xl font-bold tracking-tight">Verifications</h1>
         <p className="mt-2 text-sm text-muted-foreground">Review phone, Ghana Card, and face verification status. Test verification requires the admin override secret.</p>
       </div>
 

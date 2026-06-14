@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
-import { Loader2, ShieldAlert } from "lucide-react";
+import { Activity, Loader2, ShieldAlert } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { currentUserIsAdmin } from "@/shared/auth/roles";
 import { adminRoutes } from "@/admin/routes/AdminRoutes";
@@ -50,16 +50,24 @@ export function AdminLayout({ children }: { children?: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-border bg-card px-4 py-6 md:block">
-        <p className="font-display text-lg font-bold text-primary">SikaCircle Admin</p>
+      <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-border bg-card px-5 py-6 md:block">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+            <Activity className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="font-display text-lg font-bold text-primary">Operations Portal</p>
+            <p className="text-xs text-muted-foreground">Circle Fund Admin</p>
+          </div>
+        </div>
         <nav className="mt-8 flex flex-col gap-2">
           {adminRoutes.map(({ to, label, icon: Icon }) => {
-            const active = location.pathname === to;
+            const active = location.pathname === to || (to !== "/admin" && location.pathname.startsWith(to));
             return (
               <Link
                 key={to}
                 to={to}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium ${active ? "bg-secondary text-primary" : "text-muted-foreground"}`}
+                className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${active ? "bg-secondary text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
               >
                 <Icon className="h-4 w-4" /> {label}
               </Link>
@@ -67,9 +75,9 @@ export function AdminLayout({ children }: { children?: ReactNode }) {
           })}
         </nav>
       </aside>
-      <main className="min-h-screen px-5 py-6 md:ml-64 md:px-8">
+      <main className="min-h-screen px-5 py-6 md:ml-72 md:px-8">
         <div className="mb-5 flex items-center justify-between md:hidden">
-          <p className="font-display text-lg font-bold text-primary">SikaCircle Admin</p>
+          <p className="font-display text-lg font-bold text-primary">Operations Portal</p>
           <Link to="/home" className="text-xs font-semibold text-primary">Customer app</Link>
         </div>
         {children ?? <Outlet />}

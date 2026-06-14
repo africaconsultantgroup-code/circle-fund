@@ -33,8 +33,13 @@ export function AdminDashboard() {
 
   return (
     <section>
-      <h1 className="font-display text-2xl font-bold tracking-tight">Admin Dashboard</h1>
-      <p className="mt-2 text-sm text-muted-foreground">Operational overview for users and verification readiness.</p>
+      <div className="rounded-3xl border border-border bg-card p-5 shadow-card">
+        <p className="text-xs font-semibold uppercase tracking-wide text-primary">Admin Portal</p>
+        <h1 className="mt-2 font-display text-3xl font-bold tracking-tight">Operations Dashboard</h1>
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+          Live operational data from Circle Fund profiles, verifications, circles, and memberships.
+        </p>
+      </div>
 
       {isLoading && (
         <div className="mt-5 flex items-center gap-2 text-sm text-muted-foreground">
