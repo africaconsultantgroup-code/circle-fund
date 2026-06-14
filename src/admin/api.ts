@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import type { StaffRole, UserRole } from "@/lib/supabase-types";
 
 export type AdminUserVerification = {
   user_id: string;
@@ -108,6 +109,13 @@ export async function markTestUserVerified(userId: string, adminSecret: string) 
     headers: {
       "x-admin-verification-secret": adminSecret,
     },
+  });
+}
+
+export async function updateAdminUserRole(userId: string, role: UserRole) {
+  return invokeAdminFunction<{ userId: string; role: UserRole; status: string; staffRole: StaffRole }>("admin-update-user-role", {
+    method: "POST",
+    body: { userId, role },
   });
 }
 

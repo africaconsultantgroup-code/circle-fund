@@ -50,6 +50,7 @@ import { Route as AdminAdminTrustRouteImport } from './routes/_admin.admin.trust
 import { Route as AdminAdminRiskRouteImport } from './routes/_admin.admin.risk'
 import { Route as AdminAdminSupportRouteImport } from './routes/_admin.admin.support'
 import { Route as AdminAdminReportsRouteImport } from './routes/_admin.admin.reports'
+import { Route as AdminAdminRolesRouteImport } from './routes/_admin.admin.roles'
 import { Route as AdminAdminSettingsRouteImport } from './routes/_admin.admin.settings'
 import { Route as CircleIdMembersRouteImport } from './routes/circle.$id.members'
 import { Route as CircleIdApprovalsRouteImport } from './routes/circle.$id.approvals'
@@ -259,6 +260,11 @@ const AdminAdminReportsRoute = AdminAdminReportsRouteImport.update({
   path: '/admin/reports',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAdminRolesRoute = AdminAdminRolesRouteImport.update({
+  id: '/admin/roles',
+  path: '/admin/roles',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminAdminSettingsRoute = AdminAdminSettingsRouteImport.update({
   id: '/admin/settings',
   path: '/admin/settings',
@@ -324,6 +330,7 @@ export interface FileRoutesByFullPath {
   '/admin/risk': typeof AdminAdminRiskRoute
   '/admin/support': typeof AdminAdminSupportRoute
   '/admin/reports': typeof AdminAdminReportsRoute
+  '/admin/roles': typeof AdminAdminRolesRoute
   '/admin/settings': typeof AdminAdminSettingsRoute
   '/admin/dashboard': typeof AdminAdminDashboardRoute
   '/admin/circles': typeof AdminAdminCirclesRoute
@@ -411,6 +418,7 @@ export interface FileRoutesById {
   '/_admin/admin/risk': typeof AdminAdminRiskRoute
   '/_admin/admin/support': typeof AdminAdminSupportRoute
   '/_admin/admin/reports': typeof AdminAdminReportsRoute
+  '/_admin/admin/roles': typeof AdminAdminRolesRoute
   '/_admin/admin/settings': typeof AdminAdminSettingsRoute
   '/_admin/admin/dashboard': typeof AdminAdminDashboardRoute
   '/_admin/admin/circles': typeof AdminAdminCirclesRoute
@@ -459,6 +467,7 @@ export interface FileRouteTypes {
     | '/admin/risk'
     | '/admin/support'
     | '/admin/reports'
+    | '/admin/roles'
     | '/admin/settings'
     | '/admin/dashboard'
     | '/admin/circles'
@@ -545,6 +554,7 @@ export interface FileRouteTypes {
     | '/_admin/admin/risk'
     | '/_admin/admin/support'
     | '/_admin/admin/reports'
+    | '/_admin/admin/roles'
     | '/_admin/admin/settings'
     | '/_admin/admin/dashboard'
     | '/_admin/admin/circles'
@@ -891,6 +901,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdminReportsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/_admin/admin/roles': {
+      id: '/_admin/admin/roles'
+      path: '/admin/roles'
+      fullPath: '/admin/roles'
+      preLoaderRoute: typeof AdminAdminRolesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/_admin/admin/settings': {
       id: '/_admin/admin/settings'
       path: '/admin/settings'
@@ -920,6 +937,7 @@ interface AdminRouteChildren {
   AdminAdminRiskRoute: typeof AdminAdminRiskRoute
   AdminAdminSupportRoute: typeof AdminAdminSupportRoute
   AdminAdminReportsRoute: typeof AdminAdminReportsRoute
+  AdminAdminRolesRoute: typeof AdminAdminRolesRoute
   AdminAdminSettingsRoute: typeof AdminAdminSettingsRoute
   AdminAdminIndexRoute: typeof AdminAdminIndexRoute
 }
@@ -936,6 +954,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAdminRiskRoute: AdminAdminRiskRoute,
   AdminAdminSupportRoute: AdminAdminSupportRoute,
   AdminAdminReportsRoute: AdminAdminReportsRoute,
+  AdminAdminRolesRoute: AdminAdminRolesRoute,
   AdminAdminSettingsRoute: AdminAdminSettingsRoute,
   AdminAdminIndexRoute: AdminAdminIndexRoute,
 }

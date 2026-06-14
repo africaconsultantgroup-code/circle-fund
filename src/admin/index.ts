@@ -6,4 +6,5 @@ export { VerificationReview } from "@/admin/pages/VerificationReview";
 export { CircleManagement } from "@/admin/pages/CircleManagement";
 export { AdminSectionPage } from "@/admin/pages/AdminSectionPage";
 export { AuditLogPage } from "@/admin/pages/AuditLogPage";
+export { RoleManagement } from "@/admin/pages/RoleManagement";
 export { adminRoutes } from "@/admin/routes/AdminRoutes";
