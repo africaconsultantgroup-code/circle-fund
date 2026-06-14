@@ -70,6 +70,19 @@ export type AdminAuditLog = {
   created_at: string;
 };
 
+export type StaffInvitation = {
+  id: string;
+  email: string;
+  role: StaffRole;
+  status: "pending" | "accepted" | "cancelled";
+  invited_by: string | null;
+  accepted_user_id: string | null;
+  invited_at: string;
+  accepted_at: string | null;
+  cancelled_at: string | null;
+  metadata: Record<string, unknown>;
+};
+
 export type AdminOverview = {
   staffRole: string;
   metrics: AdminMetrics;
@@ -87,6 +100,7 @@ export type AdminOverview = {
     approved_by: string | null;
   }>;
   auditLogs: AdminAuditLog[];
+  staffInvitations: StaffInvitation[];
 };
 
 type AdminFunctionResult<T> = {
@@ -116,6 +130,27 @@ export async function updateAdminUserRole(userId: string, role: UserRole) {
   return invokeAdminFunction<{ userId: string; role: UserRole; status: string; staffRole: StaffRole }>("admin-update-user-role", {
     method: "POST",
     body: { userId, role },
+  });
+}
+
+export async function manageStaff(action: "invite", payload: { email: string; role: StaffRole }) {
+  return invokeAdminFunction<{ status: string; invitation?: StaffInvitation; matchedExistingUser?: boolean }>("admin-manage-staff", {
+    method: "POST",
+    body: { action, ...payload },
+  });
+}
+
+export async function cancelStaffInvitation(invitationId: string) {
+  return invokeAdminFunction<{ status: string; invitation: StaffInvitation }>("admin-manage-staff", {
+    method: "POST",
+    body: { action: "cancel_invitation", invitationId },
+  });
+}
+
+export async function disableStaffAccount(userId: string) {
+  return invokeAdminFunction<{ status: string; profile: { user_id: string; role: string; account_status: string } }>("admin-manage-staff", {
+    method: "POST",
+    body: { action: "disable_staff", userId },
   });
 }
 

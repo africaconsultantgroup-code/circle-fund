@@ -101,6 +101,43 @@ export interface Database {
           metadata?: Json;
         };
       };
+      staff_invitations: {
+        Row: {
+          id: string;
+          email: string;
+          role: StaffRole;
+          status: 'pending' | 'accepted' | 'cancelled';
+          invited_by: string | null;
+          accepted_user_id: string | null;
+          invited_at: string;
+          accepted_at: string | null;
+          cancelled_at: string | null;
+          metadata: Json;
+        };
+        Insert: {
+          id?: string;
+          email: string;
+          role: StaffRole;
+          status?: 'pending' | 'accepted' | 'cancelled';
+          invited_by?: string | null;
+          accepted_user_id?: string | null;
+          invited_at?: string;
+          accepted_at?: string | null;
+          cancelled_at?: string | null;
+          metadata?: Json;
+        };
+        Update: {
+          email?: string;
+          role?: StaffRole;
+          status?: 'pending' | 'accepted' | 'cancelled';
+          invited_by?: string | null;
+          accepted_user_id?: string | null;
+          invited_at?: string;
+          accepted_at?: string | null;
+          cancelled_at?: string | null;
+          metadata?: Json;
+        };
+      };
       circles: {
         Row: {
           id: string;
