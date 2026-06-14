@@ -42,7 +42,15 @@ import { Route as AppHomeRouteImport } from './routes/_app/home'
 import { Route as AppCirclesRouteImport } from './routes/_app/circles'
 import { Route as AdminAdminIndexRouteImport } from './routes/_admin.admin.index'
 import { Route as AdminAdminDashboardRouteImport } from './routes/_admin.admin.dashboard'
+import { Route as AdminAdminActivityRouteImport } from './routes/_admin.admin.activity'
+import { Route as AdminAdminContributionsRouteImport } from './routes/_admin.admin.contributions'
 import { Route as AdminAdminCirclesRouteImport } from './routes/_admin.admin.circles'
+import { Route as AdminAdminPayoutsRouteImport } from './routes/_admin.admin.payouts'
+import { Route as AdminAdminTrustRouteImport } from './routes/_admin.admin.trust'
+import { Route as AdminAdminRiskRouteImport } from './routes/_admin.admin.risk'
+import { Route as AdminAdminSupportRouteImport } from './routes/_admin.admin.support'
+import { Route as AdminAdminReportsRouteImport } from './routes/_admin.admin.reports'
+import { Route as AdminAdminSettingsRouteImport } from './routes/_admin.admin.settings'
 import { Route as CircleIdMembersRouteImport } from './routes/circle.$id.members'
 import { Route as CircleIdApprovalsRouteImport } from './routes/circle.$id.approvals'
 import { Route as AdminAdminVerificationsRouteImport } from './routes/_admin.admin.verifications'
@@ -211,9 +219,49 @@ const AdminAdminDashboardRoute = AdminAdminDashboardRouteImport.update({
   path: '/admin/dashboard',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAdminActivityRoute = AdminAdminActivityRouteImport.update({
+  id: '/admin/activity',
+  path: '/admin/activity',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAdminContributionsRoute = AdminAdminContributionsRouteImport.update({
+  id: '/admin/contributions',
+  path: '/admin/contributions',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminAdminCirclesRoute = AdminAdminCirclesRouteImport.update({
   id: '/admin/circles',
   path: '/admin/circles',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAdminPayoutsRoute = AdminAdminPayoutsRouteImport.update({
+  id: '/admin/payouts',
+  path: '/admin/payouts',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAdminTrustRoute = AdminAdminTrustRouteImport.update({
+  id: '/admin/trust',
+  path: '/admin/trust',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAdminRiskRoute = AdminAdminRiskRouteImport.update({
+  id: '/admin/risk',
+  path: '/admin/risk',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAdminSupportRoute = AdminAdminSupportRouteImport.update({
+  id: '/admin/support',
+  path: '/admin/support',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAdminReportsRoute = AdminAdminReportsRouteImport.update({
+  id: '/admin/reports',
+  path: '/admin/reports',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAdminSettingsRoute = AdminAdminSettingsRouteImport.update({
+  id: '/admin/settings',
+  path: '/admin/settings',
   getParentRoute: () => AdminRoute,
 } as any)
 const CircleIdMembersRoute = CircleIdMembersRouteImport.update({
@@ -269,6 +317,14 @@ export interface FileRoutesByFullPath {
   '/verify/': typeof VerifyIndexRoute
   '/admin/users': typeof AdminAdminUsersRoute
   '/admin/verifications': typeof AdminAdminVerificationsRoute
+  '/admin/activity': typeof AdminAdminActivityRoute
+  '/admin/contributions': typeof AdminAdminContributionsRoute
+  '/admin/payouts': typeof AdminAdminPayoutsRoute
+  '/admin/trust': typeof AdminAdminTrustRoute
+  '/admin/risk': typeof AdminAdminRiskRoute
+  '/admin/support': typeof AdminAdminSupportRoute
+  '/admin/reports': typeof AdminAdminReportsRoute
+  '/admin/settings': typeof AdminAdminSettingsRoute
   '/admin/dashboard': typeof AdminAdminDashboardRoute
   '/admin/circles': typeof AdminAdminCirclesRoute
   '/circle/$id/approvals': typeof CircleIdApprovalsRoute
@@ -348,6 +404,14 @@ export interface FileRoutesById {
   '/verify/': typeof VerifyIndexRoute
   '/_admin/admin/users': typeof AdminAdminUsersRoute
   '/_admin/admin/verifications': typeof AdminAdminVerificationsRoute
+  '/_admin/admin/activity': typeof AdminAdminActivityRoute
+  '/_admin/admin/contributions': typeof AdminAdminContributionsRoute
+  '/_admin/admin/payouts': typeof AdminAdminPayoutsRoute
+  '/_admin/admin/trust': typeof AdminAdminTrustRoute
+  '/_admin/admin/risk': typeof AdminAdminRiskRoute
+  '/_admin/admin/support': typeof AdminAdminSupportRoute
+  '/_admin/admin/reports': typeof AdminAdminReportsRoute
+  '/_admin/admin/settings': typeof AdminAdminSettingsRoute
   '/_admin/admin/dashboard': typeof AdminAdminDashboardRoute
   '/_admin/admin/circles': typeof AdminAdminCirclesRoute
   '/circle/$id/approvals': typeof CircleIdApprovalsRoute
@@ -388,6 +452,14 @@ export interface FileRouteTypes {
     | '/verify/'
     | '/admin/users'
     | '/admin/verifications'
+    | '/admin/activity'
+    | '/admin/contributions'
+    | '/admin/payouts'
+    | '/admin/trust'
+    | '/admin/risk'
+    | '/admin/support'
+    | '/admin/reports'
+    | '/admin/settings'
     | '/admin/dashboard'
     | '/admin/circles'
     | '/circle/$id/approvals'
@@ -466,6 +538,14 @@ export interface FileRouteTypes {
     | '/verify/'
     | '/_admin/admin/users'
     | '/_admin/admin/verifications'
+    | '/_admin/admin/activity'
+    | '/_admin/admin/contributions'
+    | '/_admin/admin/payouts'
+    | '/_admin/admin/trust'
+    | '/_admin/admin/risk'
+    | '/_admin/admin/support'
+    | '/_admin/admin/reports'
+    | '/_admin/admin/settings'
     | '/_admin/admin/dashboard'
     | '/_admin/admin/circles'
     | '/circle/$id/approvals'
@@ -762,6 +842,62 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdminVerificationsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/_admin/admin/activity': {
+      id: '/_admin/admin/activity'
+      path: '/admin/activity'
+      fullPath: '/admin/activity'
+      preLoaderRoute: typeof AdminAdminActivityRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/_admin/admin/contributions': {
+      id: '/_admin/admin/contributions'
+      path: '/admin/contributions'
+      fullPath: '/admin/contributions'
+      preLoaderRoute: typeof AdminAdminContributionsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/_admin/admin/payouts': {
+      id: '/_admin/admin/payouts'
+      path: '/admin/payouts'
+      fullPath: '/admin/payouts'
+      preLoaderRoute: typeof AdminAdminPayoutsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/_admin/admin/trust': {
+      id: '/_admin/admin/trust'
+      path: '/admin/trust'
+      fullPath: '/admin/trust'
+      preLoaderRoute: typeof AdminAdminTrustRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/_admin/admin/risk': {
+      id: '/_admin/admin/risk'
+      path: '/admin/risk'
+      fullPath: '/admin/risk'
+      preLoaderRoute: typeof AdminAdminRiskRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/_admin/admin/support': {
+      id: '/_admin/admin/support'
+      path: '/admin/support'
+      fullPath: '/admin/support'
+      preLoaderRoute: typeof AdminAdminSupportRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/_admin/admin/reports': {
+      id: '/_admin/admin/reports'
+      path: '/admin/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AdminAdminReportsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/_admin/admin/settings': {
+      id: '/_admin/admin/settings'
+      path: '/admin/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminAdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/_admin/admin/users': {
       id: '/_admin/admin/users'
       path: '/admin/users'
@@ -777,6 +913,14 @@ interface AdminRouteChildren {
   AdminAdminDashboardRoute: typeof AdminAdminDashboardRoute
   AdminAdminUsersRoute: typeof AdminAdminUsersRoute
   AdminAdminVerificationsRoute: typeof AdminAdminVerificationsRoute
+  AdminAdminActivityRoute: typeof AdminAdminActivityRoute
+  AdminAdminContributionsRoute: typeof AdminAdminContributionsRoute
+  AdminAdminPayoutsRoute: typeof AdminAdminPayoutsRoute
+  AdminAdminTrustRoute: typeof AdminAdminTrustRoute
+  AdminAdminRiskRoute: typeof AdminAdminRiskRoute
+  AdminAdminSupportRoute: typeof AdminAdminSupportRoute
+  AdminAdminReportsRoute: typeof AdminAdminReportsRoute
+  AdminAdminSettingsRoute: typeof AdminAdminSettingsRoute
   AdminAdminIndexRoute: typeof AdminAdminIndexRoute
 }
 
@@ -785,6 +929,14 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAdminDashboardRoute: AdminAdminDashboardRoute,
   AdminAdminUsersRoute: AdminAdminUsersRoute,
   AdminAdminVerificationsRoute: AdminAdminVerificationsRoute,
+  AdminAdminActivityRoute: AdminAdminActivityRoute,
+  AdminAdminContributionsRoute: AdminAdminContributionsRoute,
+  AdminAdminPayoutsRoute: AdminAdminPayoutsRoute,
+  AdminAdminTrustRoute: AdminAdminTrustRoute,
+  AdminAdminRiskRoute: AdminAdminRiskRoute,
+  AdminAdminSupportRoute: AdminAdminSupportRoute,
+  AdminAdminReportsRoute: AdminAdminReportsRoute,
+  AdminAdminSettingsRoute: AdminAdminSettingsRoute,
   AdminAdminIndexRoute: AdminAdminIndexRoute,
 }
 
