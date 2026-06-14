@@ -306,8 +306,10 @@ export interface Database {
         Row: {
           id: string;
           circle_id: string;
+          member_id: string | null;
           user_id: string;
           amount: number;
+          amount_due: number | null;
           contribution_date: string | null;
           due_date: string | null;
           method: string | null;
@@ -321,8 +323,10 @@ export interface Database {
         Insert: {
           id?: string;
           circle_id: string;
+          member_id?: string | null;
           user_id: string;
           amount: number;
+          amount_due?: number | null;
           contribution_date?: string | null;
           due_date?: string | null;
           method?: string | null;
@@ -334,7 +338,9 @@ export interface Database {
           updated_at?: string | null;
         };
         Update: {
+          member_id?: string | null;
           amount?: number;
+          amount_due?: number | null;
           contribution_date?: string | null;
           due_date?: string | null;
           method?: string | null;
@@ -581,6 +587,7 @@ export interface Database {
         Args: { check_circle_id: string };
         Returns: Array<{
           contribution_id: string;
+          member_id: string | null;
           user_id: string;
           full_name: string | null;
           expected_amount: number;
@@ -589,6 +596,14 @@ export interface Database {
           paid_at: string | null;
           payment_reference: string | null;
         }>;
+      };
+      generate_circle_contribution_schedule: {
+        Args: { check_circle_id: string; periods?: number };
+        Returns: number;
+      };
+      mark_contribution_paid_for_testing: {
+        Args: { check_contribution_id: string; payment_reference?: string | null };
+        Returns: Database['public']['Tables']['contributions']['Row'];
       };
       current_user_is_admin: {
         Args: Record<PropertyKey, never>;

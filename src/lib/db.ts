@@ -319,12 +319,17 @@ export async function manageCircleMember(membershipId: string, action: 'approve'
 
 export async function addContribution(payload: {
   circle_id: string;
+  member_id?: string | null;
   user_id: string;
   amount: number;
+  amount_due?: number | null;
   contribution_date?: string | null;
+  due_date?: string | null;
   method?: string | null;
   status?: Database['public']['Enums']['contribution_status'];
   reference?: string | null;
+  paid_at?: string | null;
+  payment_reference?: string | null;
 }) {
   return supabase.from('contributions').insert(payload).select('*').single();
 }
@@ -364,6 +369,20 @@ export async function listTransactionsForUser(userId: string) {
 
 export async function listCircleContributions(circleId: string) {
   return supabase.rpc('get_circle_contribution_status', { check_circle_id: circleId });
+}
+
+export async function generateCircleContributionSchedule(circleId: string, periods = 1) {
+  return supabase.rpc('generate_circle_contribution_schedule', {
+    check_circle_id: circleId,
+    periods,
+  });
+}
+
+export async function markContributionPaidForTesting(contributionId: string, paymentReference?: string | null) {
+  return supabase.rpc('mark_contribution_paid_for_testing', {
+    check_contribution_id: contributionId,
+    payment_reference: paymentReference ?? null,
+  });
 }
 
 export async function listCirclePayouts(circleId: string) {

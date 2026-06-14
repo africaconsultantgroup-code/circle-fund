@@ -5,10 +5,12 @@ import { SavingsPlanner } from "@/components/savings-planner";
 import { Calendar, Check, Loader2, Settings, Share2, ShieldAlert, UserCheck, Users, WalletCards, X } from "lucide-react";
 import { getCircle, type Circle as MockCircleType } from "@/lib/mock-data";
 import {
+  generateCircleContributionSchedule,
   getCircleById,
   getCircleMembership,
   listCircleContributions,
   listCircleMembers,
+  markContributionPaidForTesting,
   manageCircleMember,
   type Circle,
   type CircleContributionStatus,
@@ -48,6 +50,8 @@ function CircleDetails() {
   const [contributions, setContributions] = useState<CircleContributionStatus[]>([]);
   const [membershipStatus, setMembershipStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isGeneratingSchedule, setIsGeneratingSchedule] = useState(false);
+  const [markingContributionId, setMarkingContributionId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -59,6 +63,22 @@ function CircleDetails() {
   const currency = (circle?.base_currency ?? mockCircle?.baseCurrency ?? "GHS") as CurrencyCode;
   const amount = Number(circle?.contribution_amount ?? mockCircle?.amount ?? 0);
   const maxMembers = Math.min(circle?.max_members ?? 15, 15);
+  const contributionSummary = useMemo(() => {
+    const totalExpected = contributions.reduce((sum, contribution) => sum + Number(contribution.expected_amount ?? 0), 0);
+    const totalPaid = contributions
+      .filter((contribution) => contribution.status === "paid")
+      .reduce((sum, contribution) => sum + Number(contribution.expected_amount ?? 0), 0);
+    const overdue = contributions
+      .filter((contribution) => contribution.status === "overdue")
+      .reduce((sum, contribution) => sum + Number(contribution.expected_amount ?? 0), 0);
+
+    return {
+      totalExpected,
+      totalPaid,
+      outstanding: Math.max(totalExpected - totalPaid, 0),
+      overdue,
+    };
+  }, [contributions]);
 
   useEffect(() => {
     void loadCircle();
@@ -110,6 +130,38 @@ function CircleDetails() {
     }
 
     setMessage(action === "approve" ? "Member approved." : action === "reject" ? "Member rejected." : "Member removed.");
+    await loadCircle();
+  }
+
+  async function handleGenerateSchedule() {
+    setMessage("");
+    setError("");
+    setIsGeneratingSchedule(true);
+    const { data, error: scheduleError } = await generateCircleContributionSchedule(circleId, 1);
+    setIsGeneratingSchedule(false);
+
+    if (scheduleError) {
+      setError(scheduleError.message);
+      return;
+    }
+
+    setMessage(Number(data ?? 0) > 0 ? "Contribution schedule generated." : "Contribution schedule is already up to date.");
+    await loadCircle();
+  }
+
+  async function handleMarkPaid(contribution: CircleContributionStatus) {
+    setMessage("");
+    setError("");
+    setMarkingContributionId(contribution.contribution_id);
+    const { error: markError } = await markContributionPaidForTesting(contribution.contribution_id);
+    setMarkingContributionId(null);
+
+    if (markError) {
+      setError(markError.message);
+      return;
+    }
+
+    setMessage("Contribution marked as paid for testing.");
     await loadCircle();
   }
 
@@ -165,6 +217,8 @@ function CircleDetails() {
                 <Metric label="Pending" value={String(pendingMembers.length)} />
                 <Metric label="Frequency" value={circle.frequency ?? "Monthly"} />
                 <Metric label="Start date" value={formatDate(circle.start_date)} />
+                <Metric label="Expected" value={formatCurrency(contributionSummary.totalExpected, currency)} />
+                <Metric label="Outstanding" value={formatCurrency(contributionSummary.outstanding, currency)} />
               </div>
               <SavingsPlanner defaultTargetAmount={amount} defaultDueDate={toDateInputValue(circle.start_date)} currency={currency} />
             </section>
@@ -189,7 +243,25 @@ function CircleDetails() {
           )}
 
           {tab === "contributions" && (
-            <section className="p-5">
+            <section className="flex flex-col gap-4 p-5">
+              <div className="grid grid-cols-2 gap-3">
+                <Metric label="Total expected" value={formatCurrency(contributionSummary.totalExpected, currency)} />
+                <Metric label="Total paid" value={formatCurrency(contributionSummary.totalPaid, currency)} />
+                <Metric label="Outstanding" value={formatCurrency(contributionSummary.outstanding, currency)} />
+                <Metric label="Overdue" value={formatCurrency(contributionSummary.overdue, currency)} />
+              </div>
+
+              {isAdmin && (
+                <button
+                  onClick={handleGenerateSchedule}
+                  disabled={isGeneratingSchedule}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                >
+                  {isGeneratingSchedule && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Generate contribution schedule
+                </button>
+              )}
+
               {contributions.length === 0 ? (
                 <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
                   No contribution records yet.
@@ -204,6 +276,16 @@ function CircleDetails() {
                       </div>
                       <p className="mt-1 text-[11px] text-muted-foreground">Expected {formatCurrency(Number(contribution.expected_amount ?? amount), currency)} - due {formatDate(contribution.due_date)}</p>
                       <p className="mt-1 text-[11px] text-muted-foreground">Paid at {formatDate(contribution.paid_at)} - ref {contribution.payment_reference ?? "none"}</p>
+                      {isAdmin && contribution.status !== "paid" && (
+                        <button
+                          onClick={() => handleMarkPaid(contribution)}
+                          disabled={markingContributionId === contribution.contribution_id}
+                          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-success/10 py-2 text-[11px] font-semibold text-success disabled:opacity-60"
+                        >
+                          {markingContributionId === contribution.contribution_id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                          Mark paid for testing
+                        </button>
+                      )}
                     </li>
                   ))}
                 </ul>
