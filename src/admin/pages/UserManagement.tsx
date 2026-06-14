@@ -84,7 +84,10 @@ export function UserManagement() {
                   <p className="mt-0.5 text-xs text-muted-foreground">{user.email || user.userId}</p>
                 </div>
                 <StatusPill value={user.accountStatus} good={user.accountStatus === "active"} />
-                <StatusPill value={user.verification?.verification_status ?? "not_started"} good={user.verification?.verification_status === "verified"} />
+                <StatusPill
+                  value={user.verification?.is_test_verification ? "Test verified" : user.verification?.verification_status ?? "not_started"}
+                  good={user.verification?.verification_status === "verified" || Boolean(user.verification?.is_test_verification)}
+                />
                 <span className="text-xs font-semibold capitalize text-muted-foreground">{user.role}</span>
               </li>
             ))}

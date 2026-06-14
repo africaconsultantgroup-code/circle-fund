@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
 
   const { data: verifications, error: verificationsError } = await serviceClient
     .from("user_verifications")
-    .select("user_id, phone_verified, ghana_card_verified, ghana_card_status, face_verified, face_status, selfie_uploaded, verification_status, provider_reference, verified_at, updated_at");
+    .select("user_id, phone_verified, ghana_card_verified, ghana_card_status, face_verified, face_status, selfie_uploaded, verification_provider, provider_reference, verification_status, is_test_verification, verified_at, updated_at");
 
   if (verificationsError) return json({ error: verificationsError.message }, 500);
 

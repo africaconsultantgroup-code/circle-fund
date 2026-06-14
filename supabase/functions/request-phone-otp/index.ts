@@ -50,11 +50,11 @@ Deno.serve(async (req) => {
     const now = new Date();
     const reference = providerReference("phone_otp");
     const status = "pending";
-    const otp = otpRoute.testOtpMode ? "123456" : generateOtp();
+    const otp = otpRoute.testOtpMode ? "000000" : generateOtp();
     const expiresAt = new Date(now.getTime() + 10 * 60 * 1000);
     const otpHash = await hashSensitiveValue(`${normalizedPhoneNumber}:${otp}`);
     const failureReason = otpRoute.testOtpMode
-      ? "Test OTP mode. SMS was not sent. Awaiting user verification."
+      ? "Diaspora Test OTP mode. SMS was not sent. Awaiting user verification."
       : `${otpRoute.providerLabel} OTP sent. Awaiting user verification.`;
     const { data: existingVerification, error: existingVerificationError } = await serviceClient
       .from("user_verifications")
@@ -93,6 +93,7 @@ Deno.serve(async (req) => {
         otp_code_hash: otpHash,
         otp_expires_at: expiresAt.toISOString(),
         verification_provider: otpRoute.provider,
+        is_test_verification: otpRoute.testOtpMode,
         provider_reference: reference,
         verification_status: nextStatus,
         failure_reason: failureReason,
@@ -182,10 +183,11 @@ Deno.serve(async (req) => {
       deliveryStatus,
       hubtelResponse,
       testOtpMode: otpRoute.testOtpMode,
-      testOtp: otpRoute.testOtpMode ? "123456" : undefined,
+      testOtp: otpRoute.testOtpMode ? "000000" : undefined,
       message: otpRoute.testOtpMode
-        ? "Test OTP mode: use 123456. SMS was not sent."
+        ? "International SMS is not live yet. Use test OTP for preview access."
         : `${otpRoute.providerLabel} OTP sent. Enter the code to verify your phone.`,
+      testModeLabel: otpRoute.testOtpMode ? "Test OTP only — not for production verification." : undefined,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error.";
@@ -264,8 +266,8 @@ function resolveOtpProvider(phoneNumber: string, detectedCountry: string) {
   }
 
   return {
-    provider: futureProvider ? `${futureProvider}_pending_integration` : "sandbox_international_otp",
-    providerLabel: futureProvider ? futureProvider : "International test",
+    provider: "diaspora_test_otp",
+    providerLabel: futureProvider ? `${futureProvider} test` : "Diaspora test",
     allowHubtelInternational: false,
     testOtpMode: true,
   };

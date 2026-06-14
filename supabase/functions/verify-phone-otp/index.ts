@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
     const reference = providerReference("phone_verify");
     const { data: existingVerification, error: existingVerificationError } = await serviceClient
       .from("user_verifications")
-      .select("id, user_id, phone_number, phone_verified, phone_verified_at, ghana_card_verified, face_verified, verification_status, otp_status, otp_verified_at, otp_code_hash, otp_expires_at, otp_reference")
+      .select("id, user_id, phone_number, phone_verified, phone_verified_at, ghana_card_verified, face_verified, verification_status, otp_status, otp_verified_at, otp_code_hash, otp_expires_at, otp_reference, verification_provider, is_test_verification")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -151,6 +151,7 @@ Deno.serve(async (req) => {
     }
 
     const status = resolveAggregateStatus(existingVerification);
+    const isDiasporaTestOtp = existingVerification.verification_provider === "diaspora_test_otp" || otpProvider === "diaspora_test_otp";
     const verificationPatch = {
       phone_number: storedPhoneNumber,
       phone_verified: true,
@@ -160,7 +161,8 @@ Deno.serve(async (req) => {
       otp_verified_at: now.toISOString(),
       otp_code_hash: null,
       otp_expires_at: null,
-      verification_provider: otpProvider,
+      verification_provider: isDiasporaTestOtp ? "diaspora_test_otp" : otpProvider,
+      is_test_verification: isDiasporaTestOtp,
       provider_reference: reference,
       verification_status: status,
       failure_reason: null,
@@ -179,6 +181,7 @@ Deno.serve(async (req) => {
         otp_status: verificationPatch.otp_status,
         otp_verified_at: verificationPatch.otp_verified_at,
         verification_provider: verificationPatch.verification_provider,
+        is_test_verification: verificationPatch.is_test_verification,
       },
     });
 
@@ -186,7 +189,7 @@ Deno.serve(async (req) => {
       .from("user_verifications")
       .update(verificationPatch)
       .eq("user_id", user.id)
-      .select("id, user_id, phone_number, phone_verified, phone_verified_at, otp_status, otp_verified_at, otp_reference, verification_status")
+      .select("id, user_id, phone_number, phone_verified, phone_verified_at, otp_status, otp_verified_at, otp_reference, verification_status, verification_provider, is_test_verification")
       .maybeSingle();
 
     console.log("verify_phone_otp_update_result_raw", {
@@ -246,7 +249,7 @@ Deno.serve(async (req) => {
 
     const { data: refreshedVerification, error: refreshError } = await serviceClient
       .from("user_verifications")
-      .select("id, user_id, phone_number, phone_verified, phone_verified_at, otp_status, otp_verified_at, ghana_card_status, face_status, verification_status")
+      .select("id, user_id, phone_number, phone_verified, phone_verified_at, otp_status, otp_verified_at, ghana_card_status, face_status, verification_status, verification_provider, is_test_verification")
       .eq("user_id", user.id)
       .single();
 
@@ -270,7 +273,36 @@ Deno.serve(async (req) => {
       ghanaCardStatus: refreshedVerification.ghana_card_status,
       selfieStatus: refreshedVerification.face_status,
       verificationStatus: refreshedVerification.verification_status,
+      verificationProvider: refreshedVerification.verification_provider,
+      isTestVerification: refreshedVerification.is_test_verification,
     });
+
+    if (isDiasporaTestOtp) {
+      const { error: auditError } = await serviceClient
+        .from("audit_logs")
+        .insert({
+          staff_user_id: user.id,
+          action: "use_diaspora_test_otp",
+          target_type: "user_verification",
+          target_id: refreshedVerification.id,
+          notes: "Diaspora user verified phone with test OTP preview mode.",
+          metadata: {
+            user_id: refreshedVerification.user_id,
+            phone_number: refreshedVerification.phone_number,
+            detected_country: detectedCountry,
+            otp_provider: "diaspora_test_otp",
+            is_test_verification: true,
+          },
+        });
+
+      if (auditError) {
+        console.warn("verify_phone_otp_diaspora_test_audit_failed", {
+          userId: refreshedVerification.user_id,
+          verificationRecordId: refreshedVerification.id,
+          error: auditError.message,
+        });
+      }
+    }
 
     console.log("verify_phone_otp_success", {
       userId: refreshedVerification.user_id,
@@ -296,7 +328,8 @@ Deno.serve(async (req) => {
       providerReference: reference,
       normalizedPhoneNumber: refreshedVerification.phone_number,
       detectedCountry,
-      otpProvider,
+      otpProvider: refreshedVerification.verification_provider ?? otpProvider,
+      isTestVerification: refreshedVerification.is_test_verification,
       message: status === "verified"
         ? "Phone number verified. Verification is complete."
         : "Phone number verified. Continue to the next verification step.",
@@ -358,8 +391,7 @@ function detectCountry(phoneNumber: string) {
 function resolveOtpProvider(phoneNumber: string, detectedCountry: string) {
   if (detectedCountry === "GH") return "hubtel_otp";
   if ((Deno.env.get("HUBTEL_ENABLE_INTERNATIONAL_SMS") ?? "").toLowerCase() === "true") return "hubtel_international_otp";
-  const futureProvider = (Deno.env.get("INTERNATIONAL_SMS_PROVIDER") ?? "").trim().toLowerCase();
-  return futureProvider ? `${futureProvider}_pending_integration` : "sandbox_international_otp";
+  return "diaspora_test_otp";
 }
 
 async function markOtpFailed(serviceClient: any, userId: string, phoneNumber: string) {
@@ -388,7 +420,7 @@ async function repairVerifiedPhoneStatus(serviceClient: any, userId: string, pho
       updated_at: now.toISOString(),
     })
     .eq("user_id", userId)
-    .select("id, user_id, phone_number, phone_verified, phone_verified_at, otp_status, otp_verified_at, otp_reference, verification_status")
+    .select("id, user_id, phone_number, phone_verified, phone_verified_at, otp_status, otp_verified_at, otp_reference, verification_status, verification_provider, is_test_verification")
     .single();
 
   if (error) {
@@ -412,6 +444,8 @@ function resolveAggregateStatus(existingVerification: {
   otp_code_hash: string | null;
   otp_expires_at: string | null;
   otp_reference: string | null;
+  verification_provider?: string | null;
+  is_test_verification?: boolean;
 } | null) {
   if (
     existingVerification?.ghana_card_verified &&

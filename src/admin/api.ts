@@ -9,7 +9,9 @@ export type AdminUserVerification = {
   face_verified: boolean;
   face_status?: string;
   selfie_uploaded: boolean;
+  verification_provider: string | null;
   verification_status: string;
+  is_test_verification: boolean;
   provider_reference: string | null;
   verified_at: string | null;
   updated_at: string | null;

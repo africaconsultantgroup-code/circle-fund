@@ -97,7 +97,11 @@ export function VerificationReview() {
                 <VerificationBit label="Phone" verified={Boolean(user.verification?.phone_verified)} />
                 <VerificationBit label="Ghana Card" verified={Boolean(user.verification?.ghana_card_verified)} />
                 <VerificationBit label="Face" verified={Boolean(user.verification?.face_verified)} />
-                <VerificationBit label="Overall" verified={user.verification?.verification_status === "verified"} value={user.verification?.verification_status ?? "not_started"} />
+                <VerificationBit
+                  label="Overall"
+                  verified={user.verification?.verification_status === "verified" || Boolean(user.verification?.is_test_verification)}
+                  value={user.verification?.is_test_verification ? "Test verified" : user.verification?.verification_status ?? "not_started"}
+                />
               </div>
             </li>
           ))}

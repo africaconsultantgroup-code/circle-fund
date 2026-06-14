@@ -251,7 +251,10 @@ export function RoleManagement() {
                     <StatusPill value={normalizeRole(user.role)} good={user.role !== "customer"} />
                   )}
                 </div>
-                <StatusPill value={user.verification?.verification_status ?? "not_started"} good={user.verification?.verification_status === "verified"} />
+                <StatusPill
+                  value={user.verification?.is_test_verification ? "Test verified" : user.verification?.verification_status ?? "not_started"}
+                  good={user.verification?.verification_status === "verified" || Boolean(user.verification?.is_test_verification)}
+                />
                 <div className="flex items-center gap-2">
                   <StatusPill value={user.accountStatus} good={user.accountStatus === "active"} />
                   {canAssignRoles && normalizeRole(user.role) !== "customer" && user.accountStatus === "active" && (

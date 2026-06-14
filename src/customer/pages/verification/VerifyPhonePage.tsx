@@ -20,6 +20,8 @@ export function VerifyPhonePage() {
     otpProvider?: string;
     deliveryStatus?: string;
     testOtpMode?: boolean;
+    testOtp?: string;
+    testModeLabel?: string;
   } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -28,6 +30,8 @@ export function VerifyPhonePage() {
   const otpInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const otpCode = otp.join("");
   const otpComplete = otpCode.length === 6;
+  const diasporaTestOtpEnabled = import.meta.env.VITE_ENABLE_DIASPORA_TEST_OTP === "true";
+  const selectedCountryIsGhana = country === "GH";
 
   useEffect(() => {
     let isMounted = true;
@@ -111,6 +115,8 @@ export function VerifyPhonePage() {
       otpProvider?: string;
       deliveryStatus?: string;
       testOtpMode?: boolean;
+      testOtp?: string;
+      testModeLabel?: string;
     } | null;
     setOtpReference(response?.providerReference ?? null);
     setPhoneDebug({
@@ -120,6 +126,8 @@ export function VerifyPhonePage() {
       otpProvider: response?.otpProvider,
       deliveryStatus: response?.deliveryStatus,
       testOtpMode: response?.testOtpMode,
+      testOtp: response?.testOtp,
+      testModeLabel: response?.testModeLabel,
     });
     setMessage(resultMessage(data, "OTP request created. Enter the code to verify your phone."));
     setStep("otp");
@@ -203,6 +211,11 @@ export function VerifyPhonePage() {
               <h2 className="font-display text-xl font-bold">Enter your phone number</h2>
               <p className="mt-1 text-sm text-muted-foreground">SikaCircle sends your verification code through the available OTP provider for your country.</p>
             </div>
+            {!selectedCountryIsGhana && (
+              <div className="rounded-2xl border border-gold/40 bg-gold/10 p-4 text-[11px] font-medium text-[color:var(--gold-foreground)]">
+                International SMS is not live yet. Use test OTP for preview access.
+              </div>
+            )}
             <div className="flex items-center gap-2 rounded-2xl border border-input bg-muted/40 px-4 py-3.5">
               <select
                 value={country}
@@ -265,7 +278,13 @@ export function VerifyPhonePage() {
             {phoneDebug.detectedCountry && <p>Detected country: <span className="font-mono text-foreground">{phoneDebug.detectedCountry}</span></p>}
             {phoneDebug.otpProvider && <p>OTP provider used: <span className="font-mono text-foreground">{phoneDebug.otpProvider}</span></p>}
             {phoneDebug.deliveryStatus && <p>Delivery status: <span className="font-mono text-foreground">{phoneDebug.deliveryStatus}</span></p>}
-            {phoneDebug.testOtpMode && <p className="mt-1 font-semibold text-[color:var(--gold-foreground)]">Test OTP mode: use 123456. SMS was not sent.</p>}
+            {phoneDebug.testOtpMode && (
+              <div className="mt-2 rounded-xl border border-gold/40 bg-gold/10 p-3 text-[color:var(--gold-foreground)]">
+                <p className="font-semibold">{phoneDebug.testModeLabel ?? "Test OTP only — not for production verification."}</p>
+                {diasporaTestOtpEnabled && <p className="mt-1">Test OTP: <span className="font-mono text-foreground">{phoneDebug.testOtp ?? "000000"}</span></p>}
+                {!diasporaTestOtpEnabled && <p className="mt-1">Diaspora test OTP display is disabled for this build.</p>}
+              </div>
+            )}
           </div>
         )}
         {flowSummary && <VerificationDebug summary={flowSummary} />}

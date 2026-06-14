@@ -250,6 +250,7 @@ export interface Database {
           verification_provider: string | null;
           provider_reference: string | null;
           verification_status: VerificationStatus;
+          is_test_verification: boolean;
           failure_reason: string | null;
           verified_at: string | null;
           created_at: string | null;
@@ -275,6 +276,7 @@ export interface Database {
           verification_provider?: string | null;
           provider_reference?: string | null;
           verification_status?: VerificationStatus;
+          is_test_verification?: boolean;
           failure_reason?: string | null;
           verified_at?: string | null;
           created_at?: string | null;
@@ -298,6 +300,7 @@ export interface Database {
           verification_provider?: string | null;
           provider_reference?: string | null;
           verification_status?: VerificationStatus;
+          is_test_verification?: boolean;
           failure_reason?: string | null;
           verified_at?: string | null;
           updated_at?: string | null;
