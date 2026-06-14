@@ -128,6 +128,15 @@ function CircleDetails() {
     setMembers((membersResult.data ?? []) as CircleMemberDetails[]);
     setContributions((contributionResult.data ?? []) as CircleContributionStatus[]);
     setPayoutRotation((rotationResult.data ?? []) as PayoutRotationItem[]);
+    console.log("payout_rotation_fetch_debug", {
+      circle_id: circleId,
+      user_id: currentUser.id,
+      member_role: membershipResult.data?.role ?? (circleResult.data.owner_id === currentUser.id ? "owner" : null),
+      member_status: membershipResult.data?.status ?? (circleResult.data.owner_id === currentUser.id ? "approved" : null),
+      payout_schedule_rows_found: rotationResult.data?.length ?? 0,
+      payout_schedule_query_error: rotationResult.error?.message ?? null,
+      payout_schedule_rows: rotationResult.data ?? [],
+    });
     setIsLoading(false);
   }
 
@@ -213,6 +222,87 @@ function CircleDetails() {
     await loadCircle();
   }
 
+  function renderPayoutRotationSection() {
+    return (
+      <section className="flex flex-col gap-4">
+        <div>
+          <h2 className="font-display text-lg font-semibold">Payout Rotation</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Fair automatic order for who receives each susu payout.</p>
+        </div>
+
+        {myPayoutTurn && (
+          <div className="grid grid-cols-3 gap-2">
+            <Metric label="My position" value={`#${myPayoutTurn.rotation_position}`} />
+            <Metric label="Expected date" value={formatDate(myPayoutTurn.payout_due_date)} />
+            <Metric label="Expected amount" value={formatCurrency(Number(myPayoutTurn.payout_amount ?? 0), currency)} />
+          </div>
+        )}
+
+        {isAdmin && (
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => handleGenerateRotation(false)}
+              disabled={isUpdatingRotation || !canChangeRotation || payoutRotation.length > 0}
+              className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+            >
+              {isUpdatingRotation ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shuffle className="h-4 w-4" />}
+              Generate Payout Order
+            </button>
+            {payoutRotation.length > 0 && (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => handleGenerateRotation(true)}
+                  disabled={isUpdatingRotation || !canChangeRotation}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-muted px-3 py-2 text-[11px] font-semibold disabled:opacity-60"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" /> Regenerate Payout Order
+                </button>
+                <button
+                  onClick={handleLockRotation}
+                  disabled={isUpdatingRotation || rotationLocked || hasCircleStarted(circle?.start_date)}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-success/10 px-3 py-2 text-[11px] font-semibold text-success disabled:opacity-60"
+                >
+                  <LockKeyhole className="h-3.5 w-3.5" /> Lock Payout Order
+                </button>
+              </div>
+            )}
+            {payoutRotation.length > 0 && !rotationLocked && (
+              <p className="text-[11px] text-muted-foreground">Regenerating replaces this fair random order and is only available before the circle starts.</p>
+            )}
+            {rotationLocked && <p className="text-[11px] text-muted-foreground">This payout order is locked and will not change automatically.</p>}
+          </div>
+        )}
+
+        {payoutRotation.length === 0 ? (
+          <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
+            Payout order has not been generated yet.
+          </div>
+        ) : membershipStatus === "approved" || isAdmin ? (
+          <ul className="flex flex-col gap-3">
+            {payoutRotation.map((turn) => (
+              <li key={turn.schedule_id} className="rounded-2xl border border-border bg-card p-4 shadow-card">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">#{turn.rotation_position} {turn.full_name ?? "Member"}</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {formatCurrency(Number(turn.payout_amount ?? 0), currency)} - {formatDate(turn.payout_due_date)}
+                    </p>
+                  </div>
+                  <StatusPill status={turn.status} />
+                </div>
+                {turn.is_current_user && <p className="mt-2 text-[11px] font-semibold text-primary">This is your payout turn.</p>}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
+            Approved members can see the full payout order.
+          </div>
+        )}
+      </section>
+    );
+  }
+
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
       <PageHeader
@@ -260,7 +350,7 @@ function CircleDetails() {
           </div>
 
           {tab === "overview" && (
-            <section className="px-5 pt-5">
+            <section className="flex flex-col gap-5 px-5 pt-5">
               <div className="grid grid-cols-2 gap-3">
                 <Metric label="Approved" value={`${approvedMembers.length}/${maxMembers}`} />
                 <Metric label="Pending" value={String(pendingMembers.length)} />
@@ -272,6 +362,7 @@ function CircleDetails() {
                 <Metric label="Payout date" value={myPayoutTurn ? formatDate(myPayoutTurn.payout_due_date) : "Not set"} />
               </div>
               <SavingsPlanner defaultTargetAmount={amount} defaultDueDate={toDateInputValue(circle.start_date)} currency={currency} />
+              {renderPayoutRotationSection()}
             </section>
           )}
 
@@ -346,77 +437,7 @@ function CircleDetails() {
 
           {tab === "rotation" && (
             <section className="flex flex-col gap-4 p-5">
-              {myPayoutTurn && (
-                <div className="rounded-2xl border border-primary/20 bg-secondary p-4 shadow-card">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Your turn</p>
-                  <p className="mt-1 font-display text-xl font-semibold">Position #{myPayoutTurn.rotation_position}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Expected payout {formatCurrency(Number(myPayoutTurn.payout_amount ?? 0), currency)} on {formatDate(myPayoutTurn.payout_due_date)}
-                  </p>
-                </div>
-              )}
-
-              {isAdmin && (
-                <div className="flex flex-col gap-2">
-                  <button
-                    onClick={() => handleGenerateRotation(false)}
-                    disabled={isUpdatingRotation || !canChangeRotation || payoutRotation.length > 0}
-                    className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
-                  >
-                    {isUpdatingRotation ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shuffle className="h-4 w-4" />}
-                    Generate payout order
-                  </button>
-                  {payoutRotation.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => handleGenerateRotation(true)}
-                        disabled={isUpdatingRotation || !canChangeRotation}
-                        className="flex items-center justify-center gap-2 rounded-xl bg-muted px-3 py-2 text-[11px] font-semibold disabled:opacity-60"
-                      >
-                        <RefreshCw className="h-3.5 w-3.5" /> Regenerate
-                      </button>
-                      <button
-                        onClick={handleLockRotation}
-                        disabled={isUpdatingRotation || rotationLocked || hasCircleStarted(circle.start_date)}
-                        className="flex items-center justify-center gap-2 rounded-xl bg-success/10 px-3 py-2 text-[11px] font-semibold text-success disabled:opacity-60"
-                      >
-                        <LockKeyhole className="h-3.5 w-3.5" /> Lock order
-                      </button>
-                    </div>
-                  )}
-                  {payoutRotation.length > 0 && !rotationLocked && (
-                    <p className="text-[11px] text-muted-foreground">Regenerating replaces this fair random order and is only available before the circle starts.</p>
-                  )}
-                  {rotationLocked && <p className="text-[11px] text-muted-foreground">This payout order is locked and will not change automatically.</p>}
-                </div>
-              )}
-
-              {payoutRotation.length === 0 ? (
-                <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
-                  Payout order has not been generated yet.
-                </div>
-              ) : membershipStatus === "approved" || isAdmin ? (
-                <ul className="flex flex-col gap-3">
-                  {payoutRotation.map((turn) => (
-                    <li key={turn.schedule_id} className="rounded-2xl border border-border bg-card p-4 shadow-card">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold">#{turn.rotation_position} {turn.full_name ?? "Member"}</p>
-                          <p className="mt-1 text-[11px] text-muted-foreground">
-                            {formatCurrency(Number(turn.payout_amount ?? 0), currency)} - {formatDate(turn.payout_due_date)}
-                          </p>
-                        </div>
-                        <StatusPill status={turn.status} />
-                      </div>
-                      {turn.is_current_user && <p className="mt-2 text-[11px] font-semibold text-primary">This is your payout turn.</p>}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
-                  Approved members can see the full payout order.
-                </div>
-              )}
+              {renderPayoutRotationSection()}
             </section>
           )}
 
