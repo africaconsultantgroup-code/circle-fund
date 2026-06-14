@@ -424,6 +424,20 @@ export interface Database {
           deposited_at?: string;
         };
       };
+      admin_bootstrap_emails: {
+        Row: {
+          email: string;
+          created_at: string;
+        };
+        Insert: {
+          email: string;
+          created_at?: string;
+        };
+        Update: {
+          email?: string;
+          created_at?: string;
+        };
+      };
     };
     Views: {
       [_: string]: {
@@ -511,6 +525,16 @@ export interface Database {
       current_user_is_admin: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
+      };
+      bootstrap_current_user_admin: {
+        Args: Record<PropertyKey, never>;
+        Returns: Array<{
+          user_id: string;
+          email: string;
+          role: string;
+          account_status: string;
+          promoted: boolean;
+        }>;
       };
     };
     Enums: {

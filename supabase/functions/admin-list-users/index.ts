@@ -9,11 +9,7 @@ Deno.serve(async (req) => {
   const { data: authUserResult, error: authUserError } = await serviceClient.auth.admin.getUserById(user.id);
   const authEmail = authUserError ? user.email ?? null : authUserResult.user?.email ?? user.email ?? null;
 
-  const { data: adminProfile, error: adminProfileError } = await serviceClient
-    .from("profiles")
-    .select("role, account_status")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const { profile: adminProfile, error: adminProfileError, bootstrapped } = await resolveAdminProfile(serviceClient, user.id, authEmail);
 
   console.log("admin_list_users_authorization", {
     authUserId: user.id,
@@ -23,9 +19,11 @@ Deno.serve(async (req) => {
     profileFound: Boolean(adminProfile),
     profileError: adminProfileError?.message ?? null,
     allowed: adminProfile?.role === "admin" && adminProfile.account_status === "active",
+    bootstrapped,
     expectedRole: "admin",
     checkedTable: "public.profiles",
     checkedField: "role",
+    checkedFilter: "user_id = auth.uid()",
   });
 
   if (adminProfileError || adminProfile?.role !== "admin" || adminProfile.account_status !== "active") {
@@ -75,3 +73,52 @@ Deno.serve(async (req) => {
 
   return json({ users });
 });
+
+async function resolveAdminProfile(serviceClient: any, userId: string, authEmail: string | null) {
+  const firstRead = await readAdminProfile(serviceClient, userId);
+  if (firstRead.error || firstRead.profile?.role === "admin") {
+    return { ...firstRead, bootstrapped: false };
+  }
+
+  if (!authEmail) {
+    return { ...firstRead, bootstrapped: false };
+  }
+
+  const { data: bootstrapEmail, error: bootstrapEmailError } = await serviceClient
+    .from("admin_bootstrap_emails")
+    .select("email")
+    .eq("email", authEmail.toLowerCase())
+    .maybeSingle();
+
+  if (bootstrapEmailError || !bootstrapEmail) {
+    return { ...firstRead, bootstrapped: false };
+  }
+
+  const now = new Date().toISOString();
+  const { error: upsertError } = await serviceClient
+    .from("profiles")
+    .upsert({
+      user_id: userId,
+      role: "admin",
+      account_status: "active",
+      profile_completed: true,
+      updated_at: now,
+    }, { onConflict: "user_id" });
+
+  if (upsertError) {
+    return { profile: firstRead.profile, error: upsertError, bootstrapped: false };
+  }
+
+  const secondRead = await readAdminProfile(serviceClient, userId);
+  return { ...secondRead, bootstrapped: true };
+}
+
+async function readAdminProfile(serviceClient: any, userId: string) {
+  const { data: profile, error } = await serviceClient
+    .from("profiles")
+    .select("role, account_status")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  return { profile, error };
+}

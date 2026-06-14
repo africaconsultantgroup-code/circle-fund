@@ -21,5 +21,13 @@ export async function currentUserIsAdmin() {
   const { data, error } = await supabase.rpc("current_user_is_admin");
   if (error) return false;
 
-  return Boolean(data);
+  if (data) return true;
+
+  const { data: bootstrapData, error: bootstrapError } = await supabase.rpc("bootstrap_current_user_admin");
+  if (bootstrapError) return false;
+
+  const bootstrapped = Array.isArray(bootstrapData) && bootstrapData.some((row) => row.role === "admin" && row.account_status === "active");
+  if (bootstrapped) return true;
+
+  return false;
 }
