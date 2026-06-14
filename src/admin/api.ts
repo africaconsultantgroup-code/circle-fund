@@ -19,11 +19,58 @@ export type AdminUser = {
   email: string | null;
   fullName: string | null;
   phone: string | null;
+  country: string | null;
+  preferredCurrency: string | null;
   role: string;
   accountStatus: string;
   profileCompleted: boolean;
   createdAt: string | null;
   verification: AdminUserVerification | null;
+};
+
+export type AdminMetrics = {
+  totalUsers: number;
+  verifiedUsers: number;
+  pendingVerifications: number;
+  suspendedUsers: number;
+  totalCircles: number;
+  activeCircles: number;
+};
+
+export type AdminCircle = {
+  id: string;
+  ownerId: string;
+  ownerName: string | null;
+  ownerEmail: string | null;
+  name: string;
+  contributionAmount: number | null;
+  baseCurrency: string | null;
+  frequency: string | null;
+  maxMembers: number;
+  status: string;
+  inviteCode: string | null;
+  startDate: string | null;
+  createdAt: string | null;
+  memberCount: number;
+  pendingMemberCount: number;
+  totalMemberRows: number;
+};
+
+export type AdminOverview = {
+  metrics: AdminMetrics;
+  users: AdminUser[];
+  verifications: AdminUserVerification[];
+  circles: AdminCircle[];
+  circleMembers: Array<{
+    id: string;
+    circle_id: string;
+    user_id: string;
+    role: string;
+    status: string;
+    joined_at: string | null;
+    approved_at: string | null;
+    approved_by: string | null;
+  }>;
 };
 
 type AdminFunctionResult<T> = {
@@ -33,6 +80,10 @@ type AdminFunctionResult<T> = {
 
 export async function listAdminUsers() {
   return invokeAdminFunction<{ users: AdminUser[] }>("admin-list-users");
+}
+
+export async function getAdminOverview() {
+  return invokeAdminFunction<AdminOverview>("admin-overview");
 }
 
 export async function markTestUserVerified(userId: string, adminSecret: string) {

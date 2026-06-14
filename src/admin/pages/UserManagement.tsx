@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Search, ShieldAlert } from "lucide-react";
-import { listAdminUsers, type AdminUser } from "@/admin/api";
+import { getAdminOverview, type AdminUser } from "@/admin/api";
 
 export function UserManagement() {
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -11,7 +11,7 @@ export function UserManagement() {
   useEffect(() => {
     let isMounted = true;
 
-    listAdminUsers().then(({ data, error }) => {
+    getAdminOverview().then(({ data, error }) => {
       if (!isMounted) return;
       setUsers(data?.users ?? []);
       setError(error?.message ?? "");

@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, ShieldAlert, ShieldCheck, Users } from "lucide-react";
-import { listAdminUsers, type AdminUser } from "@/admin/api";
+import { Circle, Loader2, ShieldAlert, ShieldCheck, Users } from "lucide-react";
+import { getAdminOverview, type AdminMetrics } from "@/admin/api";
 
 export function AdminDashboard() {
-  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [metrics, setMetrics] = useState<AdminMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let isMounted = true;
 
-    listAdminUsers().then(({ data, error }) => {
+    getAdminOverview().then(({ data, error }) => {
       if (!isMounted) return;
-      setUsers(data?.users ?? []);
+      setMetrics(data?.metrics ?? null);
       setError(error?.message ?? "");
       setIsLoading(false);
     });
@@ -22,12 +22,14 @@ export function AdminDashboard() {
     };
   }, []);
 
-  const stats = useMemo(() => {
-    const verified = users.filter((user) => user.verification?.verification_status === "verified").length;
-    const pending = users.filter((user) => user.verification && user.verification.verification_status !== "verified").length;
-    const active = users.filter((user) => user.accountStatus === "active").length;
-    return { total: users.length, verified, pending, active };
-  }, [users]);
+  const stats = useMemo(() => metrics ?? {
+    totalUsers: 0,
+    verifiedUsers: 0,
+    pendingVerifications: 0,
+    suspendedUsers: 0,
+    totalCircles: 0,
+    activeCircles: 0,
+  }, [metrics]);
 
   return (
     <section>
@@ -48,11 +50,13 @@ export function AdminDashboard() {
       )}
 
       {!isLoading && !error && (
-        <div className="mt-5 grid gap-3 md:grid-cols-4">
-          <Metric icon={<Users className="h-4 w-4" />} label="Total users" value={stats.total} />
-          <Metric icon={<ShieldCheck className="h-4 w-4" />} label="Verified" value={stats.verified} />
-          <Metric icon={<ShieldAlert className="h-4 w-4" />} label="Needs review" value={stats.pending} />
-          <Metric icon={<Users className="h-4 w-4" />} label="Active accounts" value={stats.active} />
+        <div className="mt-5 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <Metric icon={<Users className="h-4 w-4" />} label="Total Users" value={stats.totalUsers} />
+          <Metric icon={<ShieldCheck className="h-4 w-4" />} label="Verified Users" value={stats.verifiedUsers} />
+          <Metric icon={<ShieldAlert className="h-4 w-4" />} label="Pending Verifications" value={stats.pendingVerifications} />
+          <Metric icon={<Users className="h-4 w-4" />} label="Suspended Users" value={stats.suspendedUsers} />
+          <Metric icon={<Circle className="h-4 w-4" />} label="Total Circles" value={stats.totalCircles} />
+          <Metric icon={<Circle className="h-4 w-4" />} label="Active Circles" value={stats.activeCircles} />
         </div>
       )}
     </section>

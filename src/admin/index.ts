@@ -3,4 +3,5 @@ export { AdminLogin } from "@/admin/pages/AdminLogin";
 export { AdminDashboard } from "@/admin/pages/AdminDashboard";
 export { UserManagement } from "@/admin/pages/UserManagement";
 export { VerificationReview } from "@/admin/pages/VerificationReview";
+export { CircleManagement } from "@/admin/pages/CircleManagement";
 export { adminRoutes } from "@/admin/routes/AdminRoutes";

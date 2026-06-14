@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
-import { listAdminUsers, markTestUserVerified, type AdminUser } from "@/admin/api";
+import { getAdminOverview, markTestUserVerified, type AdminUser } from "@/admin/api";
 
 export function VerificationReview() {
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -12,7 +12,7 @@ export function VerificationReview() {
 
   const loadUsers = async () => {
     setIsLoading(true);
-    const { data, error } = await listAdminUsers();
+    const { data, error } = await getAdminOverview();
     setUsers(data?.users ?? []);
     setError(error?.message ?? "");
     setIsLoading(false);
