@@ -11,31 +11,39 @@ Deno.serve(async (req) => {
     const { user, serviceClient, error } = await getAuthedServiceClient(req);
     if (error) return error;
 
-    const { phoneNumber, otp, otpReference } = await req.json();
+    const { phoneNumber, otp, otpReference, countryCode } = await req.json();
     if (typeof phoneNumber !== "string" || typeof otp !== "string" || otp.trim().length !== 6) {
       console.warn("verify_phone_otp_invalid_payload", { userId: user.id });
       return json({ error: "A phone number and OTP are required." }, 400);
     }
 
-    const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
+    const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber, typeof countryCode === "string" ? countryCode : undefined);
+    const detectedCountry = detectCountry(normalizedPhoneNumber);
     if (!isValidInternationalPhoneNumber(normalizedPhoneNumber)) {
       console.warn("verify_phone_otp_invalid_recipient_format", {
         userId: user.id,
         rawPhoneNumber: phoneNumber,
         normalizedPhoneNumber,
+        detectedCountry,
+        countryCode,
       });
       return json({
         ok: false,
         error: "Invalid phone number format.",
         reason: "invalid_recipient_format",
         normalizedPhoneNumber,
+        detectedCountry,
       }, 400);
     }
 
+    const otpProvider = resolveOtpProvider(normalizedPhoneNumber, detectedCountry);
     console.log("verify_phone_otp_started", {
       userId: user.id,
       otpReference: typeof otpReference === "string" ? otpReference : null,
+      rawPhoneInput: phoneNumber,
       normalizedPhoneNumber,
+      detectedCountry,
+      otpProvider,
       phoneLast4: normalizedPhoneNumber.slice(-4),
       hasOtpReference: typeof otpReference === "string",
     });
@@ -54,6 +62,8 @@ Deno.serve(async (req) => {
       requestedOtpReference: typeof otpReference === "string" ? otpReference : null,
       savedOtpReference: existingVerification?.otp_reference ?? null,
       phoneNumber: existingVerification?.phone_number ?? normalizedPhoneNumber,
+      detectedCountry,
+      otpProvider,
       expiryTime: existingVerification?.otp_expires_at ?? null,
       databaseRecordFound: Boolean(existingVerification),
       hasOtpHash: Boolean(existingVerification?.otp_code_hash),
@@ -150,7 +160,7 @@ Deno.serve(async (req) => {
       otp_verified_at: now.toISOString(),
       otp_code_hash: null,
       otp_expires_at: null,
-      verification_provider: storedPhoneNumber.startsWith("233") ? "hubtel_otp" : "sandbox_international_otp",
+      verification_provider: otpProvider,
       provider_reference: reference,
       verification_status: status,
       failure_reason: null,
@@ -168,6 +178,7 @@ Deno.serve(async (req) => {
         phone_verified_at: verificationPatch.phone_verified_at,
         otp_status: verificationPatch.otp_status,
         otp_verified_at: verificationPatch.otp_verified_at,
+        verification_provider: verificationPatch.verification_provider,
       },
     });
 
@@ -283,6 +294,9 @@ Deno.serve(async (req) => {
       otpVerifiedAt: refreshedVerification.otp_verified_at,
       updatedVerification: refreshedVerification,
       providerReference: reference,
+      normalizedPhoneNumber: refreshedVerification.phone_number,
+      detectedCountry,
+      otpProvider,
       message: status === "verified"
         ? "Phone number verified. Verification is complete."
         : "Phone number verified. Continue to the next verification step.",
@@ -293,8 +307,30 @@ Deno.serve(async (req) => {
   }
 });
 
-function normalizePhoneNumber(phoneNumber: string) {
+function normalizePhoneNumber(phoneNumber: string, countryCode = "") {
   const compact = phoneNumber.replace(/\D/g, "");
+  const country = countryCode.trim().toUpperCase();
+  const hasPlusPrefix = phoneNumber.trim().startsWith("+");
+
+  if (!compact) return "";
+  if (hasPlusPrefix) return compact;
+
+  if (country === "GH") {
+    if (compact.startsWith("0")) return `233${compact.slice(1)}`;
+    if (compact.startsWith("233")) return compact;
+    if (compact.length === 9) return `233${compact}`;
+  }
+
+  if (country === "GB" || country === "UK") {
+    if (compact.startsWith("0")) return `44${compact.slice(1)}`;
+    if (compact.startsWith("44")) return compact;
+  }
+
+  if (country === "US" || country === "CA") {
+    if (compact.startsWith("1") && compact.length === 11) return compact;
+    if (compact.length === 10) return `1${compact}`;
+  }
+
   if (compact.startsWith("0")) return `233${compact.slice(1)}`;
   if (compact.startsWith("233")) return compact;
   if (compact.length === 9) return `233${compact}`;
@@ -309,6 +345,21 @@ function isValidInternationalPhoneNumber(phoneNumber: string) {
     || /^44\d{9,10}$/.test(phoneNumber)
     || /^1\d{10}$/.test(phoneNumber)
     || /^(?!233|44|1)\d{8,15}$/.test(phoneNumber);
+}
+
+function detectCountry(phoneNumber: string) {
+  if (/^233\d{9}$/.test(phoneNumber)) return "GH";
+  if (/^44\d{9,10}$/.test(phoneNumber)) return "GB";
+  if (/^1\d{10}$/.test(phoneNumber)) return "US_CA";
+  if (/^\d{8,15}$/.test(phoneNumber)) return "OTHER";
+  return "UNKNOWN";
+}
+
+function resolveOtpProvider(phoneNumber: string, detectedCountry: string) {
+  if (detectedCountry === "GH") return "hubtel_otp";
+  if ((Deno.env.get("HUBTEL_ENABLE_INTERNATIONAL_SMS") ?? "").toLowerCase() === "true") return "hubtel_international_otp";
+  const futureProvider = (Deno.env.get("INTERNATIONAL_SMS_PROVIDER") ?? "").trim().toLowerCase();
+  return futureProvider ? `${futureProvider}_pending_integration` : "sandbox_international_otp";
 }
 
 async function markOtpFailed(serviceClient: any, userId: string, phoneNumber: string) {

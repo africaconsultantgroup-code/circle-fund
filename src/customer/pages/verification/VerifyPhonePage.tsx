@@ -13,7 +13,14 @@ export function VerifyPhonePage() {
   const [country, setCountry] = useState<CountryCode>("GH");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [otpReference, setOtpReference] = useState<string | null>(null);
-  const [phoneDebug, setPhoneDebug] = useState<{ rawPhoneNumber: string; normalizedPhoneNumber: string } | null>(null);
+  const [phoneDebug, setPhoneDebug] = useState<{
+    rawPhoneNumber: string;
+    normalizedPhoneNumber: string;
+    detectedCountry?: string;
+    otpProvider?: string;
+    deliveryStatus?: string;
+    testOtpMode?: boolean;
+  } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -78,7 +85,7 @@ export function VerifyPhonePage() {
     }
 
     setIsSaving(true);
-    const { data, error } = await requestPhoneOtp(normalizedPhone);
+    const { data, error } = await requestPhoneOtp(normalizedPhone, country);
     setIsSaving(false);
 
     if (error) {
@@ -88,18 +95,33 @@ export function VerifyPhonePage() {
         setPhoneDebug({
           rawPhoneNumber: details.rawPhoneNumber ?? phoneNumber,
           normalizedPhoneNumber: details.normalizedPhoneNumber ?? "",
+          detectedCountry: details.detectedCountry,
+          otpProvider: details.otpProvider,
+          deliveryStatus: details.deliveryStatus,
         });
       }
       return;
     }
 
-    const response = data as { providerReference?: string; rawPhoneNumber?: string; normalizedPhoneNumber?: string } | null;
+    const response = data as {
+      providerReference?: string;
+      rawPhoneNumber?: string;
+      normalizedPhoneNumber?: string;
+      detectedCountry?: string;
+      otpProvider?: string;
+      deliveryStatus?: string;
+      testOtpMode?: boolean;
+    } | null;
     setOtpReference(response?.providerReference ?? null);
     setPhoneDebug({
       rawPhoneNumber: phoneNumber,
       normalizedPhoneNumber: response?.normalizedPhoneNumber ?? normalizedPhone,
+      detectedCountry: response?.detectedCountry,
+      otpProvider: response?.otpProvider,
+      deliveryStatus: response?.deliveryStatus,
+      testOtpMode: response?.testOtpMode,
     });
-    setMessage(resultMessage(data, "Hubtel OTP sent. Enter the code to verify your phone."));
+    setMessage(resultMessage(data, "OTP request created. Enter the code to verify your phone."));
     setStep("otp");
     setTimeout(() => otpInputRefs.current[0]?.focus(), 50);
   };
@@ -115,7 +137,7 @@ export function VerifyPhonePage() {
 
     setIsSaving(true);
     const normalizedPhone = normalizeInternationalPhoneNumber(phoneNumber, country);
-    const { data, error } = await verifyPhoneOtp(normalizedPhone, otpCode, otpReference);
+    const { data, error } = await verifyPhoneOtp(normalizedPhone, otpCode, otpReference, country);
     setIsSaving(false);
 
     if (error) {
@@ -179,7 +201,7 @@ export function VerifyPhonePage() {
             </div>
             <div>
               <h2 className="font-display text-xl font-bold">Enter your phone number</h2>
-              <p className="mt-1 text-sm text-muted-foreground">SikaCircle sends your verification code through Hubtel.</p>
+              <p className="mt-1 text-sm text-muted-foreground">SikaCircle sends your verification code through the available OTP provider for your country.</p>
             </div>
             <div className="flex items-center gap-2 rounded-2xl border border-input bg-muted/40 px-4 py-3.5">
               <select
@@ -203,8 +225,8 @@ export function VerifyPhonePage() {
               <MessageSquare className="h-6 w-6" />
             </div>
             <div>
-              <h2 className="font-display text-xl font-bold">Enter your Hubtel OTP</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Use the 6-digit code sent to your phone.</p>
+              <h2 className="font-display text-xl font-bold">Enter your OTP</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Use the 6-digit code from your OTP request.</p>
             </div>
             <div className="grid grid-cols-6 gap-2">
               {otp.map((v, i) => (
@@ -240,6 +262,10 @@ export function VerifyPhonePage() {
             <p className="font-semibold text-foreground">OTP debug</p>
             <p className="mt-1">Raw phone entered: <span className="font-mono text-foreground">{phoneDebug.rawPhoneNumber}</span></p>
             <p>Normalized phone for OTP: <span className="font-mono text-foreground">{phoneDebug.normalizedPhoneNumber}</span></p>
+            {phoneDebug.detectedCountry && <p>Detected country: <span className="font-mono text-foreground">{phoneDebug.detectedCountry}</span></p>}
+            {phoneDebug.otpProvider && <p>OTP provider used: <span className="font-mono text-foreground">{phoneDebug.otpProvider}</span></p>}
+            {phoneDebug.deliveryStatus && <p>Delivery status: <span className="font-mono text-foreground">{phoneDebug.deliveryStatus}</span></p>}
+            {phoneDebug.testOtpMode && <p className="mt-1 font-semibold text-[color:var(--gold-foreground)]">Test OTP mode: use 123456. SMS was not sent.</p>}
           </div>
         )}
         {flowSummary && <VerificationDebug summary={flowSummary} />}
@@ -328,7 +354,14 @@ function resultMessage(data: unknown, fallback: string) {
   return [response.message ?? fallback, response.status ? `Status: ${response.status}` : "", response.providerReference ? `Reference: ${response.providerReference}` : ""].filter(Boolean).join(" ");
 }
 
-async function describeFunctionError(error: unknown): Promise<{ message: string; rawPhoneNumber?: string; normalizedPhoneNumber?: string }> {
+async function describeFunctionError(error: unknown): Promise<{
+  message: string;
+  rawPhoneNumber?: string;
+  normalizedPhoneNumber?: string;
+  detectedCountry?: string;
+  otpProvider?: string;
+  deliveryStatus?: string;
+}> {
   const errorLike = error as { message?: string; context?: unknown };
 
   if (errorLike.context instanceof Response) {
@@ -340,12 +373,18 @@ async function describeFunctionError(error: unknown): Promise<{ message: string;
         code?: unknown;
         rawPhoneNumber?: unknown;
         normalizedPhoneNumber?: unknown;
+        detectedCountry?: unknown;
+        otpProvider?: unknown;
+        deliveryStatus?: unknown;
       };
       const message = [body.error, body.message, body.reason, body.code].find((value) => typeof value === "string");
       return {
         message: typeof message === "string" ? message : errorLike.message ?? "Phone verification failed.",
         rawPhoneNumber: typeof body.rawPhoneNumber === "string" ? body.rawPhoneNumber : undefined,
         normalizedPhoneNumber: typeof body.normalizedPhoneNumber === "string" ? body.normalizedPhoneNumber : undefined,
+        detectedCountry: typeof body.detectedCountry === "string" ? body.detectedCountry : undefined,
+        otpProvider: typeof body.otpProvider === "string" ? body.otpProvider : undefined,
+        deliveryStatus: typeof body.deliveryStatus === "string" ? body.deliveryStatus : undefined,
       };
     } catch {
       return { message: errorLike.message ?? "Phone verification failed." };

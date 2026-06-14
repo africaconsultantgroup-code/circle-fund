@@ -89,15 +89,15 @@ export async function getCurrentUserVerification() {
   return { userId, data: data ?? null, error: error ? { message: error.message } : null };
 }
 
-export async function requestPhoneOtp(phoneNumber: string) {
+export async function requestPhoneOtp(phoneNumber: string, countryCode?: string) {
   return invokeAuthedFunction('request-phone-otp', {
-    body: { phoneNumber },
+    body: { phoneNumber, countryCode },
   });
 }
 
-export async function verifyPhoneOtp(phoneNumber: string, otp: string, otpReference?: string | null) {
+export async function verifyPhoneOtp(phoneNumber: string, otp: string, otpReference?: string | null, countryCode?: string) {
   return invokeAuthedFunction('verify-phone-otp', {
-    body: { phoneNumber, otp, otpReference },
+    body: { phoneNumber, otp, otpReference, countryCode },
   });
 }
 
