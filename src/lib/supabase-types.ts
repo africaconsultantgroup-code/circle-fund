@@ -4,6 +4,7 @@ export type CircleStatus = 'active' | 'paused' | 'completed' | 'cancelled';
 export type MemberStatus = 'pending' | 'approved' | 'rejected' | 'removed';
 export type ContributionStatus = 'pending' | 'processed' | 'failed' | 'unpaid' | 'paid' | 'late' | 'overdue';
 export type PayoutStatus = 'pending' | 'completed' | 'failed';
+export type PayoutScheduleStatus = 'scheduled' | 'pending' | 'paid' | 'skipped' | 'failed';
 export type TransactionType = 'contribution' | 'payout' | 'refund' | 'fee' | 'adjustment';
 export type TransactionStatus = 'pending' | 'completed' | 'failed';
 export type LegacyVerificationStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
@@ -385,6 +386,43 @@ export interface Database {
           updated_at?: string | null;
         };
       };
+      payout_schedule: {
+        Row: {
+          id: string;
+          circle_id: string;
+          member_id: string;
+          rotation_position: number;
+          payout_due_date: string | null;
+          payout_amount: number;
+          status: PayoutScheduleStatus;
+          locked_at: string | null;
+          locked_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          circle_id: string;
+          member_id: string;
+          rotation_position: number;
+          payout_due_date?: string | null;
+          payout_amount?: number;
+          status?: PayoutScheduleStatus;
+          locked_at?: string | null;
+          locked_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          rotation_position?: number;
+          payout_due_date?: string | null;
+          payout_amount?: number;
+          status?: PayoutScheduleStatus;
+          locked_at?: string | null;
+          locked_by?: string | null;
+          updated_at?: string;
+        };
+      };
       transactions: {
         Row: {
           id: string;
@@ -604,6 +642,35 @@ export interface Database {
       mark_contribution_paid_for_testing: {
         Args: { check_contribution_id: string; payment_reference?: string | null };
         Returns: Database['public']['Tables']['contributions']['Row'];
+      };
+      circle_rotation_is_locked: {
+        Args: { check_circle_id: string };
+        Returns: boolean;
+      };
+      generate_circle_payout_rotation: {
+        Args: { check_circle_id: string; regenerate?: boolean };
+        Returns: number;
+      };
+      lock_circle_payout_rotation: {
+        Args: { check_circle_id: string };
+        Returns: number;
+      };
+      get_circle_payout_rotation: {
+        Args: { check_circle_id: string };
+        Returns: Array<{
+          schedule_id: string;
+          circle_id: string;
+          member_id: string;
+          user_id: string;
+          full_name: string | null;
+          role: string | null;
+          rotation_position: number;
+          payout_due_date: string | null;
+          payout_amount: number;
+          status: string;
+          locked_at: string | null;
+          is_current_user: boolean;
+        }>;
       };
       current_user_is_admin: {
         Args: Record<PropertyKey, never>;

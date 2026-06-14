@@ -2,19 +2,23 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { SavingsPlanner } from "@/components/savings-planner";
-import { Calendar, Check, Loader2, Settings, Share2, ShieldAlert, UserCheck, Users, WalletCards, X } from "lucide-react";
+import { Calendar, Check, Loader2, LockKeyhole, RefreshCw, Settings, Share2, ShieldAlert, Shuffle, UserCheck, Users, WalletCards, X } from "lucide-react";
 import { getCircle, type Circle as MockCircleType } from "@/lib/mock-data";
 import {
   generateCircleContributionSchedule,
+  generateCirclePayoutRotation,
   getCircleById,
   getCircleMembership,
+  listCirclePayoutRotation,
   listCircleContributions,
   listCircleMembers,
+  lockCirclePayoutRotation,
   markContributionPaidForTesting,
   manageCircleMember,
   type Circle,
   type CircleContributionStatus,
   type CircleMemberDetails,
+  type PayoutRotationItem,
 } from "@/lib/db";
 import { getCurrentUser, type AuthUser } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase";
@@ -39,7 +43,7 @@ export const Route = createFileRoute("/circle/$id")({
   ),
 });
 
-type Tab = "overview" | "members" | "contributions" | "settings";
+type Tab = "overview" | "members" | "contributions" | "rotation" | "settings";
 
 function CircleDetails() {
   const { circleId, mockCircle } = Route.useLoaderData() as { circleId: string; mockCircle: MockCircleType | null };
@@ -48,9 +52,11 @@ function CircleDetails() {
   const [circle, setCircle] = useState<Circle | null>(null);
   const [members, setMembers] = useState<CircleMemberDetails[]>([]);
   const [contributions, setContributions] = useState<CircleContributionStatus[]>([]);
+  const [payoutRotation, setPayoutRotation] = useState<PayoutRotationItem[]>([]);
   const [membershipStatus, setMembershipStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingSchedule, setIsGeneratingSchedule] = useState(false);
+  const [isUpdatingRotation, setIsUpdatingRotation] = useState(false);
   const [markingContributionId, setMarkingContributionId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -63,6 +69,9 @@ function CircleDetails() {
   const currency = (circle?.base_currency ?? mockCircle?.baseCurrency ?? "GHS") as CurrencyCode;
   const amount = Number(circle?.contribution_amount ?? mockCircle?.amount ?? 0);
   const maxMembers = Math.min(circle?.max_members ?? 15, 15);
+  const myPayoutTurn = useMemo(() => payoutRotation.find((item) => item.is_current_user), [payoutRotation]);
+  const rotationLocked = payoutRotation.some((item) => Boolean(item.locked_at));
+  const canChangeRotation = isAdmin && !rotationLocked && !hasCircleStarted(circle?.start_date);
   const contributionSummary = useMemo(() => {
     const totalExpected = contributions.reduce((sum, contribution) => sum + Number(contribution.expected_amount ?? 0), 0);
     const totalPaid = contributions
@@ -100,11 +109,12 @@ function CircleDetails() {
       return;
     }
 
-    const [circleResult, membershipResult, membersResult, contributionResult] = await Promise.all([
+    const [circleResult, membershipResult, membersResult, contributionResult, rotationResult] = await Promise.all([
       getCircleById(circleId),
       getCircleMembership(circleId, currentUser.id),
       listCircleMembers(circleId),
       listCircleContributions(circleId),
+      listCirclePayoutRotation(circleId),
     ]);
 
     if (circleResult.error || !circleResult.data) {
@@ -117,6 +127,7 @@ function CircleDetails() {
     setMembershipStatus(membershipResult.data?.status ?? (circleResult.data.owner_id === currentUser.id ? "approved" : null));
     setMembers((membersResult.data ?? []) as CircleMemberDetails[]);
     setContributions((contributionResult.data ?? []) as CircleContributionStatus[]);
+    setPayoutRotation((rotationResult.data ?? []) as PayoutRotationItem[]);
     setIsLoading(false);
   }
 
@@ -165,6 +176,43 @@ function CircleDetails() {
     await loadCircle();
   }
 
+  async function handleGenerateRotation(regenerate = false) {
+    setMessage("");
+    setError("");
+
+    if (regenerate && !window.confirm("Regenerating will replace the current payout order before the circle starts. Continue?")) {
+      return;
+    }
+
+    setIsUpdatingRotation(true);
+    const { data, error: rotationError } = await generateCirclePayoutRotation(circleId, regenerate);
+    setIsUpdatingRotation(false);
+
+    if (rotationError) {
+      setError(rotationError.message);
+      return;
+    }
+
+    setMessage(Number(data ?? 0) > 0 ? "Payout rotation generated." : "Payout rotation is already generated.");
+    await loadCircle();
+  }
+
+  async function handleLockRotation() {
+    setMessage("");
+    setError("");
+    setIsUpdatingRotation(true);
+    const { data, error: lockError } = await lockCirclePayoutRotation(circleId);
+    setIsUpdatingRotation(false);
+
+    if (lockError) {
+      setError(lockError.message);
+      return;
+    }
+
+    setMessage(Number(data ?? 0) > 0 ? "Payout rotation locked." : "Payout rotation was already locked.");
+    await loadCircle();
+  }
+
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
       <PageHeader
@@ -203,10 +251,11 @@ function CircleDetails() {
           )}
           {message && <Notice tone="success" text={message} />}
 
-          <div className="grid grid-cols-4 gap-2 px-5 pt-4">
+          <div className="grid grid-cols-5 gap-2 px-5 pt-4">
             <TabButton active={tab === "overview"} icon={<WalletCards className="h-4 w-4" />} label="Overview" onClick={() => setTab("overview")} />
             <TabButton active={tab === "members"} icon={<Users className="h-4 w-4" />} label="Members" onClick={() => setTab("members")} />
             <TabButton active={tab === "contributions"} icon={<Calendar className="h-4 w-4" />} label="Contrib." onClick={() => setTab("contributions")} />
+            <TabButton active={tab === "rotation"} icon={<Shuffle className="h-4 w-4" />} label="Payouts" onClick={() => setTab("rotation")} />
             <TabButton active={tab === "settings"} icon={<Settings className="h-4 w-4" />} label="Settings" onClick={() => setTab("settings")} />
           </div>
 
@@ -219,6 +268,8 @@ function CircleDetails() {
                 <Metric label="Start date" value={formatDate(circle.start_date)} />
                 <Metric label="Expected" value={formatCurrency(contributionSummary.totalExpected, currency)} />
                 <Metric label="Outstanding" value={formatCurrency(contributionSummary.outstanding, currency)} />
+                <Metric label="Your turn" value={myPayoutTurn ? `#${myPayoutTurn.rotation_position}` : "Not set"} />
+                <Metric label="Payout date" value={myPayoutTurn ? formatDate(myPayoutTurn.payout_due_date) : "Not set"} />
               </div>
               <SavingsPlanner defaultTargetAmount={amount} defaultDueDate={toDateInputValue(circle.start_date)} currency={currency} />
             </section>
@@ -289,6 +340,82 @@ function CircleDetails() {
                     </li>
                   ))}
                 </ul>
+              )}
+            </section>
+          )}
+
+          {tab === "rotation" && (
+            <section className="flex flex-col gap-4 p-5">
+              {myPayoutTurn && (
+                <div className="rounded-2xl border border-primary/20 bg-secondary p-4 shadow-card">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Your turn</p>
+                  <p className="mt-1 font-display text-xl font-semibold">Position #{myPayoutTurn.rotation_position}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Expected payout {formatCurrency(Number(myPayoutTurn.payout_amount ?? 0), currency)} on {formatDate(myPayoutTurn.payout_due_date)}
+                  </p>
+                </div>
+              )}
+
+              {isAdmin && (
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => handleGenerateRotation(false)}
+                    disabled={isUpdatingRotation || !canChangeRotation || payoutRotation.length > 0}
+                    className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                  >
+                    {isUpdatingRotation ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shuffle className="h-4 w-4" />}
+                    Generate payout order
+                  </button>
+                  {payoutRotation.length > 0 && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => handleGenerateRotation(true)}
+                        disabled={isUpdatingRotation || !canChangeRotation}
+                        className="flex items-center justify-center gap-2 rounded-xl bg-muted px-3 py-2 text-[11px] font-semibold disabled:opacity-60"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" /> Regenerate
+                      </button>
+                      <button
+                        onClick={handleLockRotation}
+                        disabled={isUpdatingRotation || rotationLocked || hasCircleStarted(circle.start_date)}
+                        className="flex items-center justify-center gap-2 rounded-xl bg-success/10 px-3 py-2 text-[11px] font-semibold text-success disabled:opacity-60"
+                      >
+                        <LockKeyhole className="h-3.5 w-3.5" /> Lock order
+                      </button>
+                    </div>
+                  )}
+                  {payoutRotation.length > 0 && !rotationLocked && (
+                    <p className="text-[11px] text-muted-foreground">Regenerating replaces this fair random order and is only available before the circle starts.</p>
+                  )}
+                  {rotationLocked && <p className="text-[11px] text-muted-foreground">This payout order is locked and will not change automatically.</p>}
+                </div>
+              )}
+
+              {payoutRotation.length === 0 ? (
+                <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
+                  Payout order has not been generated yet.
+                </div>
+              ) : membershipStatus === "approved" || isAdmin ? (
+                <ul className="flex flex-col gap-3">
+                  {payoutRotation.map((turn) => (
+                    <li key={turn.schedule_id} className="rounded-2xl border border-border bg-card p-4 shadow-card">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold">#{turn.rotation_position} {turn.full_name ?? "Member"}</p>
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            {formatCurrency(Number(turn.payout_amount ?? 0), currency)} - {formatDate(turn.payout_due_date)}
+                          </p>
+                        </div>
+                        <StatusPill status={turn.status} />
+                      </div>
+                      {turn.is_current_user && <p className="mt-2 text-[11px] font-semibold text-primary">This is your payout turn.</p>}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
+                  Approved members can see the full payout order.
+                </div>
               )}
             </section>
           )}
@@ -431,4 +558,11 @@ function toDateInputValue(value: string | null | undefined) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return undefined;
   return parsed.toISOString().slice(0, 10);
+}
+
+function hasCircleStarted(value: string | null | undefined) {
+  if (!value) return false;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return false;
+  return parsed.getTime() <= Date.now();
 }

@@ -9,6 +9,7 @@ export type CircleMember = Database['public']['Tables']['circle_members']['Row']
 export type UserVerification = Database['public']['Tables']['user_verifications']['Row'];
 export type Contribution = Database['public']['Tables']['contributions']['Row'];
 export type Payout = Database['public']['Tables']['payouts']['Row'];
+export type PayoutRotationItem = Database['public']['Functions']['get_circle_payout_rotation']['Returns'][number];
 export type Transaction = Database['public']['Tables']['transactions']['Row'];
 export type PersonalSusuPlan = Database['public']['Tables']['personal_susu_plans']['Row'];
 export type PersonalSusuPlanInsert = Database['public']['Tables']['personal_susu_plans']['Insert'];
@@ -387,6 +388,21 @@ export async function markContributionPaidForTesting(contributionId: string, pay
 
 export async function listCirclePayouts(circleId: string) {
   return supabase.from('payouts').select('*').eq('circle_id', circleId).order('payout_date', { ascending: false });
+}
+
+export async function listCirclePayoutRotation(circleId: string) {
+  return supabase.rpc('get_circle_payout_rotation', { check_circle_id: circleId });
+}
+
+export async function generateCirclePayoutRotation(circleId: string, regenerate = false) {
+  return supabase.rpc('generate_circle_payout_rotation', {
+    check_circle_id: circleId,
+    regenerate,
+  });
+}
+
+export async function lockCirclePayoutRotation(circleId: string) {
+  return supabase.rpc('lock_circle_payout_rotation', { check_circle_id: circleId });
 }
 
 export async function listPersonalSusuPlans(userId: string) {
