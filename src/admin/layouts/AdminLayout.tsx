@@ -1,20 +1,23 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { Activity, Loader2, ShieldAlert } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { currentUserIsAdmin } from "@/shared/auth/roles";
-import { adminRoutes } from "@/admin/routes/AdminRoutes";
+import { getCurrentStaffRole } from "@/shared/auth/roles";
+import { adminRoutes, staffCanAccessAdminRoute } from "@/admin/routes/AdminRoutes";
+import type { StaffRole } from "@/lib/supabase-types";
 
 export function AdminLayout({ children }: { children?: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [status, setStatus] = useState<"checking" | "allowed" | "blocked">("checking");
+  const [staffRole, setStaffRole] = useState<StaffRole | null>(null);
 
   useEffect(() => {
     let isMounted = true;
 
-    currentUserIsAdmin().then((isAdmin) => {
+    getCurrentStaffRole().then((role) => {
       if (!isMounted) return;
-      if (isAdmin) {
+      if (role) {
+        setStaffRole(role);
         setStatus("allowed");
         return;
       }
@@ -27,6 +30,8 @@ export function AdminLayout({ children }: { children?: ReactNode }) {
       isMounted = false;
     };
   }, [navigate]);
+
+  const canAccessRoute = staffCanAccessAdminRoute(staffRole, location.pathname);
 
   if (status === "checking") {
     return (
@@ -48,6 +53,19 @@ export function AdminLayout({ children }: { children?: ReactNode }) {
     );
   }
 
+  if (!canAccessRoute) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-6 text-center">
+        <div className="max-w-sm rounded-2xl border border-destructive/30 bg-destructive/5 p-5 text-destructive">
+          <ShieldAlert className="mx-auto h-6 w-6" />
+          <p className="mt-2 font-display text-sm font-semibold">Permission required</p>
+          <p className="mt-1 text-xs">Your staff role cannot access this admin page.</p>
+          <Link to="/admin" className="mt-4 inline-flex text-xs font-semibold text-primary">Back to dashboard</Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-border bg-card px-5 py-6 md:block">
@@ -61,7 +79,7 @@ export function AdminLayout({ children }: { children?: ReactNode }) {
           </div>
         </div>
         <nav className="mt-8 flex flex-col gap-2">
-          {adminRoutes.map(({ to, label, icon: Icon }) => {
+          {adminRoutes.filter((route) => !route.hidden && staffCanAccessAdminRoute(staffRole, route.to)).map(({ to, label, icon: Icon }) => {
             const active = location.pathname === to || (to !== "/admin" && location.pathname.startsWith(to));
             return (
               <Link

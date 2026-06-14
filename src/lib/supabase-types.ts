@@ -10,7 +10,8 @@ export type LegacyVerificationStatus = 'unverified' | 'pending' | 'verified' | '
 export type VerificationStatus = 'not_started' | 'pending' | 'verified' | 'failed' | 'manual_review';
 export type OtpStatus = 'not_started' | 'pending' | 'verified' | 'failed';
 export type AccountStatus = 'active' | 'pending' | 'suspended' | 'disabled';
-export type UserRole = 'customer' | 'admin';
+export type StaffRole = 'super_admin' | 'operations' | 'compliance' | 'finance' | 'support';
+export type UserRole = 'customer' | StaffRole;
 export type CurrencyCode = 'GHS' | 'GBP' | 'USD' | 'EUR';
 export type PersonalSusuFrequency = 'daily' | 'weekly' | 'biweekly' | 'monthly';
 export type PersonalSusuDurationUnit = 'weeks' | 'months';
@@ -68,6 +69,36 @@ export interface Database {
           account_status?: AccountStatus;
           role?: UserRole;
           updated_at?: string | null;
+        };
+      };
+      audit_logs: {
+        Row: {
+          id: string;
+          staff_user_id: string | null;
+          action: string;
+          target_type: string;
+          target_id: string | null;
+          notes: string | null;
+          metadata: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          staff_user_id?: string | null;
+          action: string;
+          target_type: string;
+          target_id?: string | null;
+          notes?: string | null;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Update: {
+          staff_user_id?: string | null;
+          action?: string;
+          target_type?: string;
+          target_id?: string | null;
+          notes?: string | null;
+          metadata?: Json;
         };
       };
       circles: {

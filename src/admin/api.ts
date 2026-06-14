@@ -56,7 +56,21 @@ export type AdminCircle = {
   totalMemberRows: number;
 };
 
+export type AdminAuditLog = {
+  id: string;
+  staff_user_id: string | null;
+  staffName: string | null;
+  staffEmail: string | null;
+  action: string;
+  target_type: string;
+  target_id: string | null;
+  notes: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
 export type AdminOverview = {
+  staffRole: string;
   metrics: AdminMetrics;
   users: AdminUser[];
   verifications: AdminUserVerification[];
@@ -71,6 +85,7 @@ export type AdminOverview = {
     approved_at: string | null;
     approved_by: string | null;
   }>;
+  auditLogs: AdminAuditLog[];
 };
 
 type AdminFunctionResult<T> = {

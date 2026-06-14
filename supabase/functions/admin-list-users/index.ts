@@ -1,5 +1,7 @@
 import { corsHeaders, getAuthedServiceClient, isOptions, json } from "../_shared/verification.ts";
 
+const staffRoles = ["super_admin", "operations", "support", "admin"];
+
 Deno.serve(async (req) => {
   if (isOptions(req)) return new Response("ok", { headers: corsHeaders });
 
@@ -18,15 +20,15 @@ Deno.serve(async (req) => {
     accountStatus: adminProfile?.account_status ?? null,
     profileFound: Boolean(adminProfile),
     profileError: adminProfileError?.message ?? null,
-    allowed: adminProfile?.role === "admin" && adminProfile.account_status === "active",
+    allowed: canListUsers(adminProfile?.role) && adminProfile?.account_status === "active",
     bootstrapped,
-    expectedRole: "admin",
+    expectedRole: "super_admin, operations, or support",
     checkedTable: "public.profiles",
     checkedField: "role",
     checkedFilter: "user_id = auth.uid()",
   });
 
-  if (adminProfileError || adminProfile?.role !== "admin" || adminProfile.account_status !== "active") {
+  if (adminProfileError || !canListUsers(adminProfile?.role) || adminProfile.account_status !== "active") {
     return json({
       error: "Admin access required.",
       authUserId: user.id,
@@ -76,7 +78,7 @@ Deno.serve(async (req) => {
 
 async function resolveAdminProfile(serviceClient: any, userId: string, authEmail: string | null) {
   const firstRead = await readAdminProfile(serviceClient, userId);
-  if (firstRead.error || firstRead.profile?.role === "admin") {
+  if (firstRead.error || canListUsers(firstRead.profile?.role)) {
     return { ...firstRead, bootstrapped: false };
   }
 
@@ -99,7 +101,7 @@ async function resolveAdminProfile(serviceClient: any, userId: string, authEmail
     .from("profiles")
     .upsert({
       user_id: userId,
-      role: "admin",
+      role: "super_admin",
       account_status: "active",
       profile_completed: true,
       updated_at: now,
@@ -121,4 +123,8 @@ async function readAdminProfile(serviceClient: any, userId: string) {
     .maybeSingle();
 
   return { profile, error };
+}
+
+function canListUsers(role: string | null | undefined) {
+  return staffRoles.includes(role ?? "");
 }

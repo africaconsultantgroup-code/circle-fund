@@ -1,5 +1,7 @@
 import { corsHeaders, getAuthedServiceClient, isOptions, json, providerReference } from "../_shared/verification.ts";
 
+const staffRoles = ["super_admin", "compliance", "admin"];
+
 Deno.serve(async (req) => {
   if (isOptions(req)) return new Response("ok", { headers: corsHeaders });
 
@@ -29,15 +31,15 @@ Deno.serve(async (req) => {
       accountStatus: adminProfile?.account_status ?? null,
       profileFound: Boolean(adminProfile),
       profileError: adminProfileError?.message ?? null,
-      allowed: adminProfile?.role === "admin" && adminProfile.account_status === "active",
+      allowed: canApproveVerification(adminProfile?.role) && adminProfile?.account_status === "active",
       bootstrapped,
-      expectedRole: "admin",
+      expectedRole: "super_admin or compliance",
       checkedTable: "public.profiles",
       checkedField: "role",
       checkedFilter: "user_id = auth.uid()",
     });
 
-    if (adminProfileError || adminProfile?.role !== "admin" || adminProfile.account_status !== "active") {
+    if (adminProfileError || !canApproveVerification(adminProfile?.role) || adminProfile.account_status !== "active") {
       return json({
         error: "Admin access required.",
         authUserId: user.id,
@@ -89,6 +91,29 @@ Deno.serve(async (req) => {
 
     if (verificationError) return json({ error: verificationError.message }, 500);
 
+    const { error: auditError } = await serviceClient
+      .from("audit_logs")
+      .insert({
+        staff_user_id: user.id,
+        action: "approve_verification",
+        target_type: "user_verification",
+        target_id: userId,
+        notes: "Staff marked test user verified from the admin portal.",
+        metadata: {
+          provider_reference: reference,
+          staff_role: normalizeStaffRole(adminProfile.role),
+          source: "admin-mark-test-user-verified",
+        },
+      });
+
+    if (auditError) {
+      console.warn("admin_mark_test_user_verified_audit_log_failed", {
+        staffUserId: user.id,
+        targetUserId: userId,
+        error: auditError.message,
+      });
+    }
+
     return json({ status: "verified", providerReference: reference });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error.";
@@ -98,7 +123,7 @@ Deno.serve(async (req) => {
 
 async function resolveAdminProfile(serviceClient: any, userId: string, authEmail: string | null) {
   const firstRead = await readAdminProfile(serviceClient, userId);
-  if (firstRead.error || firstRead.profile?.role === "admin") {
+  if (firstRead.error || canApproveVerification(firstRead.profile?.role)) {
     return { ...firstRead, bootstrapped: false };
   }
 
@@ -121,7 +146,7 @@ async function resolveAdminProfile(serviceClient: any, userId: string, authEmail
     .from("profiles")
     .upsert({
       user_id: userId,
-      role: "admin",
+      role: "super_admin",
       account_status: "active",
       profile_completed: true,
       updated_at: now,
@@ -143,4 +168,12 @@ async function readAdminProfile(serviceClient: any, userId: string) {
     .maybeSingle();
 
   return { profile, error };
+}
+
+function canApproveVerification(role: string | null | undefined) {
+  return staffRoles.includes(role ?? "");
+}
+
+function normalizeStaffRole(role: string) {
+  return role === "admin" ? "super_admin" : role;
 }
