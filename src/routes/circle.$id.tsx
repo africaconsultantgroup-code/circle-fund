@@ -329,7 +329,7 @@ function Notice({ text, tone }: { text: string; tone: "gold" | "danger" | "succe
 
 function StatusPill({ status }: { status: string }) {
   const good = status === "approved" || status === "paid" || status === "processed";
-  const danger = status === "rejected" || status === "removed" || status === "late" || status === "failed";
+  const danger = status === "rejected" || status === "removed" || status === "late" || status === "overdue" || status === "failed";
   return (
     <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${good ? "bg-success/10 text-success" : danger ? "bg-destructive/10 text-destructive" : "bg-gold/15 text-[color:var(--gold-foreground)]"}`}>
       {status}

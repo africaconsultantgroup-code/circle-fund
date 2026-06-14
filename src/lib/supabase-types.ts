@@ -2,7 +2,7 @@ export type Json = string | number | boolean | null | { [key: string]: Json } | 
 
 export type CircleStatus = 'active' | 'paused' | 'completed' | 'cancelled';
 export type MemberStatus = 'pending' | 'approved' | 'rejected' | 'removed';
-export type ContributionStatus = 'pending' | 'processed' | 'failed' | 'unpaid' | 'paid' | 'late';
+export type ContributionStatus = 'pending' | 'processed' | 'failed' | 'unpaid' | 'paid' | 'late' | 'overdue';
 export type PayoutStatus = 'pending' | 'completed' | 'failed';
 export type TransactionType = 'contribution' | 'payout' | 'refund' | 'fee' | 'adjustment';
 export type TransactionStatus = 'pending' | 'completed' | 'failed';
