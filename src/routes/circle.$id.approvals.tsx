@@ -178,8 +178,8 @@ function MemberSection({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold">{member.full_name ?? "Member"}</p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">{member.phone ?? "No phone"} - {member.country ?? "No country"} - {member.preferred_currency ?? "GHS"}</p>
-                  <p className="text-[11px] text-muted-foreground">Joined {formatDate(member.joined_at)} - {member.role}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">Joined {formatDate(member.joined_at)} - {member.role}</p>
+                  <p className="text-[11px] text-muted-foreground">Verification {member.verification_status ?? "not_started"}</p>
                 </div>
                 <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-[color:var(--gold-foreground)]">{member.status}</span>
               </div>

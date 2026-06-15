@@ -29,6 +29,8 @@ export interface Database {
           id: string;
           user_id: string;
           full_name: string | null;
+          name: string | null;
+          email: string | null;
           phone: string | null;
           country: string | null;
           preferred_currency: CurrencyCode;
@@ -46,6 +48,8 @@ export interface Database {
           id?: string;
           user_id: string;
           full_name?: string | null;
+          name?: string | null;
+          email?: string | null;
           phone?: string | null;
           country?: string | null;
           preferred_currency?: CurrencyCode;
@@ -61,6 +65,8 @@ export interface Database {
         };
         Update: {
           full_name?: string | null;
+          name?: string | null;
+          email?: string | null;
           phone?: string | null;
           country?: string | null;
           preferred_currency?: CurrencyCode;
