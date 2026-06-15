@@ -70,10 +70,11 @@ export function PaymentMonitoringPage({ title, description, emptyText }: Payment
           </div>
 
           <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-card shadow-card">
-            <div className="grid min-w-[980px] grid-cols-[1.1fr_1fr_0.8fr_0.9fr_0.8fr_0.9fr_1fr] gap-4 border-b border-border px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="grid min-w-[1080px] grid-cols-[1.1fr_1fr_0.8fr_0.8fr_0.9fr_0.8fr_0.9fr_1fr] gap-4 border-b border-border px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               <span>User</span>
               <span>Circle</span>
               <span>Amount</span>
+              <span>Type</span>
               <span>Status</span>
               <span>Provider</span>
               <span>Reference</span>
@@ -81,13 +82,14 @@ export function PaymentMonitoringPage({ title, description, emptyText }: Payment
             </div>
             <ul className="divide-y divide-border overflow-x-auto">
               {transactions.map((transaction) => (
-                <li key={transaction.id} className="grid min-w-[980px] grid-cols-[1.1fr_1fr_0.8fr_0.9fr_0.8fr_0.9fr_1fr] items-center gap-4 px-5 py-3 text-sm">
+                <li key={transaction.id} className="grid min-w-[1080px] grid-cols-[1.1fr_1fr_0.8fr_0.8fr_0.9fr_0.8fr_0.9fr_1fr] items-center gap-4 px-5 py-3 text-sm">
                   <div className="min-w-0">
                     <p className="truncate font-medium">{transaction.userName ?? transaction.userEmail ?? transaction.user_id}</p>
                     <p className="truncate text-xs text-muted-foreground">{transaction.userEmail ?? transaction.user_id}</p>
                   </div>
                   <p className="truncate text-xs font-medium text-muted-foreground">{transaction.circleName ?? transaction.circle_id ?? "No circle"}</p>
                   <p className="text-xs font-semibold">{formatCurrency(Number(transaction.amount ?? 0), (transaction.currency || "GHS") as CurrencyCode)}</p>
+                  <p className="text-xs font-medium capitalize text-muted-foreground">{formatPaymentType(transaction.payment_type ?? "contribution")}</p>
                   <StatusPill status={transaction.status} />
                   <p className="text-xs font-medium uppercase text-muted-foreground">{transaction.provider}</p>
                   <p className="truncate font-mono text-[11px] text-muted-foreground">{transaction.provider_reference ?? "none"}</p>
@@ -122,6 +124,10 @@ function StatusPill({ status }: { status: string }) {
       {status}
     </span>
   );
+}
+
+function formatPaymentType(value: string) {
+  return value.replace(/_/g, " ");
 }
 
 function formatDate(value: string | null | undefined) {

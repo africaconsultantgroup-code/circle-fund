@@ -19,6 +19,7 @@ export type PersonalSusuDurationUnit = 'weeks' | 'months';
 export type PersonalSusuPlanStatus = 'active' | 'completed' | 'cancelled';
 export type PersonalSusuPaymentStatus = 'pending' | 'paid' | 'failed';
 export type PaymentTransactionStatus = 'initiated' | 'pending' | 'successful' | 'failed' | 'cancelled' | 'reversed';
+export type PaymentType = 'contribution' | 'savings' | 'piggy_bag' | 'personal_susu';
 
 export interface Database {
   public: {
@@ -439,6 +440,7 @@ export interface Database {
           provider: string;
           provider_reference: string | null;
           status: PaymentTransactionStatus;
+          payment_type: PaymentType;
           provider_response: Json;
           created_at: string;
           updated_at: string;
@@ -454,6 +456,7 @@ export interface Database {
           provider?: string;
           provider_reference?: string | null;
           status?: PaymentTransactionStatus;
+          payment_type?: PaymentType;
           provider_response?: Json;
           created_at?: string;
           updated_at?: string;
@@ -467,6 +470,7 @@ export interface Database {
           provider?: string;
           provider_reference?: string | null;
           status?: PaymentTransactionStatus;
+          payment_type?: PaymentType;
           provider_response?: Json;
           updated_at?: string;
         };
@@ -758,6 +762,17 @@ export interface Database {
       };
       initiate_hubtel_contribution_payment: {
         Args: { check_contribution_id: string };
+        Returns: Database['public']['Tables']['payment_transactions']['Row'];
+      };
+      initiate_placeholder_payment: {
+        Args: {
+          payment_type: PaymentType;
+          amount: number;
+          currency?: string;
+          circle_id?: string | null;
+          contribution_id?: string | null;
+          provider_response?: Json;
+        };
         Returns: Database['public']['Tables']['payment_transactions']['Row'];
       };
       record_hubtel_payment_webhook: {

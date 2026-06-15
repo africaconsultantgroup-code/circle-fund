@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
       .order("joined_at", { ascending: false }),
     serviceClient
       .from("payment_transactions")
-      .select("id, user_id, circle_id, contribution_id, amount, currency, payment_method, provider, provider_reference, status, provider_response, created_at, updated_at")
+      .select("id, user_id, circle_id, contribution_id, amount, currency, payment_method, provider, provider_reference, status, payment_type, provider_response, created_at, updated_at")
       .order("created_at", { ascending: false })
       .limit(200),
     serviceClient

@@ -201,7 +201,7 @@ function CircleDetails() {
       return;
     }
 
-    setPaymentNotice(`Hubtel payment integration is being prepared. Reference: ${data?.provider_reference ?? "pending"}`);
+    setPaymentNotice(`Hubtel payment is being prepared. Real payment will be enabled once API credentials are added. Reference: ${data?.provider_reference ?? "pending"}`);
     await loadCircle();
   }
 
@@ -440,7 +440,7 @@ function CircleDetails() {
                       <p className="mt-1 text-[11px] text-muted-foreground">Expected {formatCurrency(Number(contribution.expected_amount ?? amount), currency)} - due {formatDate(contribution.due_date)}</p>
                       <p className="mt-1 text-[11px] text-muted-foreground">Paid at {formatDate(contribution.paid_at)} - ref {contribution.payment_reference ?? "none"}</p>
                       <p className="mt-1 text-[11px] text-muted-foreground">Payment {contribution.payment_status ?? "not initiated"} - provider {contribution.payment_provider ?? "none"}</p>
-                      {user?.id === contribution.user_id && ["unpaid", "overdue", "pending"].includes(contribution.status) && (
+                      {user?.id === contribution.user_id && ["unpaid", "overdue", "pending", "failed"].includes(contribution.status) && (
                         <button
                           onClick={() => handleInitiatePayment(contribution)}
                           disabled={initiatingPaymentId === contribution.contribution_id}

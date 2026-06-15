@@ -83,6 +83,7 @@ export type AdminPaymentTransaction = {
   provider: string;
   provider_reference: string | null;
   status: string;
+  payment_type: string;
   provider_response: Record<string, unknown>;
   created_at: string;
   updated_at: string;

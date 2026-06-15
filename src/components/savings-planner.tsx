@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
-import { CalendarDays, Calculator } from "lucide-react";
+import { CalendarDays, Calculator, Loader2, Wallet } from "lucide-react";
 import { formatCurrency } from "@/lib/diaspora";
+import { initiatePlaceholderPayment, type PaymentTransaction } from "@/lib/db";
 import type { CurrencyCode } from "@/lib/supabase-types";
+import { PaymentPreparationModal } from "@/components/payment-preparation-modal";
 
 type Frequency = "daily" | "weekly" | "biweekly" | "monthly";
 
@@ -27,9 +29,45 @@ export function SavingsPlanner({
   const [savedAmount, setSavedAmount] = useState(defaultSavedAmount);
   const [dueDate, setDueDate] = useState(defaultDueDate ?? defaultFutureDate());
   const [frequency, setFrequency] = useState<Frequency>("weekly");
+  const [isPreparingPayment, setIsPreparingPayment] = useState(false);
+  const [paymentTransaction, setPaymentTransaction] = useState<PaymentTransaction | null>(null);
+  const [paymentError, setPaymentError] = useState("");
 
   const plan = useMemo(() => calculateSavingsPlan(targetAmount, savedAmount, dueDate), [targetAmount, savedAmount, dueDate]);
   const selectedAmount = plan.amounts[frequency];
+  const hasAmountDue = plan.remainingAmount > 0;
+
+  const handlePreparePayment = async (amount: number, label: string) => {
+    setPaymentError("");
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setPaymentError("No amount is due for this savings plan.");
+      return;
+    }
+
+    setIsPreparingPayment(true);
+    const { data, error } = await initiatePlaceholderPayment({
+      paymentType: "savings",
+      amount,
+      currency,
+      metadata: {
+        source: "savings_planner",
+        label,
+        targetAmount,
+        savedAmount,
+        dueDate,
+        frequency,
+      },
+    });
+    setIsPreparingPayment(false);
+
+    if (error || !data) {
+      setPaymentError(error?.message ?? "We could not prepare this payment. Please try again.");
+      return;
+    }
+
+    setPaymentTransaction(data);
+  };
 
   return (
     <section className="mt-7 px-5">
@@ -90,7 +128,42 @@ export function SavingsPlanner({
           <PlanMetric label="Biweekly" value={formatCurrency(plan.amounts.biweekly, currency)} />
           <PlanMetric label="Monthly" value={formatCurrency(plan.amounts.monthly, currency)} />
         </div>
+
+        <div className="mt-4 rounded-2xl border border-border bg-muted/30 p-3">
+          {hasAmountDue ? (
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                disabled={isPreparingPayment}
+                onClick={() => handlePreparePayment(plan.remainingAmount, "full_remaining_amount")}
+                className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+              >
+                {isPreparingPayment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
+                Start Saving Plan
+              </button>
+              <button
+                type="button"
+                disabled={isPreparingPayment}
+                onClick={() => handlePreparePayment(selectedAmount, `${frequency}_amount`)}
+                className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground disabled:opacity-60"
+              >
+                {isPreparingPayment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
+                Add Money
+              </button>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No amount is due for this savings plan.</p>
+          )}
+          {paymentError && <p className="mt-2 text-xs font-medium text-destructive">{paymentError}</p>}
+        </div>
       </div>
+
+      <PaymentPreparationModal
+        open={Boolean(paymentTransaction)}
+        transaction={paymentTransaction}
+        title="Savings payment prepared"
+        onClose={() => setPaymentTransaction(null)}
+      />
     </section>
   );
 }

@@ -3,12 +3,15 @@ import { useEffect, useState } from "react";
 import { CalendarDays, Loader2, LockKeyhole, PiggyBank, Plus, Wallet } from "lucide-react";
 import { formatGHS } from "@/lib/mock-data";
 import { buildPlanMetrics, formatDate, loadPiggyPlans, type PiggyPlanWithMetrics } from "@/lib/piggy-bag";
-import { listPersonalSusuDeposits, type PersonalSusuPlan } from "@/lib/db";
+import { initiatePlaceholderPayment, listPersonalSusuDeposits, type PaymentTransaction, type PersonalSusuPlan } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { PaymentPreparationModal } from "@/components/payment-preparation-modal";
 
 export function PiggyBagPage() {
   const [plans, setPlans] = useState<PiggyPlanWithMetrics[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [preparingPlanId, setPreparingPlanId] = useState<string | null>(null);
+  const [paymentTransaction, setPaymentTransaction] = useState<PaymentTransaction | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -50,6 +53,40 @@ export function PiggyBagPage() {
   const lockedBalance = plans.reduce((total, item) => total + item.lockedBalance, 0);
   const availableBalance = plans.reduce((total, item) => total + item.availableBalance, 0);
   const activePlans = plans.filter((item) => item.plan.status === "active").length;
+
+  const handleFundPlan = async (item: PiggyPlanWithMetrics) => {
+    setError("");
+    const amount = item.metrics.expectedContributionPerPeriod || item.metrics.remainingBalance;
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("No amount is due for this Piggy Bag plan.");
+      return;
+    }
+
+    setPreparingPlanId(item.plan.id);
+    const { data, error } = await initiatePlaceholderPayment({
+      paymentType: "piggy_bag",
+      amount,
+      currency: "GHS",
+      metadata: {
+        source: "piggy_bag_list",
+        planId: item.plan.id,
+        planName: item.plan.name,
+        targetAmount: item.plan.target_amount,
+        lockedUntil: item.plan.locked_until,
+        duration: item.plan.duration,
+        durationUnit: item.plan.duration_unit,
+      },
+    });
+    setPreparingPlanId(null);
+
+    if (error || !data) {
+      setError(error?.message ?? "We could not prepare Piggy Bag funding. Please try again.");
+      return;
+    }
+
+    setPaymentTransaction(data);
+  };
 
   return (
     <div className="flex flex-col px-5 pt-12">
@@ -109,9 +146,13 @@ export function PiggyBagPage() {
               No Piggy Bag plans yet. Create a locked savings goal to get started.
             </li>
           )}
-          {plans.map(({ plan, metrics, lockedBalance: locked }) => (
+          {plans.map((item) => {
+            const { plan, metrics, lockedBalance: locked } = item;
+            const amountDue = metrics.expectedContributionPerPeriod || metrics.remainingBalance;
+            return (
             <li key={plan.id}>
-              <Link to="/piggy-bag/$id" params={{ id: plan.id }} className="block rounded-3xl border border-border bg-card p-4 shadow-card">
+              <div className="rounded-3xl border border-border bg-card p-4 shadow-card">
+                <Link to="/piggy-bag/$id" params={{ id: plan.id }} className="block">
                 <div className="flex items-start gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary text-primary">
                     <PiggyBank className="h-5 w-5" />
@@ -135,11 +176,33 @@ export function PiggyBagPage() {
                     <CalendarDays className="h-3.5 w-3.5" /> {formatDate(plan.locked_until)}
                   </span>
                 </div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+                  <span>Duration: <span className="font-semibold text-foreground">{plan.duration} {plan.duration_unit}</span></span>
+                  <span className="text-right">Due: <span className="font-semibold text-foreground">{formatGHS(amountDue)}</span></span>
+                </div>
               </Link>
+                <button
+                  type="button"
+                  disabled={preparingPlanId === plan.id || amountDue <= 0}
+                  onClick={() => handleFundPlan(item)}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-primary py-3 text-sm font-semibold text-primary-foreground disabled:bg-muted disabled:text-muted-foreground"
+                >
+                  {preparingPlanId === plan.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
+                  Fund Piggy Bag
+                </button>
+              </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       </section>
+
+      <PaymentPreparationModal
+        open={Boolean(paymentTransaction)}
+        transaction={paymentTransaction}
+        title="Piggy Bag payment prepared"
+        onClose={() => setPaymentTransaction(null)}
+      />
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { CalendarDays, CheckCircle2, Loader2, LockKeyhole, PiggyBank, ShieldAlert, Wallet } from "lucide-react";
+import { PaymentPreparationModal } from "@/components/payment-preparation-modal";
 import { PageHeader } from "@/components/page-header";
+import { initiatePlaceholderPayment, type PaymentTransaction } from "@/lib/db";
 import { formatGHS } from "@/lib/mock-data";
 import { formatDate, loadPiggyPlan, recordPiggyDeposit, type PiggyPlanWithMetrics } from "@/lib/piggy-bag";
 
@@ -9,6 +11,8 @@ export function PiggyBagDetailPage({ planId }: { planId: string }) {
   const [depositAmount, setDepositAmount] = useState(100);
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingDeposit, setIsSavingDeposit] = useState(false);
+  const [isPreparingPayment, setIsPreparingPayment] = useState(false);
+  const [paymentTransaction, setPaymentTransaction] = useState<PaymentTransaction | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -44,6 +48,43 @@ export function PiggyBagDetailPage({ planId }: { planId: string }) {
 
     setMessage("Deposit recorded and locked in Piggy Bag. Hubtel collections can replace this preparation step later.");
     await loadDetails();
+  };
+
+  const handlePreparePiggyPayment = async () => {
+    setMessage("");
+    setError("");
+
+    if (!details) return;
+
+    const amount = depositAmount || details.metrics.expectedContributionPerPeriod || details.metrics.remainingBalance;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("No amount is due for this Personal Susu plan.");
+      return;
+    }
+
+    setIsPreparingPayment(true);
+    const { data, error } = await initiatePlaceholderPayment({
+      paymentType: "personal_susu",
+      amount,
+      currency: "GHS",
+      metadata: {
+        source: "piggy_bag_detail",
+        planId: details.plan.id,
+        planName: details.plan.name,
+        targetAmount: details.plan.target_amount,
+        dueDate: details.metrics.nextPaymentDate,
+        lockedUntil: details.plan.locked_until,
+      },
+    });
+    setIsPreparingPayment(false);
+
+    if (error || !data) {
+      setError(error?.message ?? "We could not prepare this Personal Susu payment. Please try again.");
+      return;
+    }
+
+    setPaymentTransaction(data);
+    setMessage("Hubtel payment is being prepared. Real payment will be enabled once API credentials are added.");
   };
 
   const handleWithdrawalRequest = () => {
@@ -126,6 +167,19 @@ export function PiggyBagDetailPage({ planId }: { planId: string }) {
                 {isSavingDeposit ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
               </button>
             </div>
+            <button
+              type="button"
+              disabled={isPreparingPayment}
+              onClick={handlePreparePiggyPayment}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-primary/25 bg-primary/10 py-3 text-sm font-semibold text-primary disabled:opacity-60"
+            >
+              {isPreparingPayment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
+              Pay Susu Contribution
+            </button>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Contribution amount: <span className="font-semibold text-foreground">{formatGHS(depositAmount)}</span>
+              {" "}Due date: <span className="font-semibold text-foreground">{details.metrics.nextPaymentDate ? formatDate(details.metrics.nextPaymentDate) : formatDate(details.plan.locked_until)}</span>
+            </p>
           </section>
 
           <section className="rounded-3xl border border-border bg-card p-4 shadow-card">
@@ -184,6 +238,13 @@ export function PiggyBagDetailPage({ planId }: { planId: string }) {
               ))}
             </ul>
           </section>
+
+          <PaymentPreparationModal
+            open={Boolean(paymentTransaction)}
+            transaction={paymentTransaction}
+            title="Personal Susu payment prepared"
+            onClose={() => setPaymentTransaction(null)}
+          />
         </div>
       )}
     </div>

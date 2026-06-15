@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Database } from './supabase-types';
+import type { Database, Json, PaymentType } from './supabase-types';
 import type { UserProfile } from './auth';
 
 export type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -390,6 +390,24 @@ export async function markContributionPaidForTesting(contributionId: string, pay
 export async function initiateHubtelContributionPayment(contributionId: string) {
   return supabase.rpc('initiate_hubtel_contribution_payment', {
     check_contribution_id: contributionId,
+  });
+}
+
+export async function initiatePlaceholderPayment(payload: {
+  paymentType: PaymentType;
+  amount: number;
+  currency?: string;
+  circleId?: string | null;
+  contributionId?: string | null;
+  metadata?: Json;
+}) {
+  return supabase.rpc('initiate_placeholder_payment', {
+    payment_type: payload.paymentType,
+    amount: payload.amount,
+    currency: payload.currency ?? 'GHS',
+    circle_id: payload.circleId ?? null,
+    contribution_id: payload.contributionId ?? null,
+    provider_response: payload.metadata ?? {},
   });
 }
 
