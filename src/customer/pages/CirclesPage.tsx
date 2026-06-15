@@ -4,23 +4,28 @@ import { Plus, Search, LogIn, Loader2 } from "lucide-react";
 import { loadUserCircles, type UserCircle } from "@/lib/user-circles";
 import { getVerificationGateSummary, type VerificationGateSummary } from "@/lib/onboarding";
 import { formatCurrency } from "@/lib/diaspora";
+import { canCreateCircle, type CreateCircleLimitResult } from "@/lib/circle-limits";
 
 export function CirclesPage() {
   const [circles, setCircles] = useState<UserCircle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [gateSummary, setGateSummary] = useState<VerificationGateSummary | null>(null);
+  const [createLimit, setCreateLimit] = useState<CreateCircleLimitResult | null>(null);
   const canUseCircles = Boolean(gateSummary?.canUseCircleActions);
   const formsComplete = Boolean(gateSummary?.formsComplete);
+  const canCreate = canUseCircles && Boolean(createLimit?.canCreate);
+  const createLimitMessage = createLimit?.message ?? "You can only administer 2 active susu groups at a time.";
 
   useEffect(() => {
     let isMounted = true;
 
-    Promise.all([loadUserCircles(), getVerificationGateSummary()]).then(([circleResult, gateResult]) => {
+    Promise.all([loadUserCircles(), getVerificationGateSummary(), canCreateCircle()]).then(([circleResult, gateResult, createResult]) => {
       if (!isMounted) return;
       setCircles(circleResult.data);
       setError(circleResult.error ?? "");
       setGateSummary(gateResult);
+      setCreateLimit(createResult);
       setIsLoading(false);
     });
 
@@ -36,7 +41,7 @@ export function CirclesPage() {
           <h1 className="font-display text-2xl font-bold tracking-tight">My Circles</h1>
           <p className="text-xs text-muted-foreground">{circles.length} active circles</p>
         </div>
-        {canUseCircles ? (
+        {canCreate ? (
           <Link to="/create-circle" className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-card">
             <Plus className="h-5 w-5" />
           </Link>
@@ -55,11 +60,11 @@ export function CirclesPage() {
       <div className="mt-5 grid grid-cols-2 gap-3">
         {canUseCircles ? (
           <>
-            <Link to="/create-circle" className="flex flex-col items-start gap-2 rounded-2xl bg-gradient-primary p-4 text-primary-foreground shadow-card">
+            {canCreate ? <Link to="/create-circle" className="flex flex-col items-start gap-2 rounded-2xl bg-gradient-primary p-4 text-primary-foreground shadow-card">
               <Plus className="h-5 w-5" />
               <p className="font-display text-sm font-semibold">Create circle</p>
               <p className="text-[11px] text-primary-foreground/70">Invite up to 15 members</p>
-            </Link>
+            </Link> : <DisabledCircleAction icon={<Plus className="h-5 w-5" />} title="Create circle" reason={createLimitMessage} />}
             <Link to="/join-circle" className="flex flex-col items-start gap-2 rounded-2xl border border-border bg-card p-4 shadow-card">
               <LogIn className="h-5 w-5 text-primary" />
               <p className="font-display text-sm font-semibold">Join circle</p>
@@ -78,6 +83,11 @@ export function CirclesPage() {
           {formsComplete ? "Verification submitted. Your account is under review." : `Continue verification: ${gateSummary.nextStep.label}`}
         </Link>
       )}
+      {canUseCircles && !canCreate && (
+        <div className="mt-3 rounded-2xl border border-gold/40 bg-gold/10 p-4 text-[11px] font-medium text-[color:var(--gold-foreground)]">
+          {createLimitMessage}
+        </div>
+      )}
 
       <ul className="mt-7 flex flex-col gap-3">
         {isLoading && (
@@ -94,9 +104,11 @@ export function CirclesPage() {
           <li className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
             <p>No circles yet. Create your first circle or join one with an invite link.</p>
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <Link to="/create-circle" className="rounded-xl bg-gradient-primary px-3 py-2 text-center text-[11px] font-semibold text-primary-foreground">
+              {canCreate ? <Link to="/create-circle" className="rounded-xl bg-gradient-primary px-3 py-2 text-center text-[11px] font-semibold text-primary-foreground">
                 Create Circle
-              </Link>
+              </Link> : <button disabled className="rounded-xl bg-muted px-3 py-2 text-center text-[11px] font-semibold text-muted-foreground">
+                Create Locked
+              </button>}
               <Link to="/join-circle" className="rounded-xl border border-border px-3 py-2 text-center text-[11px] font-semibold text-primary">
                 Join Circle
               </Link>
@@ -139,12 +151,12 @@ export function CirclesPage() {
   );
 }
 
-function DisabledCircleAction({ icon, title }: { icon: React.ReactNode; title: string }) {
+function DisabledCircleAction({ icon, title, reason = "Verification required" }: { icon: React.ReactNode; title: string; reason?: string }) {
   return (
     <button disabled className="flex flex-col items-start gap-2 rounded-2xl border border-border bg-card p-4 text-left opacity-50 shadow-card">
       <span className="text-primary">{icon}</span>
       <p className="font-display text-sm font-semibold">{title}</p>
-      <p className="text-[11px] text-muted-foreground">Verification required</p>
+      <p className="text-[11px] text-muted-foreground">{reason}</p>
     </button>
   );
 }

@@ -1,7 +1,7 @@
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
 export type CircleStatus = 'active' | 'paused' | 'completed' | 'cancelled';
-export type MemberStatus = 'pending' | 'approved' | 'rejected' | 'removed';
+export type MemberStatus = 'pending' | 'pending_capacity_review' | 'approved' | 'rejected' | 'removed';
 export type ContributionStatus = 'pending' | 'processed' | 'failed' | 'unpaid' | 'paid' | 'late' | 'overdue';
 export type PayoutStatus = 'pending' | 'completed' | 'failed';
 export type PayoutScheduleStatus = 'scheduled' | 'processing' | 'pending' | 'paid' | 'skipped' | 'failed';
@@ -771,6 +771,23 @@ export interface Database {
       user_active_circle_count: {
         Args: { check_user_id: string };
         Returns: number;
+      };
+      can_create_circle: {
+        Args: { check_user_id: string; log_block?: boolean };
+        Returns: Array<{
+          can_create: boolean;
+          active_admin_count: number;
+          message: string;
+        }>;
+      };
+      can_join_circle: {
+        Args: { check_user_id: string; check_circle_id: string; log_review?: boolean };
+        Returns: Array<{
+          can_join: boolean;
+          requires_capacity_review: boolean;
+          active_circle_count: number;
+          message: string;
+        }>;
       };
       user_periodic_obligation: {
         Args: { check_user_id: string };

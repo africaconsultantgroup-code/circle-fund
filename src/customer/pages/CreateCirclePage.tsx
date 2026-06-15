@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/page-header";
 import { Users, Repeat, Calendar, FileText, ShieldCheck, ShieldAlert, CheckCircle2, Loader2, Copy, MessageCircle } from "lucide-react";
 import { createCircleWithCreator, generateInviteToken, getProfileByUserId } from "@/lib/db";
 import { getCircleEligibility, type CircleEligibility } from "@/lib/onboarding";
+import { canCreateCircle, type CreateCircleLimitResult } from "@/lib/circle-limits";
 import { currencyOptions, formatCurrency } from "@/lib/diaspora";
 import type { CurrencyCode } from "@/lib/supabase-types";
 
@@ -24,16 +25,18 @@ export function CreateCirclePage() {
   const [createdCircleName, setCreatedCircleName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [eligibility, setEligibility] = useState<CircleEligibility | null>(null);
+  const [createLimit, setCreateLimit] = useState<CreateCircleLimitResult | null>(null);
   const [isCheckingEligibility, setIsCheckingEligibility] = useState(true);
-  const eligible = Boolean(eligibility?.isEligible);
+  const eligible = Boolean(eligibility?.isEligible && createLimit?.canCreate);
   const blocked = isCheckingEligibility || !eligible;
 
   useEffect(() => {
     let isMounted = true;
 
-    getCircleEligibility().then((result) => {
+    Promise.all([getCircleEligibility(), canCreateCircle()]).then(([result, limitResult]) => {
       if (!isMounted) return;
       setEligibility(result);
+      setCreateLimit(limitResult);
       setIsCheckingEligibility(false);
       if (result.userId) {
         void getProfileByUserId(result.userId).then(({ data }) => {
@@ -67,6 +70,15 @@ export function CreateCirclePage() {
     setInviteLink("");
     setCreatedCircleName("");
 
+    if (isCheckingEligibility) return;
+
+    if (eligibility?.isEligible && !createLimit?.canCreate) {
+      const blockedLimit = await canCreateCircle(eligibility.userId, true);
+      setCreateLimit(blockedLimit);
+      setSubmitError(blockedLimit.message);
+      return;
+    }
+
     if (blocked || !validate()) return;
 
     setIsSaving(true);
@@ -75,6 +87,13 @@ export function CreateCirclePage() {
       if (!currentEligibility.isEligible || !currentEligibility.userId) {
         setEligibility(currentEligibility);
         setSubmitError(currentEligibility.message || "Please sign in before creating a circle.");
+        return;
+      }
+
+      const currentCreateLimit = await canCreateCircle(currentEligibility.userId, true);
+      setCreateLimit(currentCreateLimit);
+      if (!currentCreateLimit.canCreate) {
+        setSubmitError(currentCreateLimit.message);
         return;
       }
 
@@ -123,7 +142,17 @@ export function CreateCirclePage() {
             <p className="text-[11px] font-medium">Checking verification eligibility...</p>
           </div>
         )}
-        {!isCheckingEligibility && !eligible && (
+        {!isCheckingEligibility && eligibility?.isEligible && !createLimit?.canCreate && (
+          <div className="flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-destructive">
+            <ShieldAlert className="h-5 w-5" />
+            <div className="flex-1">
+              <p className="font-display text-sm font-semibold">Circle admin limit reached</p>
+              <p className="text-[11px] opacity-80">{createLimit?.message}</p>
+              <p className="mt-1 text-[11px] font-semibold">Creation blocked</p>
+            </div>
+          </div>
+        )}
+        {!isCheckingEligibility && !eligibility?.isEligible && (
           <Link to={eligibility?.issues[0]?.to ?? "/verify"} className="flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-destructive">
             <ShieldAlert className="h-5 w-5" />
             <div className="flex-1">

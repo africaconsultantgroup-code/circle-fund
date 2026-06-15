@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import type { Database, Json, PaymentType } from './supabase-types';
+import { canCreateCircle, canJoinCircle } from './circle-limits';
 import type { UserProfile } from './auth';
 
 export type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -206,13 +207,9 @@ export async function createCircleWithCreator(payload: CircleInsert, userId: str
     return { data: null, error: eligibilityResult.error ?? { message: 'Please sign in before creating a circle.' } };
   }
 
-  const adminCountResult = await supabase.rpc('user_active_circle_admin_count', { check_user_id: userId });
-  if (adminCountResult.error) {
-    return { data: null, error: adminCountResult.error };
-  }
-
-  if (Number(adminCountResult.data ?? 0) >= 2) {
-    return { data: null, error: { message: 'You can only administer 2 active susu groups at a time.' } };
+  const createLimit = await canCreateCircle(userId, true);
+  if (!createLimit.canCreate) {
+    return { data: null, error: { message: createLimit.message } };
   }
 
   const initialInviteToken = payload.invite_code ?? payload.invite_token ?? generateInviteToken();
@@ -283,27 +280,9 @@ export async function joinCircle(circleId: string, userId: string) {
     return { data: null, error: eligibilityResult.error ?? { message: 'Please sign in before joining a circle.' } };
   }
 
-  const capacityResult = await supabase.rpc('circle_has_member_capacity', { check_circle_id: circleId });
-  if (capacityResult.error) {
-    return { data: null, error: capacityResult.error };
-  }
-
-  if (!capacityResult.data) {
-    return { data: null, error: { message: 'This circle already has the maximum 15 members.' } };
-  }
-
-  const membershipResult = await getCircleMembership(circleId, userId);
-  if (membershipResult.error) {
-    return { data: null, error: membershipResult.error };
-  }
-
-  if (membershipResult.data) {
-    return { data: null, error: { message: 'You are already a member of this circle.' } };
-  }
-
-  const activeCountResult = await supabase.rpc('user_active_circle_count', { check_user_id: userId });
-  if (activeCountResult.error) {
-    return { data: null, error: activeCountResult.error };
+  const joinLimit = await canJoinCircle(circleId, userId, true);
+  if (!joinLimit.canJoin) {
+    return { data: null, error: { message: joinLimit.message } };
   }
 
   const memberResult = await createCircleMember({
@@ -317,11 +296,11 @@ export async function joinCircle(circleId: string, userId: string) {
     return memberResult;
   }
 
-  if (Number(activeCountResult.data ?? 0) >= 3 || memberResult.data.requires_capacity_review) {
+  if (joinLimit.requiresCapacityReview || memberResult.data.requires_capacity_review) {
     return {
       data: memberResult.data,
       error: null,
-      message: 'You are already in 3 active susu groups. SikaCircle needs to review your capacity before approving this request.',
+      message: joinLimit.message,
     };
   }
 

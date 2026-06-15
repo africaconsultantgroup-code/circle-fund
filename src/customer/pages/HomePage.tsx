@@ -35,6 +35,7 @@ import { buildPlanMetrics } from "@/lib/piggy-bag";
 import { supabase } from "@/lib/supabase";
 import { loadUserCircles, type UserCircle } from "@/lib/user-circles";
 import { getVerificationGateSummary, type VerificationGateSummary } from "@/lib/onboarding";
+import { canCreateCircle, type CreateCircleLimitResult } from "@/lib/circle-limits";
 import type { CurrencyCode } from "@/lib/supabase-types";
 
 type ContributionWithCircle = Contribution & {
@@ -107,22 +108,23 @@ export function HomePage() {
   const [busyPayment, setBusyPayment] = useState("");
   const [paymentTransaction, setPaymentTransaction] = useState<PaymentTransaction | null>(null);
   const [paymentError, setPaymentError] = useState("");
+  const [createLimit, setCreateLimit] = useState<CreateCircleLimitResult | null>(null);
 
   const canUseCircles = Boolean(gateSummary?.canUseCircleActions);
   const nextContribution = dashboard.upcomingContributions[0] ?? null;
   const primaryCurrency = (nextContribution?.circles?.base_currency ?? dashboard.circles[0]?.baseCurrency ?? "GHS") as CurrencyCode;
   const totalFinancialPosition = dashboard.totalContributed + dashboard.piggyBoxBalance + dashboard.savingsPlanBalance;
   const unread = dashboard.notifications.length;
-  const activeCreatorCircles = dashboard.circles.filter((circle) => circle.isCreator && circle.membershipStatus === "approved").length;
-  const activeParticipationCircles = dashboard.circles.filter((circle) => ["pending", "approved"].includes(circle.membershipStatus)).length;
-  const creatorLimitReached = activeCreatorCircles >= 2;
+  const activeParticipationCircles = dashboard.circles.filter((circle) => ["pending", "pending_capacity_review", "approved"].includes(circle.membershipStatus)).length;
+  const creatorLimitReached = canUseCircles && Boolean(createLimit && !createLimit.canCreate);
   const participationReviewNeeded = activeParticipationCircles >= 3;
 
   const loadDashboard = useCallback(async () => {
     setIsLoading(true);
-    const [data, gateResult] = await Promise.all([loadFinancialDashboard(), getVerificationGateSummary()]);
+    const [data, gateResult, createResult] = await Promise.all([loadFinancialDashboard(), getVerificationGateSummary(), canCreateCircle()]);
     setDashboard(data);
     setGateSummary(gateResult);
+    setCreateLimit(createResult);
     setIsLoading(false);
   }, []);
 
@@ -324,8 +326,8 @@ export function HomePage() {
         <section className="mt-3 px-5">
           <div className="rounded-2xl border border-gold/40 bg-gold/10 p-4 text-[color:var(--gold-foreground)]">
             <p className="font-display text-sm font-semibold">Circle capacity rules</p>
-            {creatorLimitReached && <p className="mt-1 text-xs">You can only administer 2 active susu groups at a time.</p>}
-            {participationReviewNeeded && <p className="mt-1 text-xs">You are already in 3 active susu groups. New join requests may need SikaCircle capacity review.</p>}
+            {creatorLimitReached && <p className="mt-1 text-xs">{createLimit?.message ?? "You can only administer 2 active susu groups at a time."}</p>}
+            {participationReviewNeeded && <p className="mt-1 text-xs">You are already in 3 active susu groups. SikaCircle must review your capacity before approving another group.</p>}
           </div>
         </section>
       )}
@@ -668,10 +670,10 @@ function buildNotifications({
   if (participationReviewNeeded) {
     items.push({
       id: "capacity-review-rule",
-      title: "Capacity review may apply",
-      body: "You are in 3 active susu groups. Any new join request may need SikaCircle review.",
+      title: "Capacity review required",
+      body: "You are in 3 active susu groups. SikaCircle must review your capacity before approving another group.",
       tone: "gold",
-      priority: "medium",
+      priority: "high",
     });
   }
 

@@ -136,6 +136,8 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
       setMembershipStatus(resolvedMembershipStatus);
       setError(resolvedMembershipStatus === "pending"
         ? "Your join request is pending approval. Circle details are available after approval."
+        : resolvedMembershipStatus === "pending_capacity_review"
+          ? "Pending SikaCircle review. Circle details are available after your capacity review and member approval."
         : resolvedMembershipStatus === "rejected" || resolvedMembershipStatus === "removed"
           ? "You do not have access to this circle."
           : "Only approved members can view circle details.");
