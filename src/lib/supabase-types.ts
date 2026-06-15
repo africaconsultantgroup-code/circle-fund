@@ -20,6 +20,9 @@ export type PersonalSusuPlanStatus = 'active' | 'completed' | 'cancelled';
 export type PersonalSusuPaymentStatus = 'pending' | 'paid' | 'failed';
 export type PaymentTransactionStatus = 'initiated' | 'pending' | 'successful' | 'failed' | 'cancelled' | 'reversed';
 export type PaymentType = 'contribution' | 'savings' | 'piggy_bag' | 'personal_susu';
+export type WalletTransactionType = 'deposit' | 'contribution_payment' | 'payout_received' | 'piggy_bag_deposit' | 'piggy_bag_withdrawal' | 'refund';
+export type WalletTransactionDirection = 'inflow' | 'outflow' | 'lock' | 'unlock';
+export type WalletTransactionStatus = 'pending' | 'successful' | 'failed' | 'cancelled';
 
 export interface Database {
   public: {
@@ -618,6 +621,93 @@ export interface Database {
           processed_at?: string | null;
         };
       };
+      wallet_accounts: {
+        Row: {
+          id: string;
+          user_id: string;
+          available_balance: number;
+          locked_balance: number;
+          currency: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          available_balance?: number;
+          locked_balance?: number;
+          currency?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          available_balance?: number;
+          locked_balance?: number;
+          currency?: string;
+          updated_at?: string;
+        };
+      };
+      wallet_transactions: {
+        Row: {
+          id: string;
+          wallet_id: string;
+          user_id: string;
+          circle_id: string | null;
+          contribution_id: string | null;
+          payout_schedule_id: string | null;
+          transaction_type: WalletTransactionType;
+          amount: number;
+          currency: string;
+          direction: WalletTransactionDirection;
+          status: WalletTransactionStatus;
+          payment_method: string | null;
+          provider: string;
+          reference: string;
+          receipt_id: string;
+          notes: string | null;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          wallet_id: string;
+          user_id: string;
+          circle_id?: string | null;
+          contribution_id?: string | null;
+          payout_schedule_id?: string | null;
+          transaction_type: WalletTransactionType;
+          amount: number;
+          currency?: string;
+          direction: WalletTransactionDirection;
+          status?: WalletTransactionStatus;
+          payment_method?: string | null;
+          provider?: string;
+          reference?: string;
+          receipt_id?: string;
+          notes?: string | null;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          circle_id?: string | null;
+          contribution_id?: string | null;
+          payout_schedule_id?: string | null;
+          transaction_type?: WalletTransactionType;
+          amount?: number;
+          currency?: string;
+          direction?: WalletTransactionDirection;
+          status?: WalletTransactionStatus;
+          payment_method?: string | null;
+          provider?: string;
+          reference?: string;
+          receipt_id?: string;
+          notes?: string | null;
+          metadata?: Json;
+          updated_at?: string;
+        };
+      };
       transactions: {
         Row: {
           id: string;
@@ -898,6 +988,35 @@ export interface Database {
       record_hubtel_payment_webhook: {
         Args: { payload: Json };
         Returns: Database['public']['Tables']['payment_webhook_events']['Row'];
+      };
+      ensure_wallet_account: {
+        Args: { check_user_id: string; wallet_currency?: string };
+        Returns: Database['public']['Tables']['wallet_accounts']['Row'];
+      };
+      get_wallet_summary: {
+        Args: Record<PropertyKey, never>;
+        Returns: Array<{
+          wallet_id: string;
+          available_balance: number;
+          locked_balance: number;
+          total_deposits: number;
+          total_withdrawals: number;
+          monthly_inflow: number;
+          monthly_outflow: number;
+          currency: string;
+        }>;
+      };
+      prepare_wallet_deposit: {
+        Args: { amount: number; payment_method: string; currency?: string };
+        Returns: Database['public']['Tables']['wallet_transactions']['Row'];
+      };
+      pay_contribution_from_wallet: {
+        Args: { check_contribution_id: string };
+        Returns: Database['public']['Tables']['wallet_transactions']['Row'];
+      };
+      receive_payout_to_wallet: {
+        Args: { check_schedule_id: string };
+        Returns: Database['public']['Tables']['wallet_transactions']['Row'];
       };
       circle_rotation_is_locked: {
         Args: { check_circle_id: string };

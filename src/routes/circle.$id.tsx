@@ -9,7 +9,6 @@ import {
   generateCirclePayoutRotation,
   getCircleById,
   getCircleMembership,
-  initiateHubtelContributionPayment,
   listCirclePayoutRotation,
   listCircleContributions,
   listCircleMembers,
@@ -25,6 +24,7 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { requireAuth } from "@/lib/phone-guard";
 import { formatCurrency } from "@/lib/diaspora";
 import type { CurrencyCode } from "@/lib/supabase-types";
+import { payContributionFromWallet } from "@/lib/wallet";
 
 export const Route = createFileRoute("/circle/$id")({
   beforeLoad: requireAuth,
@@ -194,12 +194,12 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
     await loadCircle();
   }
 
-  async function handleInitiatePayment(contribution: CircleContributionStatus) {
+  async function handlePayContributionFromWallet(contribution: CircleContributionStatus) {
     setMessage("");
     setError("");
     setPaymentNotice("");
     setInitiatingPaymentId(contribution.contribution_id);
-    const { data, error: paymentError } = await initiateHubtelContributionPayment(contribution.contribution_id);
+    const { data, error: paymentError } = await payContributionFromWallet(contribution.contribution_id);
     setInitiatingPaymentId(null);
 
     if (paymentError) {
@@ -207,7 +207,7 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
       return;
     }
 
-    setPaymentNotice(`Hubtel payment is being prepared. Real payment will be enabled once API credentials are added. Reference: ${data?.provider_reference ?? "pending"}`);
+    setPaymentNotice(`Contribution paid from Sika Wallet. Receipt: ${data?.receipt_id ?? "pending"}`);
     await loadCircle();
   }
 
@@ -462,12 +462,12 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
                       </div>
                       {user?.id === contribution.user_id && ["unpaid", "overdue", "pending", "failed"].includes(contribution.status) && (
                         <button
-                          onClick={() => handleInitiatePayment(contribution)}
+                          onClick={() => handlePayContributionFromWallet(contribution)}
                           disabled={initiatingPaymentId === contribution.contribution_id}
                           className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2 text-[11px] font-semibold text-primary-foreground disabled:opacity-60"
                         >
                           {initiatingPaymentId === contribution.contribution_id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                          Pay Contribution
+                          Pay from Wallet
                         </button>
                       )}
                     </li>
