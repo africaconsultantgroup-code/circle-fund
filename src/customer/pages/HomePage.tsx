@@ -1,36 +1,103 @@
 import { Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
-import { ArrowUpRight, Bell, Plus, TrendingUp, Users, Wallet, ChevronRight, LogIn, ShieldCheck, ShieldAlert, PiggyBank, LockKeyhole } from "lucide-react";
-import { currentUser, formatGHS, notifications } from "@/lib/mock-data";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Bell,
+  CalendarDays,
+  ChevronRight,
+  CircleDollarSign,
+  Clock,
+  LogIn,
+  PiggyBank,
+  Plus,
+  ShieldAlert,
+  ShieldCheck,
+  Target,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { SavingsPlanner } from "@/components/savings-planner";
+import { getCurrentUser, getCurrentUserProfile, type UserProfile } from "@/lib/auth";
+import { listPersonalSusuDeposits, listPersonalSusuPlans, type Contribution, type PaymentTransaction, type Payout } from "@/lib/db";
+import { formatCurrency } from "@/lib/diaspora";
+import { buildPlanMetrics } from "@/lib/piggy-bag";
+import { supabase } from "@/lib/supabase";
 import { loadUserCircles, type UserCircle } from "@/lib/user-circles";
 import { getVerificationGateSummary, type VerificationGateSummary } from "@/lib/onboarding";
-import { formatCurrency } from "@/lib/diaspora";
+import type { CurrencyCode } from "@/lib/supabase-types";
+
+type ContributionWithCircle = Contribution & {
+  circles?: {
+    id: string;
+    name: string;
+    base_currency: CurrencyCode;
+  } | null;
+};
+
+type PayoutTurn = {
+  schedule_id: string;
+  circle_id: string;
+  circle_name: string | null;
+  payout_due_date: string | null;
+  payout_amount: number;
+  status: string;
+};
+
+type NotificationItem = {
+  id: string;
+  title: string;
+  body: string;
+  tone: "primary" | "gold" | "success";
+};
+
+type DashboardData = {
+  profile: UserProfile | null;
+  circles: UserCircle[];
+  upcomingContributions: ContributionWithCircle[];
+  totalContributed: number;
+  totalReceived: number;
+  piggyBoxBalance: number;
+  savingsPlanBalance: number;
+  nextPayout: PayoutTurn | null;
+  notifications: NotificationItem[];
+  error: string | null;
+};
+
+const emptyDashboard: DashboardData = {
+  profile: null,
+  circles: [],
+  upcomingContributions: [],
+  totalContributed: 0,
+  totalReceived: 0,
+  piggyBoxBalance: 0,
+  savingsPlanBalance: 0,
+  nextPayout: null,
+  notifications: [],
+  error: null,
+};
 
 export function HomePage() {
-  const [circles, setCircles] = useState<UserCircle[]>([]);
-  const [circleError, setCircleError] = useState("");
+  const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard);
   const [gateSummary, setGateSummary] = useState<VerificationGateSummary | null>(null);
-  const totalSaved = 6850;
-  const activeCircles = circles.length;
-  const totalMembers = circles.reduce((a, c) => a + c.memberCount, 0);
-  const unread = notifications.filter((n) => !n.read).length;
-  const nextCircle = circles[0];
+  const [isLoading, setIsLoading] = useState(true);
+
   const canUseCircles = Boolean(gateSummary?.canUseCircleActions);
+  const nextContribution = dashboard.upcomingContributions[0] ?? null;
+  const primaryCurrency = (nextContribution?.circles?.base_currency ?? dashboard.circles[0]?.baseCurrency ?? "GHS") as CurrencyCode;
+  const totalFinancialPosition = dashboard.totalContributed + dashboard.piggyBoxBalance + dashboard.savingsPlanBalance;
+  const unread = dashboard.notifications.length;
 
   const loadDashboard = useCallback(async () => {
-    const [circleResult, gateResult] = await Promise.all([loadUserCircles(), getVerificationGateSummary()]);
-    setCircles(circleResult.data);
-    setCircleError(circleResult.error ?? "");
+    setIsLoading(true);
+    const [data, gateResult] = await Promise.all([loadFinancialDashboard(), getVerificationGateSummary()]);
+    setDashboard(data);
     setGateSummary(gateResult);
+    setIsLoading(false);
   }, []);
 
   useEffect(() => {
-    let isMounted = true;
-
-    loadDashboard().then(() => {
-      if (!isMounted) return;
-    });
+    void loadDashboard();
 
     const refresh = () => {
       if (document.visibilityState === "visible") void loadDashboard();
@@ -41,57 +108,70 @@ export function HomePage() {
     document.addEventListener("visibilitychange", refresh);
 
     return () => {
-      isMounted = false;
       window.removeEventListener("focus", refresh);
       window.removeEventListener("pageshow", refresh);
       document.removeEventListener("visibilitychange", refresh);
     };
   }, [loadDashboard]);
 
+  const greetingName = dashboard.profile?.full_name?.split(" ")[0] || dashboard.profile?.email?.split("@")[0] || "there";
+
   return (
-    <div className="flex flex-col">
-      <header className="bg-gradient-card px-5 pt-12 pb-24 text-primary-foreground">
+    <div className="flex flex-col pb-8">
+      <header className="bg-gradient-card px-5 pb-24 pt-12 text-primary-foreground">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src={currentUser.avatar} alt="" className="h-11 w-11 rounded-full border-2 border-white/20 bg-white" />
-            <div>
-              <p className="text-xs text-primary-foreground/70">Good morning,</p>
-              <p className="font-display text-base font-semibold">{currentUser.name.split(" ")[0]}</p>
-            </div>
+          <div>
+            <p className="text-xs text-primary-foreground/70">Welcome back,</p>
+            <h1 className="font-display text-2xl font-bold tracking-tight">{greetingName}</h1>
+            <p className="mt-1 text-xs text-primary-foreground/65">Your SikaCircle financial dashboard</p>
           </div>
-          <Link to="/notifications" className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white/10">
+          <Link to="/notifications" className="relative flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10">
             <Bell className="h-5 w-5" />
-            {unread > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-gold" />}
+            {unread > 0 && <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-gold" />}
           </Link>
         </div>
 
         <div className="mt-8">
-          <p className="text-xs uppercase tracking-wider text-primary-foreground/60">Total Saved</p>
-          <p className="mt-1 font-display text-4xl font-bold tracking-tight">{formatGHS(totalSaved)}</p>
-          <p className="mt-1 flex items-center gap-1 text-xs text-gold">
-            <TrendingUp className="h-3 w-3" /> +12.4% this month
-          </p>
+          <p className="text-xs uppercase tracking-wider text-primary-foreground/60">Tracked balance</p>
+          <p className="mt-1 font-display text-4xl font-bold tracking-tight">{formatCurrency(totalFinancialPosition, primaryCurrency)}</p>
+          <p className="mt-2 text-xs text-primary-foreground/70">Contributions, Piggy Box, and prepared savings plans.</p>
         </div>
       </header>
 
       <div className="-mt-16 px-5">
-        <div className="grid grid-cols-3 gap-3 rounded-3xl bg-card p-4 shadow-elevated">
-          <Stat label="Circles" value={activeCircles} icon={<Users className="h-4 w-4" />} />
-          <Stat label="Members" value={totalMembers} icon={<Wallet className="h-4 w-4" />} />
-          <Stat label="Cycles" value={nextCircle?.totalCycles ?? 0} icon={<ArrowUpRight className="h-4 w-4" />} />
+        <div className="grid grid-cols-2 gap-3 rounded-3xl bg-card p-4 shadow-elevated">
+          <SummaryTile icon={<Users className="h-4 w-4" />} label="Active Circles" value={String(dashboard.circles.length)} />
+          <SummaryTile icon={<CalendarDays className="h-4 w-4" />} label="Upcoming" value={String(dashboard.upcomingContributions.length)} />
+          <SummaryTile icon={<ArrowUpRight className="h-4 w-4" />} label="Contributed" value={formatCurrency(dashboard.totalContributed, primaryCurrency)} />
+          <SummaryTile icon={<ArrowDownLeft className="h-4 w-4" />} label="Received" value={formatCurrency(dashboard.totalReceived, primaryCurrency)} />
         </div>
       </div>
 
-      <div className="mt-5 px-5">
+      <section className="mt-5 px-5">
+        {dashboard.error && (
+          <div className="mb-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            {dashboard.error}
+          </div>
+        )}
         <VerificationStatusCard gateSummary={gateSummary} />
-        <Link to="/risk-alert" className="mt-2 flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-2.5 text-muted-foreground shadow-card">
-            <ShieldAlert className="h-4 w-4" />
-            <p className="flex-1 text-[11px] font-medium">No active risk alerts</p>
-            <ChevronRight className="h-4 w-4" />
-          </Link>
-      </div>
+      </section>
 
-      <div className="mt-6 grid grid-cols-2 gap-3 px-5">
+      <section className="mt-5 grid grid-cols-2 gap-3 px-5">
+        <BalanceCard
+          icon={<PiggyBank className="h-4 w-4" />}
+          label="Piggy Box Balance"
+          value={formatCurrency(dashboard.piggyBoxBalance, "GHS")}
+          emptyText="No locked Piggy Box savings yet."
+        />
+        <BalanceCard
+          icon={<Target className="h-4 w-4" />}
+          label="Savings Plan Balance"
+          value={formatCurrency(dashboard.savingsPlanBalance, "GHS")}
+          emptyText="No savings plan payments prepared yet."
+        />
+      </section>
+
+      <section className="mt-5 grid grid-cols-2 gap-3 px-5">
         {canUseCircles ? (
           <>
             <Link to="/create-circle" className="flex items-center gap-3 rounded-2xl bg-gradient-primary p-4 text-primary-foreground shadow-card">
@@ -119,112 +199,263 @@ export function HomePage() {
             <DisabledAction icon={<LogIn className="h-5 w-5" />} title="Join" />
           </>
         )}
-      </div>
-
-      <SavingsPlanner
-        defaultTargetAmount={nextCircle?.amount ?? 1000}
-        defaultDueDate={toDateInputValue(nextCircle?.nextPayoutDate)}
-        currency={nextCircle?.baseCurrency ?? "GHS"}
-      />
-
-      <section className="mt-7 px-5">
-        <SectionHeader title="Personal Susu" actionTo="/piggy-bag" actionLabel="Open" />
-        <Link to="/piggy-bag" className="mt-3 flex items-center gap-3 rounded-3xl border border-border bg-card p-4 shadow-card">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary text-primary">
-            <PiggyBank className="h-5 w-5" />
-          </span>
-          <div className="flex-1">
-            <p className="font-display text-sm font-semibold">Piggy Bag</p>
-            <p className="text-[11px] text-muted-foreground">Create a locked savings goal and track progress.</p>
-          </div>
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-            <LockKeyhole className="h-4 w-4" />
-          </span>
-        </Link>
       </section>
 
       <section className="mt-7 px-5">
-        <SectionHeader title="Up next" actionTo="/payments" actionLabel="See all" />
-        {nextCircle ? (
+        <SectionHeader title="Next Payout Date" actionTo="/circles" actionLabel="View circles" />
+        {dashboard.nextPayout ? (
           <div className="mt-3 rounded-3xl border border-border bg-card p-4 shadow-card">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-muted-foreground">Next payout</p>
-              <span className="rounded-full bg-gold/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--gold-foreground)]">
-                {nextCircle.frequency}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-display text-base font-semibold">{dashboard.nextPayout.circle_name ?? "Susu payout"}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{formatDate(dashboard.nextPayout.payout_due_date)}</p>
+              </div>
+              <span className="rounded-full bg-gold/15 px-2.5 py-1 text-[10px] font-semibold uppercase text-[color:var(--gold-foreground)]">
+                {dashboard.nextPayout.status}
               </span>
             </div>
-            <p className="mt-2 font-display text-2xl font-bold">{formatCurrency(nextCircle.amount * nextCircle.maxMembers, nextCircle.baseCurrency)}</p>
-            <p className="text-xs text-muted-foreground">
-              To {nextCircle.nextRecipient} - {nextCircle.nextPayoutDate}
-            </p>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-gradient-primary"
-                style={{ width: `${(nextCircle.currentCycle / nextCircle.totalCycles) * 100}%` }}
-              />
-            </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              Cycle {nextCircle.currentCycle} of {nextCircle.totalCycles}
-            </p>
+            <p className="mt-4 font-display text-2xl font-bold">{formatCurrency(Number(dashboard.nextPayout.payout_amount), primaryCurrency)}</p>
           </div>
         ) : (
-          <div className="mt-3 rounded-3xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
-            {circleError || "Create a circle to see your next payout."}
-          </div>
+          <EmptyState icon={<Clock className="h-4 w-4" />} text="No payout date is scheduled yet. Your payout turn will appear after a circle rotation is generated." />
         )}
       </section>
 
       <section className="mt-7 px-5">
-        <SectionHeader title="My Circles" actionTo="/circles" actionLabel="View all" />
-        <ul className="mt-3 flex flex-col gap-3">
-          {circleError && (
-            <li className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-              {circleError}
-            </li>
-          )}
-            {!circleError && circles.length === 0 && (
-            <li className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
-              <p>Your circles will appear here after creation or joining.</p>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <Link to="/create-circle" className="rounded-xl bg-gradient-primary px-3 py-2 text-center text-[11px] font-semibold text-primary-foreground">
-                  Create Circle
-                </Link>
-                <Link to="/join-circle" className="rounded-xl border border-border px-3 py-2 text-center text-[11px] font-semibold text-primary">
-                  Join Circle
-                </Link>
-              </div>
-            </li>
-          )}
-          {circles.slice(0, 2).map((c) => (
-            <li key={c.id}>
-              <Link
-                to="/circle/$id"
-                params={{ id: c.id }}
-                className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-card"
-              >
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground font-display text-base font-semibold">
-                  {c.name.slice(0, 2).toUpperCase()}
-                </div>
-                <div className="flex-1">
-                  <p className="font-display text-sm font-semibold">{c.name}</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {c.memberCount} members - {formatCurrency(c.amount, c.baseCurrency)}/{c.frequency}
-                  </p>
-                  {c.pendingMemberCount > 0 && (
-                    <p className="text-[10px] font-semibold text-[color:var(--gold-foreground)]">{c.pendingMemberCount} pending request{c.pendingMemberCount === 1 ? "" : "s"}</p>
-                  )}
-                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full rounded-full bg-gradient-gold" style={{ width: `${(c.currentCycle / c.totalCycles) * 100}%` }} />
+        <SectionHeader title="Upcoming Contributions" actionTo="/payments" actionLabel="Pay" />
+        {dashboard.upcomingContributions.length > 0 ? (
+          <ul className="mt-3 flex flex-col gap-3">
+            {dashboard.upcomingContributions.slice(0, 3).map((contribution) => {
+              const currency = contribution.circles?.base_currency ?? primaryCurrency;
+              return (
+                <li key={contribution.id} className="rounded-2xl border border-border bg-card p-4 shadow-card">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-display text-sm font-semibold">{contribution.circles?.name ?? "Circle contribution"}</p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">Due {formatDate(contribution.due_date)} · {formatContributionStatus(contribution.status)}</p>
+                    </div>
+                    <p className="font-display text-sm font-semibold">{formatCurrency(Number(contribution.amount_due ?? contribution.amount ?? 0), currency)}</p>
                   </div>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </Link>
-            </li>
-          ))}
-        </ul>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <EmptyState icon={<CircleDollarSign className="h-4 w-4" />} text="No contribution payments are due right now." />
+        )}
+      </section>
+
+      <SavingsPlanner
+        defaultTargetAmount={Number(nextContribution?.amount_due ?? nextContribution?.amount ?? dashboard.circles[0]?.amount ?? 1000)}
+        defaultDueDate={toDateInputValue(nextContribution?.due_date ?? dashboard.circles[0]?.nextPayoutDate)}
+        currency={primaryCurrency}
+      />
+
+      <section className="mt-7 px-5">
+        <SectionHeader title="Active Circles" actionTo="/circles" actionLabel="View all" />
+        {dashboard.circles.length > 0 ? (
+          <ul className="mt-3 flex flex-col gap-3">
+            {dashboard.circles.slice(0, 3).map((circle) => (
+              <li key={circle.id}>
+                <Link to="/circle/$id" params={{ id: circle.id }} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-card">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-primary font-display text-base font-semibold text-primary-foreground">
+                    {circle.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-display text-sm font-semibold">{circle.name}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {circle.memberCount}/{circle.maxMembers} members · {formatCurrency(circle.amount, circle.baseCurrency)}/{circle.frequency}
+                    </p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState icon={<Users className="h-4 w-4" />} text="You have no active circles yet. Create or join one to get started." />
+        )}
+      </section>
+
+      <section className="mt-7 px-5">
+        <SectionHeader title="Notifications" actionTo="/notifications" actionLabel="Open" />
+        {dashboard.notifications.length > 0 ? (
+          <ul className="mt-3 flex flex-col gap-2">
+            {dashboard.notifications.map((notification) => (
+              <li key={notification.id} className="rounded-2xl border border-border bg-card p-4 shadow-card">
+                <p className="font-display text-sm font-semibold">{notification.title}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">{notification.body}</p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState icon={<Bell className="h-4 w-4" />} text="No notifications yet." />
+        )}
       </section>
     </div>
   );
+}
+
+async function loadFinancialDashboard(): Promise<DashboardData> {
+  const [profile, user, circleResult] = await Promise.all([getCurrentUserProfile(), getCurrentUser(), loadUserCircles()]);
+  if (!user) {
+    return { ...emptyDashboard, error: "Please sign in to view your financial dashboard." };
+  }
+
+  const [upcomingResult, paidContributionsResult, payoutsResult, savingsTransactionsResult, piggyResult, payoutTurnResult] = await Promise.all([
+    supabase
+      .from("contributions")
+      .select("*, circles(id, name, base_currency)")
+      .eq("user_id", user.id)
+      .in("status", ["pending", "unpaid", "overdue", "late", "failed"])
+      .order("due_date", { ascending: true }),
+    supabase
+      .from("contributions")
+      .select("amount, amount_due, status")
+      .eq("user_id", user.id)
+      .in("status", ["paid", "processed"]),
+    supabase
+      .from("payouts")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("status", "completed"),
+    supabase
+      .from("payment_transactions")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("payment_type", "savings")
+      .in("status", ["initiated", "pending", "successful"]),
+    loadPiggyBalance(user.id),
+    loadNextPayoutTurn(user.id),
+  ]);
+
+  const errors = [
+    circleResult.error,
+    upcomingResult.error?.message,
+    paidContributionsResult.error?.message,
+    payoutsResult.error?.message,
+    savingsTransactionsResult.error?.message,
+    piggyResult.error,
+    payoutTurnResult.error,
+  ].filter(Boolean);
+
+  const totalContributed = (paidContributionsResult.data ?? []).reduce(
+    (sum, contribution) => sum + Number(contribution.amount_due ?? contribution.amount ?? 0),
+    0,
+  );
+  const totalReceived = ((payoutsResult.data ?? []) as Payout[]).reduce((sum, payout) => sum + Number(payout.amount ?? 0), 0);
+  const savingsPlanBalance = ((savingsTransactionsResult.data ?? []) as PaymentTransaction[]).reduce((sum, transaction) => sum + Number(transaction.amount ?? 0), 0);
+
+  return {
+    profile,
+    circles: circleResult.data,
+    upcomingContributions: (upcomingResult.data ?? []) as ContributionWithCircle[],
+    totalContributed,
+    totalReceived,
+    piggyBoxBalance: piggyResult.balance,
+    savingsPlanBalance,
+    nextPayout: payoutTurnResult.data,
+    notifications: buildNotifications({
+      upcomingContributions: (upcomingResult.data ?? []) as ContributionWithCircle[],
+      nextPayout: payoutTurnResult.data,
+      piggyBoxBalance: piggyResult.balance,
+    }),
+    error: errors.length > 0 ? errors.join(" ") : null,
+  };
+}
+
+async function loadPiggyBalance(userId: string) {
+  const planResult = await listPersonalSusuPlans(userId);
+  if (planResult.error) return { balance: 0, error: planResult.error.message };
+
+  const metrics = await Promise.all(
+    (planResult.data ?? []).map(async (plan) => {
+      const deposits = await listPersonalSusuDeposits(plan.id, userId);
+      return deposits.error ? null : buildPlanMetrics(plan, deposits.data ?? []);
+    }),
+  );
+
+  return {
+    balance: metrics.filter(Boolean).reduce((sum, item) => sum + (item?.lockedBalance ?? 0) + (item?.availableBalance ?? 0), 0),
+    error: null,
+  };
+}
+
+async function loadNextPayoutTurn(userId: string) {
+  const { data, error } = await supabase
+    .from("payout_schedule")
+    .select("id, circle_id, payout_due_date, payout_amount, status, circles(name), circle_members!inner(user_id)")
+    .eq("circle_members.user_id", userId)
+    .in("status", ["scheduled", "pending"])
+    .order("payout_due_date", { ascending: true })
+    .limit(1);
+
+  if (error) return { data: null, error: error.message };
+  const row = (data?.[0] ?? null) as {
+    id: string;
+    circle_id: string;
+    payout_due_date: string | null;
+    payout_amount: number;
+    status: string;
+    circles?: { name?: string | null } | { name?: string | null }[] | null;
+  } | null;
+
+  if (!row) return { data: null, error: null };
+  const circle = Array.isArray(row.circles) ? row.circles[0] : row.circles;
+
+  return {
+    data: {
+      schedule_id: row.id,
+      circle_id: row.circle_id,
+      circle_name: circle?.name ?? null,
+      payout_due_date: row.payout_due_date,
+      payout_amount: Number(row.payout_amount ?? 0),
+      status: row.status,
+    },
+    error: null,
+  };
+}
+
+function buildNotifications({
+  upcomingContributions,
+  nextPayout,
+  piggyBoxBalance,
+}: {
+  upcomingContributions: ContributionWithCircle[];
+  nextPayout: PayoutTurn | null;
+  piggyBoxBalance: number;
+}) {
+  const items: NotificationItem[] = [];
+  const dueSoon = upcomingContributions.find((contribution) => daysUntil(contribution.due_date) <= 7);
+
+  if (dueSoon) {
+    items.push({
+      id: `contribution-${dueSoon.id}`,
+      title: "Contribution due soon",
+      body: `${dueSoon.circles?.name ?? "A circle"} has a contribution due ${formatDate(dueSoon.due_date)}.`,
+      tone: "gold",
+    });
+  }
+
+  if (nextPayout) {
+    items.push({
+      id: `payout-${nextPayout.schedule_id}`,
+      title: "Payout turn scheduled",
+      body: `${nextPayout.circle_name ?? "Your circle"} payout is scheduled for ${formatDate(nextPayout.payout_due_date)}.`,
+      tone: "success",
+    });
+  }
+
+  if (piggyBoxBalance > 0) {
+    items.push({
+      id: "piggy-balance",
+      title: "Piggy Box balance updated",
+      body: `${formatCurrency(piggyBoxBalance, "GHS")} is tracked in your Piggy Box.`,
+      tone: "primary",
+    });
+  }
+
+  return items.slice(0, 4);
 }
 
 function VerificationStatusCard({ gateSummary }: { gateSummary: VerificationGateSummary | null }) {
@@ -239,25 +470,56 @@ function VerificationStatusCard({ gateSummary }: { gateSummary: VerificationGate
           {complete ? <ShieldCheck className="h-5 w-5" /> : <ShieldAlert className="h-5 w-5" />}
         </span>
         <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <p className="font-display text-sm font-semibold">Verification status</p>
-          </div>
-          {complete && <p className="text-[11px] text-muted-foreground">Verification complete. Create and join circles are unlocked.</p>}
-          {!complete && formsComplete && <p className="text-[11px] text-muted-foreground">Verification forms complete. Circle actions are available while review is pending.</p>}
-          {!complete && !formsComplete && <p className="text-[11px] text-muted-foreground">Circle actions are available for testing. Verification may be required before contributions start.</p>}
+          <p className="font-display text-sm font-semibold">Verification status</p>
+          {complete && <p className="text-[11px] text-muted-foreground">Verification complete. Circle actions are unlocked.</p>}
+          {!complete && formsComplete && <p className="text-[11px] text-muted-foreground">Verification forms complete. Review is pending.</p>}
+          {!complete && !formsComplete && <p className="text-[11px] text-muted-foreground">Continue verification before money movement starts.</p>}
         </div>
         <Link to={complete || formsComplete ? "/verify/status" : gateSummary?.nextStep.to ?? "/verify"} className="text-xs font-semibold text-primary">
-          {complete ? "Status" : formsComplete ? "Review" : "Continue"}
+          {complete ? "Status" : "Continue"}
         </Link>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <StatusLine label="Phone OTP" value={statusLabel(statuses?.phone)} good={statuses?.phone === "verified"} />
-        <StatusLine label="Ghana Card" value={statusLabel(statuses?.ghanaCard)} good={statusAccepted(statuses?.ghanaCard)} />
-        <StatusLine label="Face" value={statusLabel(statuses?.face)} good={statusAccepted(statuses?.face)} />
-        <StatusLine label="Profile" value={statuses?.profile === "complete" ? "Complete" : "Incomplete"} good={statuses?.profile === "complete"} />
-        <StatusLine label="Account" value={statuses?.account === "active" ? "Active" : "Inactive"} good={statuses?.account === "active"} />
+        <StatusLine label="Phone" value={statusLabel(statuses?.phone)} good={statuses?.phone === "verified"} />
+        <StatusLine label="KYC" value={statusLabel(statuses?.ghanaCard)} good={statusAccepted(statuses?.ghanaCard)} />
       </div>
+    </div>
+  );
+}
+
+function SummaryTile({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-muted/40 p-3">
+      <div className="flex items-center gap-2 text-primary">
+        {icon}
+        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      </div>
+      <p className="mt-2 font-display text-base font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function BalanceCard({ icon, label, value, emptyText }: { icon: ReactNode; label: string; value: string; emptyText: string }) {
+  const isEmpty = value.includes("0.00") || value.endsWith("0");
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+      <div className="flex items-center gap-2 text-primary">
+        {icon}
+        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      </div>
+      <p className="mt-2 font-display text-lg font-semibold">{value}</p>
+      {isEmpty && <p className="mt-1 text-[11px] text-muted-foreground">{emptyText}</p>}
+    </div>
+  );
+}
+
+function EmptyState({ icon, text }: { icon: ReactNode; text: string }) {
+  return (
+    <div className="mt-3 flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
+      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground">{icon}</span>
+      <p>{text}</p>
     </div>
   );
 }
@@ -271,19 +533,7 @@ function StatusLine({ label, value, good }: { label: string; value: string; good
   );
 }
 
-function statusLabel(status: string | undefined) {
-  if (status === "verified") return "Verified";
-  if (status === "manual_review") return "Pending review";
-  if (status === "pending") return "Pending review";
-  if (status === "failed") return "Failed";
-  return "Not started";
-}
-
-function statusAccepted(status: string | undefined) {
-  return status === "verified" || status === "manual_review" || status === "pending";
-}
-
-function DisabledAction({ icon, title }: { icon: React.ReactNode; title: string }) {
+function DisabledAction({ icon, title }: { icon: ReactNode; title: string }) {
   return (
     <button disabled className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left opacity-50 shadow-card">
       <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-primary">{icon}</span>
@@ -293,23 +543,6 @@ function DisabledAction({ icon, title }: { icon: React.ReactNode; title: string 
       </div>
     </button>
   );
-}
-
-function Stat({ label, value, icon }: { label: string; value: number | string; icon: React.ReactNode }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-1 text-center">
-      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-primary">{icon}</span>
-      <p className="font-display text-lg font-bold">{value}</p>
-      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
-    </div>
-  );
-}
-
-function toDateInputValue(value: string | undefined) {
-  if (!value) return undefined;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return undefined;
-  return parsed.toISOString().slice(0, 10);
 }
 
 export function SectionHeader({ title, actionTo, actionLabel }: { title: string; actionTo?: string; actionLabel?: string }) {
@@ -323,4 +556,42 @@ export function SectionHeader({ title, actionTo, actionLabel }: { title: string;
       )}
     </div>
   );
+}
+
+function statusLabel(status: string | undefined) {
+  if (status === "verified") return "Verified";
+  if (status === "manual_review" || status === "pending") return "Pending review";
+  if (status === "failed") return "Failed";
+  return "Not started";
+}
+
+function statusAccepted(status: string | undefined) {
+  return status === "verified" || status === "manual_review" || status === "pending";
+}
+
+function formatContributionStatus(status: string) {
+  if (status === "late") return "overdue";
+  return status.replace("_", " ");
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return "not set";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "not set";
+  return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function toDateInputValue(value: string | null | undefined) {
+  if (!value) return undefined;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  return parsed.toISOString().slice(0, 10);
+}
+
+function daysUntil(value: string | null | undefined) {
+  if (!value) return Number.POSITIVE_INFINITY;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return Number.POSITIVE_INFINITY;
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.ceil((parsed.getTime() - Date.now()) / msPerDay);
 }
