@@ -9,6 +9,7 @@ import {
   generateCirclePayoutRotation,
   getCircleById,
   getCircleMembership,
+  initiateHubtelContributionPayment,
   listCirclePayoutRotation,
   listCircleContributions,
   listCircleMembers,
@@ -58,6 +59,8 @@ function CircleDetails() {
   const [isGeneratingSchedule, setIsGeneratingSchedule] = useState(false);
   const [isUpdatingRotation, setIsUpdatingRotation] = useState(false);
   const [markingContributionId, setMarkingContributionId] = useState<string | null>(null);
+  const [initiatingPaymentId, setInitiatingPaymentId] = useState<string | null>(null);
+  const [paymentNotice, setPaymentNotice] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -182,6 +185,23 @@ function CircleDetails() {
     }
 
     setMessage("Contribution marked as paid for testing.");
+    await loadCircle();
+  }
+
+  async function handleInitiatePayment(contribution: CircleContributionStatus) {
+    setMessage("");
+    setError("");
+    setPaymentNotice("");
+    setInitiatingPaymentId(contribution.contribution_id);
+    const { data, error: paymentError } = await initiateHubtelContributionPayment(contribution.contribution_id);
+    setInitiatingPaymentId(null);
+
+    if (paymentError) {
+      setError(paymentError.message);
+      return;
+    }
+
+    setPaymentNotice(`Hubtel payment integration is being prepared. Reference: ${data?.provider_reference ?? "pending"}`);
     await loadCircle();
   }
 
@@ -340,6 +360,7 @@ function CircleDetails() {
             <Notice tone="danger" text="You have been removed from this circle." />
           )}
           {message && <Notice tone="success" text={message} />}
+          {paymentNotice && <Notice tone="success" text={paymentNotice} />}
 
           <div className="grid grid-cols-5 gap-2 px-5 pt-4">
             <TabButton active={tab === "overview"} icon={<WalletCards className="h-4 w-4" />} label="Overview" onClick={() => setTab("overview")} />
@@ -418,6 +439,17 @@ function CircleDetails() {
                       </div>
                       <p className="mt-1 text-[11px] text-muted-foreground">Expected {formatCurrency(Number(contribution.expected_amount ?? amount), currency)} - due {formatDate(contribution.due_date)}</p>
                       <p className="mt-1 text-[11px] text-muted-foreground">Paid at {formatDate(contribution.paid_at)} - ref {contribution.payment_reference ?? "none"}</p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">Payment {contribution.payment_status ?? "not initiated"} - provider {contribution.payment_provider ?? "none"}</p>
+                      {user?.id === contribution.user_id && ["unpaid", "overdue", "pending"].includes(contribution.status) && (
+                        <button
+                          onClick={() => handleInitiatePayment(contribution)}
+                          disabled={initiatingPaymentId === contribution.contribution_id}
+                          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2 text-[11px] font-semibold text-primary-foreground disabled:opacity-60"
+                        >
+                          {initiatingPaymentId === contribution.contribution_id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                          Pay Contribution
+                        </button>
+                      )}
                       {isAdmin && contribution.status !== "paid" && (
                         <button
                           onClick={() => handleMarkPaid(contribution)}

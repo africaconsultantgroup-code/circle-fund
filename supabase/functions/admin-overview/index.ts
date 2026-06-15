@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
     }, 403);
   }
 
-  const [profilesResult, verificationsResult, circlesResult, membersResult, auditLogsResult, staffInvitationsResult, authUsers] = await Promise.all([
+  const [profilesResult, verificationsResult, circlesResult, membersResult, paymentTransactionsResult, auditLogsResult, staffInvitationsResult, authUsers] = await Promise.all([
     serviceClient
       .from("profiles")
       .select("user_id, full_name, phone, country, preferred_currency, account_status, profile_completed, role, created_at")
@@ -54,6 +54,11 @@ Deno.serve(async (req) => {
       .select("id, circle_id, user_id, role, status, joined_at, approved_at, approved_by")
       .order("joined_at", { ascending: false }),
     serviceClient
+      .from("payment_transactions")
+      .select("id, user_id, circle_id, contribution_id, amount, currency, payment_method, provider, provider_reference, status, provider_response, created_at, updated_at")
+      .order("created_at", { ascending: false })
+      .limit(200),
+    serviceClient
       .from("audit_logs")
       .select("id, staff_user_id, action, target_type, target_id, notes, metadata, created_at")
       .order("created_at", { ascending: false })
@@ -69,6 +74,7 @@ Deno.serve(async (req) => {
   if (verificationsResult.error) return json({ error: verificationsResult.error.message }, 500);
   if (circlesResult.error) return json({ error: circlesResult.error.message }, 500);
   if (membersResult.error) return json({ error: membersResult.error.message }, 500);
+  if (paymentTransactionsResult.error) return json({ error: paymentTransactionsResult.error.message }, 500);
   if (auditLogsResult.error) return json({ error: auditLogsResult.error.message }, 500);
   if (staffInvitationsResult.error) return json({ error: staffInvitationsResult.error.message }, 500);
   if (authUsers.error) return json({ error: authUsers.error.message }, 500);
@@ -77,6 +83,7 @@ Deno.serve(async (req) => {
   const verifications = verificationsResult.data ?? [];
   const circles = circlesResult.data ?? [];
   const members = membersResult.data ?? [];
+  const paymentTransactions = paymentTransactionsResult.data ?? [];
   const auditLogs = auditLogsResult.data ?? [];
   const staffInvitations = staffInvitationsResult.data ?? [];
   const authByUser = new Map(authUsers.data.users.map((authUser) => [authUser.id, authUser]));
@@ -148,6 +155,17 @@ Deno.serve(async (req) => {
     verifications,
     circles: circleSummaries,
     circleMembers: members,
+    paymentTransactions: paymentTransactions.map((transaction) => {
+      const profile = profileByUser.get(transaction.user_id);
+      const authUser = authByUser.get(transaction.user_id);
+      const circle = circles.find((item) => item.id === transaction.circle_id);
+      return {
+        ...transaction,
+        userName: profile?.full_name ?? authUser?.email ?? null,
+        userEmail: authUser?.email ?? null,
+        circleName: circle?.name ?? null,
+      };
+    }),
     auditLogs: auditLogs.map((log) => {
       const staffProfile = log.staff_user_id ? profileByUser.get(log.staff_user_id) : null;
       const staffAuth = log.staff_user_id ? authByUser.get(log.staff_user_id) : null;

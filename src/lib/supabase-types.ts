@@ -18,6 +18,7 @@ export type PersonalSusuFrequency = 'daily' | 'weekly' | 'biweekly' | 'monthly';
 export type PersonalSusuDurationUnit = 'weeks' | 'months';
 export type PersonalSusuPlanStatus = 'active' | 'completed' | 'cancelled';
 export type PersonalSusuPaymentStatus = 'pending' | 'paid' | 'failed';
+export type PaymentTransactionStatus = 'initiated' | 'pending' | 'successful' | 'failed' | 'cancelled' | 'reversed';
 
 export interface Database {
   public: {
@@ -426,6 +427,111 @@ export interface Database {
           updated_at?: string;
         };
       };
+      payment_transactions: {
+        Row: {
+          id: string;
+          user_id: string;
+          circle_id: string | null;
+          contribution_id: string | null;
+          amount: number;
+          currency: string;
+          payment_method: string | null;
+          provider: string;
+          provider_reference: string | null;
+          status: PaymentTransactionStatus;
+          provider_response: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          circle_id?: string | null;
+          contribution_id?: string | null;
+          amount: number;
+          currency?: string;
+          payment_method?: string | null;
+          provider?: string;
+          provider_reference?: string | null;
+          status?: PaymentTransactionStatus;
+          provider_response?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          circle_id?: string | null;
+          contribution_id?: string | null;
+          amount?: number;
+          currency?: string;
+          payment_method?: string | null;
+          provider?: string;
+          provider_reference?: string | null;
+          status?: PaymentTransactionStatus;
+          provider_response?: Json;
+          updated_at?: string;
+        };
+      };
+      contribution_payments: {
+        Row: {
+          id: string;
+          contribution_id: string;
+          payment_transaction_id: string;
+          user_id: string;
+          circle_id: string | null;
+          amount: number;
+          status: PaymentTransactionStatus;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          contribution_id: string;
+          payment_transaction_id: string;
+          user_id: string;
+          circle_id?: string | null;
+          amount: number;
+          status?: PaymentTransactionStatus;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          amount?: number;
+          status?: PaymentTransactionStatus;
+          updated_at?: string;
+        };
+      };
+      payment_webhook_events: {
+        Row: {
+          id: string;
+          provider: string;
+          provider_reference: string | null;
+          event_type: string | null;
+          payload: Json;
+          processing_status: string;
+          processing_error: string | null;
+          created_at: string;
+          processed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          provider?: string;
+          provider_reference?: string | null;
+          event_type?: string | null;
+          payload?: Json;
+          processing_status?: string;
+          processing_error?: string | null;
+          created_at?: string;
+          processed_at?: string | null;
+        };
+        Update: {
+          provider_reference?: string | null;
+          event_type?: string | null;
+          payload?: Json;
+          processing_status?: string;
+          processing_error?: string | null;
+          processed_at?: string | null;
+        };
+      };
       transactions: {
         Row: {
           id: string;
@@ -636,6 +742,10 @@ export interface Database {
           status: string;
           paid_at: string | null;
           payment_reference: string | null;
+          payment_transaction_id: string | null;
+          payment_status: string | null;
+          payment_provider: string | null;
+          payment_created_at: string | null;
         }>;
       };
       generate_circle_contribution_schedule: {
@@ -645,6 +755,14 @@ export interface Database {
       mark_contribution_paid_for_testing: {
         Args: { check_contribution_id: string; payment_reference?: string | null };
         Returns: Database['public']['Tables']['contributions']['Row'];
+      };
+      initiate_hubtel_contribution_payment: {
+        Args: { check_contribution_id: string };
+        Returns: Database['public']['Tables']['payment_transactions']['Row'];
+      };
+      record_hubtel_payment_webhook: {
+        Args: { payload: Json };
+        Returns: Database['public']['Tables']['payment_webhook_events']['Row'];
       };
       circle_rotation_is_locked: {
         Args: { check_circle_id: string };

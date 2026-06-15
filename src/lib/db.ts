@@ -9,6 +9,7 @@ export type CircleMember = Database['public']['Tables']['circle_members']['Row']
 export type UserVerification = Database['public']['Tables']['user_verifications']['Row'];
 export type Contribution = Database['public']['Tables']['contributions']['Row'];
 export type Payout = Database['public']['Tables']['payouts']['Row'];
+export type PaymentTransaction = Database['public']['Tables']['payment_transactions']['Row'];
 export type PayoutRotationItem = Database['public']['Functions']['get_circle_payout_rotation']['Returns'][number];
 export type Transaction = Database['public']['Tables']['transactions']['Row'];
 export type PersonalSusuPlan = Database['public']['Tables']['personal_susu_plans']['Row'];
@@ -383,6 +384,12 @@ export async function markContributionPaidForTesting(contributionId: string, pay
   return supabase.rpc('mark_contribution_paid_for_testing', {
     check_contribution_id: contributionId,
     payment_reference: paymentReference ?? null,
+  });
+}
+
+export async function initiateHubtelContributionPayment(contributionId: string) {
+  return supabase.rpc('initiate_hubtel_contribution_payment', {
+    check_contribution_id: contributionId,
   });
 }
 

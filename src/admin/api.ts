@@ -72,6 +72,25 @@ export type AdminAuditLog = {
   created_at: string;
 };
 
+export type AdminPaymentTransaction = {
+  id: string;
+  user_id: string;
+  circle_id: string | null;
+  contribution_id: string | null;
+  amount: number;
+  currency: string;
+  payment_method: string | null;
+  provider: string;
+  provider_reference: string | null;
+  status: string;
+  provider_response: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  userName?: string | null;
+  userEmail?: string | null;
+  circleName?: string | null;
+};
+
 export type StaffInvitation = {
   id: string;
   email: string;
@@ -102,6 +121,7 @@ export type AdminOverview = {
     approved_by: string | null;
   }>;
   auditLogs: AdminAuditLog[];
+  paymentTransactions: AdminPaymentTransaction[];
   staffInvitations: StaffInvitation[];
 };
 
