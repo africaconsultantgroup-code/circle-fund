@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -9,6 +9,7 @@ import {
   CircleDollarSign,
   Clock,
   LogIn,
+  Loader2,
   PiggyBank,
   Plus,
   ShieldAlert,
@@ -17,9 +18,18 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
+import { PaymentPreparationModal } from "@/components/payment-preparation-modal";
 import { SavingsPlanner } from "@/components/savings-planner";
 import { getCurrentUser, getCurrentUserProfile, type UserProfile } from "@/lib/auth";
-import { listPersonalSusuDeposits, listPersonalSusuPlans, type Contribution, type PaymentTransaction, type Payout } from "@/lib/db";
+import {
+  initiateHubtelContributionPayment,
+  initiatePlaceholderPayment,
+  listPersonalSusuDeposits,
+  listPersonalSusuPlans,
+  type Contribution,
+  type PaymentTransaction,
+  type Payout,
+} from "@/lib/db";
 import { formatCurrency } from "@/lib/diaspora";
 import { buildPlanMetrics } from "@/lib/piggy-bag";
 import { supabase } from "@/lib/supabase";
@@ -49,6 +59,17 @@ type NotificationItem = {
   title: string;
   body: string;
   tone: "primary" | "gold" | "success";
+  priority: "high" | "medium" | "low";
+};
+
+type CircleFinancialSummary = {
+  circleId: string;
+  myPosition: number | null;
+  expectedPayoutDate: string | null;
+  expectedPayoutAmount: number | null;
+  contributionProgress: number;
+  paidContributions: number;
+  totalContributions: number;
 };
 
 type DashboardData = {
@@ -60,6 +81,7 @@ type DashboardData = {
   piggyBoxBalance: number;
   savingsPlanBalance: number;
   nextPayout: PayoutTurn | null;
+  circleFinancials: Record<string, CircleFinancialSummary>;
   notifications: NotificationItem[];
   error: string | null;
 };
@@ -73,6 +95,7 @@ const emptyDashboard: DashboardData = {
   piggyBoxBalance: 0,
   savingsPlanBalance: 0,
   nextPayout: null,
+  circleFinancials: {},
   notifications: [],
   error: null,
 };
@@ -81,12 +104,19 @@ export function HomePage() {
   const [dashboard, setDashboard] = useState<DashboardData>(emptyDashboard);
   const [gateSummary, setGateSummary] = useState<VerificationGateSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [busyPayment, setBusyPayment] = useState("");
+  const [paymentTransaction, setPaymentTransaction] = useState<PaymentTransaction | null>(null);
+  const [paymentError, setPaymentError] = useState("");
 
   const canUseCircles = Boolean(gateSummary?.canUseCircleActions);
   const nextContribution = dashboard.upcomingContributions[0] ?? null;
   const primaryCurrency = (nextContribution?.circles?.base_currency ?? dashboard.circles[0]?.baseCurrency ?? "GHS") as CurrencyCode;
   const totalFinancialPosition = dashboard.totalContributed + dashboard.piggyBoxBalance + dashboard.savingsPlanBalance;
   const unread = dashboard.notifications.length;
+  const activeCreatorCircles = dashboard.circles.filter((circle) => circle.isCreator && circle.membershipStatus === "approved").length;
+  const activeParticipationCircles = dashboard.circles.filter((circle) => ["pending", "approved"].includes(circle.membershipStatus)).length;
+  const creatorLimitReached = activeCreatorCircles >= 2;
+  const participationReviewNeeded = activeParticipationCircles >= 3;
 
   const loadDashboard = useCallback(async () => {
     setIsLoading(true);
@@ -115,6 +145,66 @@ export function HomePage() {
   }, [loadDashboard]);
 
   const greetingName = dashboard.profile?.full_name?.split(" ")[0] || dashboard.profile?.email?.split("@")[0] || "there";
+
+  const handlePayContribution = async (contribution: ContributionWithCircle) => {
+    setPaymentError("");
+    setBusyPayment(contribution.id);
+    const { data, error } = await initiateHubtelContributionPayment(contribution.id);
+    setBusyPayment("");
+
+    if (error || !data) {
+      setPaymentError(error?.message ?? "We could not prepare this contribution payment.");
+      return;
+    }
+
+    setPaymentTransaction(data);
+    void loadDashboard();
+  };
+
+  const handleFundPiggyBox = async () => {
+    setPaymentError("");
+    setBusyPayment("piggy_box");
+    const { data, error } = await initiatePlaceholderPayment({
+      paymentType: "piggy_bag",
+      amount: 100,
+      currency: "GHS",
+      metadata: { source: "customer_dashboard", label: "quick_piggy_box_funding" },
+    });
+    setBusyPayment("");
+
+    if (error || !data) {
+      setPaymentError(error?.message ?? "We could not prepare Piggy Box funding.");
+      return;
+    }
+
+    setPaymentTransaction(data);
+    void loadDashboard();
+  };
+
+  const handleFundSavingsPlan = async () => {
+    const amount = Number(nextContribution?.amount_due ?? nextContribution?.amount ?? dashboard.circles[0]?.amount ?? 100);
+    setPaymentError("");
+    setBusyPayment("savings_plan");
+    const { data, error } = await initiatePlaceholderPayment({
+      paymentType: "savings",
+      amount,
+      currency: primaryCurrency,
+      metadata: {
+        source: "customer_dashboard",
+        label: "quick_savings_plan_funding",
+        contributionId: nextContribution?.id ?? null,
+      },
+    });
+    setBusyPayment("");
+
+    if (error || !data) {
+      setPaymentError(error?.message ?? "We could not prepare savings plan funding.");
+      return;
+    }
+
+    setPaymentTransaction(data);
+    void loadDashboard();
+  };
 
   return (
     <div className="flex flex-col pb-8">
@@ -153,6 +243,11 @@ export function HomePage() {
             {dashboard.error}
           </div>
         )}
+        {paymentError && (
+          <div className="mb-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            {paymentError}
+          </div>
+        )}
         <VerificationStatusCard gateSummary={gateSummary} />
       </section>
 
@@ -162,25 +257,49 @@ export function HomePage() {
           label="Piggy Box Balance"
           value={formatCurrency(dashboard.piggyBoxBalance, "GHS")}
           emptyText="No locked Piggy Box savings yet."
+          actionLabel="Fund Piggy Box"
+          loading={busyPayment === "piggy_box"}
+          onAction={handleFundPiggyBox}
         />
         <BalanceCard
           icon={<Target className="h-4 w-4" />}
           label="Savings Plan Balance"
           value={formatCurrency(dashboard.savingsPlanBalance, "GHS")}
           emptyText="No savings plan payments prepared yet."
+          actionLabel="Fund Savings Plan"
+          loading={busyPayment === "savings_plan"}
+          onAction={handleFundSavingsPlan}
         />
+      </section>
+
+      <section className="mt-5 px-5">
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+          <div className="flex items-center gap-2 text-primary">
+            <Wallet className="h-4 w-4" />
+            <h2 className="font-display text-sm font-semibold">Detailed balance breakdown</h2>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <BreakdownMetric label="Total contributed" value={formatCurrency(dashboard.totalContributed, primaryCurrency)} />
+            <BreakdownMetric label="Total received" value={formatCurrency(dashboard.totalReceived, primaryCurrency)} />
+            <BreakdownMetric label="Piggy Box" value={formatCurrency(dashboard.piggyBoxBalance, "GHS")} />
+            <BreakdownMetric label="Savings plan" value={formatCurrency(dashboard.savingsPlanBalance, primaryCurrency)} />
+          </div>
+        </div>
       </section>
 
       <section className="mt-5 grid grid-cols-2 gap-3 px-5">
         {canUseCircles ? (
           <>
-            <Link to="/create-circle" className="flex items-center gap-3 rounded-2xl bg-gradient-primary p-4 text-primary-foreground shadow-card">
+            <Link
+              to="/create-circle"
+              className={`flex items-center gap-3 rounded-2xl p-4 shadow-card ${creatorLimitReached ? "pointer-events-none border border-border bg-card text-muted-foreground opacity-60" : "bg-gradient-primary text-primary-foreground"}`}
+            >
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15">
                 <Plus className="h-5 w-5" />
               </span>
               <div>
                 <p className="font-display text-sm font-semibold">Create</p>
-                <p className="text-[11px] text-primary-foreground/70">New circle</p>
+                <p className={`text-[11px] ${creatorLimitReached ? "text-muted-foreground" : "text-primary-foreground/70"}`}>{creatorLimitReached ? "2 admin limit reached" : "New circle"}</p>
               </div>
             </Link>
             <Link to="/join-circle" className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-card">
@@ -200,6 +319,16 @@ export function HomePage() {
           </>
         )}
       </section>
+
+      {(creatorLimitReached || participationReviewNeeded) && (
+        <section className="mt-3 px-5">
+          <div className="rounded-2xl border border-gold/40 bg-gold/10 p-4 text-[color:var(--gold-foreground)]">
+            <p className="font-display text-sm font-semibold">Circle capacity rules</p>
+            {creatorLimitReached && <p className="mt-1 text-xs">You can only administer 2 active susu groups at a time.</p>}
+            {participationReviewNeeded && <p className="mt-1 text-xs">You are already in 3 active susu groups. New join requests may need SikaCircle capacity review.</p>}
+          </div>
+        </section>
+      )}
 
       <section className="mt-7 px-5">
         <SectionHeader title="Next Payout Date" actionTo="/circles" actionLabel="View circles" />
@@ -236,6 +365,15 @@ export function HomePage() {
                     </div>
                     <p className="font-display text-sm font-semibold">{formatCurrency(Number(contribution.amount_due ?? contribution.amount ?? 0), currency)}</p>
                   </div>
+                  <button
+                    type="button"
+                    disabled={busyPayment === contribution.id}
+                    onClick={() => handlePayContribution(contribution)}
+                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                  >
+                    {busyPayment === contribution.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
+                    Pay Contribution
+                  </button>
                 </li>
               );
             })}
@@ -263,6 +401,7 @@ export function HomePage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-display text-sm font-semibold">{circle.name}</p>
+                    <CircleProgressDetails circle={circle} financial={dashboard.circleFinancials[circle.id]} />
                     <p className="text-[11px] text-muted-foreground">
                       {circle.memberCount}/{circle.maxMembers} members · {formatCurrency(circle.amount, circle.baseCurrency)}/{circle.frequency}
                     </p>
@@ -283,7 +422,10 @@ export function HomePage() {
           <ul className="mt-3 flex flex-col gap-2">
             {dashboard.notifications.map((notification) => (
               <li key={notification.id} className="rounded-2xl border border-border bg-card p-4 shadow-card">
-                <p className="font-display text-sm font-semibold">{notification.title}</p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-display text-sm font-semibold">{notification.title}</p>
+                  <PriorityPill priority={notification.priority} />
+                </div>
                 <p className="mt-1 text-[11px] text-muted-foreground">{notification.body}</p>
               </li>
             ))}
@@ -292,6 +434,13 @@ export function HomePage() {
           <EmptyState icon={<Bell className="h-4 w-4" />} text="No notifications yet." />
         )}
       </section>
+
+      <PaymentPreparationModal
+        open={Boolean(paymentTransaction)}
+        transaction={paymentTransaction}
+        title="Payment prepared"
+        onClose={() => setPaymentTransaction(null)}
+      />
     </div>
   );
 }
@@ -302,13 +451,17 @@ async function loadFinancialDashboard(): Promise<DashboardData> {
     return { ...emptyDashboard, error: "Please sign in to view your financial dashboard." };
   }
 
-  const [upcomingResult, paidContributionsResult, payoutsResult, savingsTransactionsResult, piggyResult, payoutTurnResult] = await Promise.all([
+  const [upcomingResult, allContributionsResult, paidContributionsResult, payoutsResult, savingsTransactionsResult, piggyResult, payoutTurnResult, payoutTurnsResult] = await Promise.all([
     supabase
       .from("contributions")
       .select("*, circles(id, name, base_currency)")
       .eq("user_id", user.id)
       .in("status", ["pending", "unpaid", "overdue", "late", "failed"])
       .order("due_date", { ascending: true }),
+    supabase
+      .from("contributions")
+      .select("circle_id, status")
+      .eq("user_id", user.id),
     supabase
       .from("contributions")
       .select("amount, amount_due, status")
@@ -327,16 +480,19 @@ async function loadFinancialDashboard(): Promise<DashboardData> {
       .in("status", ["initiated", "pending", "successful"]),
     loadPiggyBalance(user.id),
     loadNextPayoutTurn(user.id),
+    loadPayoutTurns(user.id),
   ]);
 
   const errors = [
     circleResult.error,
     upcomingResult.error?.message,
+    allContributionsResult.error?.message,
     paidContributionsResult.error?.message,
     payoutsResult.error?.message,
     savingsTransactionsResult.error?.message,
     piggyResult.error,
     payoutTurnResult.error,
+    payoutTurnsResult.error,
   ].filter(Boolean);
 
   const totalContributed = (paidContributionsResult.data ?? []).reduce(
@@ -355,10 +511,12 @@ async function loadFinancialDashboard(): Promise<DashboardData> {
     piggyBoxBalance: piggyResult.balance,
     savingsPlanBalance,
     nextPayout: payoutTurnResult.data,
+    circleFinancials: buildCircleFinancials(circleResult.data, allContributionsResult.data ?? [], payoutTurnsResult.data),
     notifications: buildNotifications({
       upcomingContributions: (upcomingResult.data ?? []) as ContributionWithCircle[],
       nextPayout: payoutTurnResult.data,
       piggyBoxBalance: piggyResult.balance,
+      participationReviewNeeded: circleResult.data.filter((circle) => ["pending", "approved"].includes(circle.membershipStatus)).length >= 3,
     }),
     error: errors.length > 0 ? errors.join(" ") : null,
   };
@@ -416,14 +574,63 @@ async function loadNextPayoutTurn(userId: string) {
   };
 }
 
+async function loadPayoutTurns(userId: string) {
+  const { data, error } = await supabase
+    .from("payout_schedule")
+    .select("id, circle_id, rotation_position, payout_due_date, payout_amount, status, circle_members!inner(user_id)")
+    .eq("circle_members.user_id", userId);
+
+  if (error) return { data: [] as Array<PayoutTurn & { rotation_position: number }>, error: error.message };
+
+  return {
+    data: (data ?? []).map((row) => ({
+      schedule_id: row.id,
+      circle_id: row.circle_id,
+      circle_name: null,
+      payout_due_date: row.payout_due_date,
+      payout_amount: Number(row.payout_amount ?? 0),
+      status: row.status,
+      rotation_position: Number(row.rotation_position ?? 0),
+    })),
+    error: null,
+  };
+}
+
+function buildCircleFinancials(
+  circles: UserCircle[],
+  contributionRows: Array<{ circle_id: string; status: string }>,
+  payoutTurns: Array<PayoutTurn & { rotation_position: number }>,
+) {
+  return circles.reduce<Record<string, CircleFinancialSummary>>((acc, circle) => {
+    const contributions = contributionRows.filter((row) => row.circle_id === circle.id);
+    const paidContributions = contributions.filter((row) => ["paid", "processed"].includes(row.status)).length;
+    const totalContributions = contributions.length;
+    const payoutTurn = payoutTurns.find((turn) => turn.circle_id === circle.id);
+
+    acc[circle.id] = {
+      circleId: circle.id,
+      myPosition: payoutTurn?.rotation_position || null,
+      expectedPayoutDate: payoutTurn?.payout_due_date ?? null,
+      expectedPayoutAmount: payoutTurn?.payout_amount ?? null,
+      contributionProgress: totalContributions > 0 ? Math.round((paidContributions / totalContributions) * 100) : 0,
+      paidContributions,
+      totalContributions,
+    };
+
+    return acc;
+  }, {});
+}
+
 function buildNotifications({
   upcomingContributions,
   nextPayout,
   piggyBoxBalance,
+  participationReviewNeeded,
 }: {
   upcomingContributions: ContributionWithCircle[];
   nextPayout: PayoutTurn | null;
   piggyBoxBalance: number;
+  participationReviewNeeded: boolean;
 }) {
   const items: NotificationItem[] = [];
   const dueSoon = upcomingContributions.find((contribution) => daysUntil(contribution.due_date) <= 7);
@@ -434,6 +641,7 @@ function buildNotifications({
       title: "Contribution due soon",
       body: `${dueSoon.circles?.name ?? "A circle"} has a contribution due ${formatDate(dueSoon.due_date)}.`,
       tone: "gold",
+      priority: daysUntil(dueSoon.due_date) <= 2 ? "high" : "medium",
     });
   }
 
@@ -443,6 +651,7 @@ function buildNotifications({
       title: "Payout turn scheduled",
       body: `${nextPayout.circle_name ?? "Your circle"} payout is scheduled for ${formatDate(nextPayout.payout_due_date)}.`,
       tone: "success",
+      priority: "medium",
     });
   }
 
@@ -452,10 +661,21 @@ function buildNotifications({
       title: "Piggy Box balance updated",
       body: `${formatCurrency(piggyBoxBalance, "GHS")} is tracked in your Piggy Box.`,
       tone: "primary",
+      priority: "low",
     });
   }
 
-  return items.slice(0, 4);
+  if (participationReviewNeeded) {
+    items.push({
+      id: "capacity-review-rule",
+      title: "Capacity review may apply",
+      body: "You are in 3 active susu groups. Any new join request may need SikaCircle review.",
+      tone: "gold",
+      priority: "medium",
+    });
+  }
+
+  return items.sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority)).slice(0, 4);
 }
 
 function VerificationStatusCard({ gateSummary }: { gateSummary: VerificationGateSummary | null }) {
@@ -500,7 +720,23 @@ function SummaryTile({ icon, label, value }: { icon: ReactNode; label: string; v
   );
 }
 
-function BalanceCard({ icon, label, value, emptyText }: { icon: ReactNode; label: string; value: string; emptyText: string }) {
+function BalanceCard({
+  icon,
+  label,
+  value,
+  emptyText,
+  actionLabel,
+  loading,
+  onAction,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  emptyText: string;
+  actionLabel?: string;
+  loading?: boolean;
+  onAction?: () => void;
+}) {
   const isEmpty = value.includes("0.00") || value.endsWith("0");
 
   return (
@@ -511,7 +747,68 @@ function BalanceCard({ icon, label, value, emptyText }: { icon: ReactNode; label
       </div>
       <p className="mt-2 font-display text-lg font-semibold">{value}</p>
       {isEmpty && <p className="mt-1 text-[11px] text-muted-foreground">{emptyText}</p>}
+      {actionLabel && onAction && (
+        <button
+          type="button"
+          disabled={loading}
+          onClick={onAction}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-secondary px-3 py-2 text-[11px] font-semibold text-primary disabled:opacity-60"
+        >
+          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wallet className="h-3.5 w-3.5" />}
+          {actionLabel}
+        </button>
+      )}
     </div>
+  );
+}
+
+function BreakdownMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-muted/40 px-3 py-2">
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-xs font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function CircleProgressDetails({ circle, financial }: { circle: UserCircle; financial?: CircleFinancialSummary }) {
+  const progress = financial?.contributionProgress ?? 0;
+
+  return (
+    <div className="mt-2">
+      <div className="grid grid-cols-2 gap-1.5">
+        <MiniMetric label="My Position" value={financial?.myPosition ? `#${financial.myPosition}` : "Not set"} />
+        <MiniMetric label="Expected Payout" value={formatDate(financial?.expectedPayoutDate ?? circle.nextPayoutDate)} />
+        <MiniMetric label="Members" value={`${circle.memberCount}/${circle.maxMembers}`} />
+        <MiniMetric label="Progress" value={`${progress}%`} />
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+        <div className="h-full rounded-full bg-gradient-primary" style={{ width: `${progress}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-muted/40 px-2 py-1.5">
+      <p className="text-[9px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-0.5 truncate text-[11px] font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function PriorityPill({ priority }: { priority: NotificationItem["priority"] }) {
+  const classes = priority === "high"
+    ? "bg-destructive/10 text-destructive"
+    : priority === "medium"
+      ? "bg-gold/15 text-[color:var(--gold-foreground)]"
+      : "bg-secondary text-primary";
+
+  return (
+    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${classes}`}>
+      {priority}
+    </span>
   );
 }
 
@@ -594,4 +891,10 @@ function daysUntil(value: string | null | undefined) {
   if (Number.isNaN(parsed.getTime())) return Number.POSITIVE_INFINITY;
   const msPerDay = 24 * 60 * 60 * 1000;
   return Math.ceil((parsed.getTime() - Date.now()) / msPerDay);
+}
+
+function priorityRank(priority: NotificationItem["priority"]) {
+  if (priority === "high") return 1;
+  if (priority === "medium") return 2;
+  return 3;
 }

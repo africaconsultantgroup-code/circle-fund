@@ -20,9 +20,14 @@ export type UserCircle = {
   nextRecipient: string;
   nextPayoutDate: string;
   inviteToken: string | null;
+  membershipRole: string;
+  membershipStatus: string;
+  isCreator: boolean;
 };
 
 type CircleMembershipRow = {
+  role: string | null;
+  status: string | null;
   circles: Circle | Circle[] | null;
 };
 
@@ -43,6 +48,9 @@ export function mockUserCircles(): UserCircle[] {
     nextRecipient: circle.nextRecipient,
     nextPayoutDate: circle.nextPayoutDate,
     inviteToken: circle.inviteCode,
+    membershipRole: "member",
+    membershipStatus: "approved",
+    isCreator: false,
   }));
 }
 
@@ -61,12 +69,16 @@ export async function loadUserCircles(): Promise<{ data: UserCircle[]; error: st
     return { data: [], error: error.message };
   }
 
-  const circles = ((data ?? []) as CircleMembershipRow[])
-    .map((row) => Array.isArray(row.circles) ? row.circles[0] : row.circles)
-    .filter((circle): circle is Circle => Boolean(circle));
+  const rows = ((data ?? []) as CircleMembershipRow[])
+    .map((row) => ({
+      circle: Array.isArray(row.circles) ? row.circles[0] : row.circles,
+      role: row.role ?? "member",
+      status: row.status ?? "pending",
+    }))
+    .filter((row): row is { circle: Circle; role: string; status: string } => Boolean(row.circle));
 
   const mapped = await Promise.all(
-    circles.map(async (circle) => {
+    rows.map(async ({ circle, role, status }) => {
       const userCircle = toUserCircle(circle);
       const [approvedResult, pendingResult] = await Promise.all([
         countCircleMembers(circle.id),
@@ -76,6 +88,9 @@ export async function loadUserCircles(): Promise<{ data: UserCircle[]; error: st
         ...userCircle,
         memberCount: approvedResult.count ?? userCircle.memberCount,
         pendingMemberCount: pendingResult.count ?? 0,
+        membershipRole: role,
+        membershipStatus: status,
+        isCreator: role === "creator" || circle.owner_id === user.id,
       };
     }),
   );
@@ -104,6 +119,9 @@ export function toUserCircle(circle: Circle): UserCircle {
     nextRecipient: "Pending",
     nextPayoutDate: circle.start_date ? new Date(circle.start_date).toLocaleDateString() : "Not set",
     inviteToken: circle.invite_code ?? circle.invite_token ?? null,
+    membershipRole: "member",
+    membershipStatus: "pending",
+    isCreator: false,
   };
 }
 
