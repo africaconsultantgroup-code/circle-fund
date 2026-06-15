@@ -98,7 +98,9 @@ export function JoinCirclePage() {
         return;
       }
 
-      setSuccess("Join request sent. Opening circle details.");
+      setSuccess(data.requires_capacity_review
+        ? "You are already in 3 active susu groups. SikaCircle needs to review your capacity before approving this request."
+        : "Join request sent. Opening circle details.");
       setTimeout(() => navigate({ to: "/circle/$id", params: { id: data.circle_id } }), 700);
     } catch (error) {
       setJoinError(error instanceof Error ? error.message : "We could not join this circle. Please try again.");

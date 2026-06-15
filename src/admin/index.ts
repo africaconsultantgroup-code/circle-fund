@@ -8,4 +8,6 @@ export { AdminSectionPage } from "@/admin/pages/AdminSectionPage";
 export { AuditLogPage } from "@/admin/pages/AuditLogPage";
 export { RoleManagement } from "@/admin/pages/RoleManagement";
 export { PaymentMonitoringPage } from "@/admin/pages/PaymentMonitoringPage";
+export { CapacityReviewPage } from "@/admin/pages/CapacityReviewPage";
+export { PayoutOperationsPage } from "@/admin/pages/PayoutOperationsPage";
 export { adminRoutes } from "@/admin/routes/AdminRoutes";

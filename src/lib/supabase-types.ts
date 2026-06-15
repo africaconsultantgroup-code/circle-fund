@@ -205,6 +205,9 @@ export interface Database {
           invited_by: string | null;
           approved_at: string | null;
           approved_by: string | null;
+          requires_capacity_review: boolean;
+          capacity_review_status: 'not_required' | 'pending' | 'approved' | 'rejected';
+          capacity_review_reason: string | null;
           created_at: string | null;
           updated_at: string | null;
         };
@@ -218,6 +221,9 @@ export interface Database {
           invited_by?: string | null;
           approved_at?: string | null;
           approved_by?: string | null;
+          requires_capacity_review?: boolean;
+          capacity_review_status?: 'not_required' | 'pending' | 'approved' | 'rejected';
+          capacity_review_reason?: string | null;
           created_at?: string | null;
           updated_at?: string | null;
         };
@@ -228,7 +234,65 @@ export interface Database {
           invited_by?: string | null;
           approved_at?: string | null;
           approved_by?: string | null;
+          requires_capacity_review?: boolean;
+          capacity_review_status?: 'not_required' | 'pending' | 'approved' | 'rejected';
+          capacity_review_reason?: string | null;
           updated_at?: string | null;
+        };
+      };
+      capacity_reviews: {
+        Row: {
+          id: string;
+          user_id: string;
+          circle_id: string;
+          member_id: string | null;
+          active_circle_count: number;
+          estimated_periodic_obligation: number;
+          requested_reason: string | null;
+          income_employment_info: string | null;
+          missed_late_contribution_count: number;
+          trust_score: number | null;
+          verification_status: string | null;
+          status: 'pending' | 'approved' | 'rejected';
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          review_notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          circle_id: string;
+          member_id?: string | null;
+          active_circle_count?: number;
+          estimated_periodic_obligation?: number;
+          requested_reason?: string | null;
+          income_employment_info?: string | null;
+          missed_late_contribution_count?: number;
+          trust_score?: number | null;
+          verification_status?: string | null;
+          status?: 'pending' | 'approved' | 'rejected';
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          review_notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          member_id?: string | null;
+          active_circle_count?: number;
+          estimated_periodic_obligation?: number;
+          requested_reason?: string | null;
+          income_employment_info?: string | null;
+          missed_late_contribution_count?: number;
+          trust_score?: number | null;
+          verification_status?: string | null;
+          status?: 'pending' | 'approved' | 'rejected';
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          review_notes?: string | null;
+          updated_at?: string;
         };
       };
       user_verifications: {
@@ -402,6 +466,10 @@ export interface Database {
           status: PayoutScheduleStatus;
           locked_at: string | null;
           locked_by: string | null;
+          automatic_attempted_at: string | null;
+          manual_attempted_at: string | null;
+          payout_reference: string | null;
+          hold_reason: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -415,6 +483,10 @@ export interface Database {
           status?: PayoutScheduleStatus;
           locked_at?: string | null;
           locked_by?: string | null;
+          automatic_attempted_at?: string | null;
+          manual_attempted_at?: string | null;
+          payout_reference?: string | null;
+          hold_reason?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -425,6 +497,10 @@ export interface Database {
           status?: PayoutScheduleStatus;
           locked_at?: string | null;
           locked_by?: string | null;
+          automatic_attempted_at?: string | null;
+          manual_attempted_at?: string | null;
+          payout_reference?: string | null;
+          hold_reason?: string | null;
           updated_at?: string;
         };
       };
@@ -682,6 +758,18 @@ export interface Database {
         Args: { check_circle_id: string };
         Returns: boolean;
       };
+      user_active_circle_admin_count: {
+        Args: { check_user_id: string };
+        Returns: number;
+      };
+      user_active_circle_count: {
+        Args: { check_user_id: string };
+        Returns: number;
+      };
+      user_periodic_obligation: {
+        Args: { check_user_id: string };
+        Returns: number;
+      };
       circle_member_count: {
         Args: { check_circle_id: string };
         Returns: number;
@@ -709,6 +797,8 @@ export interface Database {
           phone: string | null;
           country: string | null;
           preferred_currency: string | null;
+          requires_capacity_review: boolean;
+          capacity_review_status: string;
         }>;
       };
       get_circle_access: {
@@ -733,6 +823,10 @@ export interface Database {
       manage_circle_member: {
         Args: { check_membership_id: string; action: string };
         Returns: Database['public']['Tables']['circle_members']['Row'];
+      };
+      admin_manage_capacity_review: {
+        Args: { check_review_id: string; action: 'approve' | 'reject'; notes?: string | null };
+        Returns: Database['public']['Tables']['capacity_reviews']['Row'];
       };
       get_circle_contribution_status: {
         Args: { check_circle_id: string };
@@ -807,6 +901,36 @@ export interface Database {
           locked_at: string | null;
           is_current_user: boolean;
         }>;
+      };
+      list_due_payouts_for_admin: {
+        Args: Record<PropertyKey, never>;
+        Returns: Array<{
+          schedule_id: string;
+          circle_id: string;
+          circle_name: string | null;
+          member_id: string;
+          user_id: string;
+          full_name: string | null;
+          payout_due_date: string | null;
+          payout_amount: number;
+          status: string;
+          payout_reference: string | null;
+          hold_reason: string | null;
+          automatic_attempted_at: string | null;
+          manual_attempted_at: string | null;
+        }>;
+      };
+      manual_trigger_payout: {
+        Args: { check_schedule_id: string; reason: string };
+        Returns: Database['public']['Tables']['payout_schedule']['Row'];
+      };
+      place_payout_hold: {
+        Args: { check_schedule_id: string; reason: string };
+        Returns: Database['public']['Tables']['payout_schedule']['Row'];
+      };
+      release_payout_hold: {
+        Args: { check_schedule_id: string; reason?: string | null };
+        Returns: Database['public']['Tables']['payout_schedule']['Row'];
       };
       current_user_is_admin: {
         Args: Record<PropertyKey, never>;

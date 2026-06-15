@@ -19,6 +19,8 @@ export type PersonalSusuDepositInsert = Database['public']['Tables']['personal_s
 export type CircleMemberDetails = Database['public']['Functions']['get_circle_members']['Returns'][number];
 export type CircleContributionStatus = Database['public']['Functions']['get_circle_contribution_status']['Returns'][number];
 export type CircleAccess = Database['public']['Functions']['get_circle_access']['Returns'][number];
+export type CapacityReview = Database['public']['Tables']['capacity_reviews']['Row'];
+export type AdminDuePayout = Database['public']['Functions']['list_due_payouts_for_admin']['Returns'][number];
 
 export async function getProfileByUserId(userId: string) {
   return supabase.from('profiles').select('*').eq('user_id', userId).single();
@@ -204,6 +206,15 @@ export async function createCircleWithCreator(payload: CircleInsert, userId: str
     return { data: null, error: eligibilityResult.error ?? { message: 'Please sign in before creating a circle.' } };
   }
 
+  const adminCountResult = await supabase.rpc('user_active_circle_admin_count', { check_user_id: userId });
+  if (adminCountResult.error) {
+    return { data: null, error: adminCountResult.error };
+  }
+
+  if (Number(adminCountResult.data ?? 0) >= 2) {
+    return { data: null, error: { message: 'You can only administer 2 active susu groups at a time.' } };
+  }
+
   const initialInviteToken = payload.invite_code ?? payload.invite_token ?? generateInviteToken();
   let circleResult = await createCircle({
     ...payload,
@@ -248,7 +259,7 @@ export async function createCircleWithCreator(payload: CircleInsert, userId: str
 
 function describeCircleCreateError(message: string) {
   if (/row-level security|violates row-level security/i.test(message)) {
-    return 'Please sign in before creating a circle.';
+    return 'You can only administer 2 active susu groups at a time.';
   }
 
   return message || 'We could not save this circle. Please try again.';
@@ -290,12 +301,31 @@ export async function joinCircle(circleId: string, userId: string) {
     return { data: null, error: { message: 'You are already a member of this circle.' } };
   }
 
-  return createCircleMember({
+  const activeCountResult = await supabase.rpc('user_active_circle_count', { check_user_id: userId });
+  if (activeCountResult.error) {
+    return { data: null, error: activeCountResult.error };
+  }
+
+  const memberResult = await createCircleMember({
     circle_id: circleId,
     user_id: userId,
     role: 'member',
     status: 'pending',
   });
+
+  if (memberResult.error || !memberResult.data) {
+    return memberResult;
+  }
+
+  if (Number(activeCountResult.data ?? 0) >= 3 || memberResult.data.requires_capacity_review) {
+    return {
+      data: memberResult.data,
+      error: null,
+      message: 'You are already in 3 active susu groups. SikaCircle needs to review your capacity before approving this request.',
+    };
+  }
+
+  return { ...memberResult, message: 'Join request sent. Opening circle details.' };
 }
 
 export function generateInviteToken() {
@@ -428,6 +458,43 @@ export async function generateCirclePayoutRotation(circleId: string, regenerate 
 
 export async function lockCirclePayoutRotation(circleId: string) {
   return supabase.rpc('lock_circle_payout_rotation', { check_circle_id: circleId });
+}
+
+export async function listDuePayoutsForAdmin() {
+  return supabase.rpc('list_due_payouts_for_admin');
+}
+
+export async function manualTriggerPayout(scheduleId: string, reason: string) {
+  return supabase.rpc('manual_trigger_payout', {
+    check_schedule_id: scheduleId,
+    reason,
+  });
+}
+
+export async function placePayoutHold(scheduleId: string, reason: string) {
+  return supabase.rpc('place_payout_hold', {
+    check_schedule_id: scheduleId,
+    reason,
+  });
+}
+
+export async function releasePayoutHold(scheduleId: string, reason?: string | null) {
+  return supabase.rpc('release_payout_hold', {
+    check_schedule_id: scheduleId,
+    reason: reason ?? null,
+  });
+}
+
+export async function listCapacityReviews() {
+  return supabase.from('capacity_reviews').select('*').order('created_at', { ascending: false });
+}
+
+export async function manageCapacityReview(reviewId: string, action: 'approve' | 'reject', notes?: string | null) {
+  return supabase.rpc('admin_manage_capacity_review', {
+    check_review_id: reviewId,
+    action,
+    notes: notes ?? null,
+  });
 }
 
 export async function listPersonalSusuPlans(userId: string) {

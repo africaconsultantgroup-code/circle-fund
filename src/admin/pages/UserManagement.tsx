@@ -70,18 +70,23 @@ export function UserManagement() {
 
       {!isLoading && !error && (
         <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-card shadow-card">
-          <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-3 border-b border-border px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="grid grid-cols-[1.5fr_0.8fr_0.9fr_1fr_1fr] gap-3 border-b border-border px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             <span>User</span>
+            <span>Active circles</span>
             <span>Account</span>
             <span>Verification</span>
             <span>Role</span>
           </div>
           <ul className="divide-y divide-border">
             {filteredUsers.map((user) => (
-              <li key={user.userId} className="grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-3 px-4 py-3 text-sm">
+              <li key={user.userId} className="grid grid-cols-[1.5fr_0.8fr_0.9fr_1fr_1fr] items-center gap-3 px-4 py-3 text-sm">
                 <div>
                   <p className="font-medium">{user.fullName || user.email || "Unnamed user"}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">{user.email || user.userId}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-foreground">{user.activeCircleCount}</p>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">{user.activeAdminCircleCount} admin</p>
                 </div>
                 <StatusPill value={user.accountStatus} good={user.accountStatus === "active"} />
                 <StatusPill

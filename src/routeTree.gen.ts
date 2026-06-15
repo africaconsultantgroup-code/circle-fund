@@ -44,6 +44,7 @@ import { Route as AdminAdminIndexRouteImport } from './routes/_admin.admin.index
 import { Route as AdminAdminDashboardRouteImport } from './routes/_admin.admin.dashboard'
 import { Route as AdminAdminActivityRouteImport } from './routes/_admin.admin.activity'
 import { Route as AdminAdminContributionsRouteImport } from './routes/_admin.admin.contributions'
+import { Route as AdminAdminCapacityRouteImport } from './routes/_admin.admin.capacity'
 import { Route as AdminAdminCirclesRouteImport } from './routes/_admin.admin.circles'
 import { Route as AdminAdminPayoutsRouteImport } from './routes/_admin.admin.payouts'
 import { Route as AdminAdminTrustRouteImport } from './routes/_admin.admin.trust'
@@ -230,6 +231,11 @@ const AdminAdminContributionsRoute = AdminAdminContributionsRouteImport.update({
   path: '/admin/contributions',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAdminCapacityRoute = AdminAdminCapacityRouteImport.update({
+  id: '/admin/capacity',
+  path: '/admin/capacity',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminAdminCirclesRoute = AdminAdminCirclesRouteImport.update({
   id: '/admin/circles',
   path: '/admin/circles',
@@ -325,6 +331,7 @@ export interface FileRoutesByFullPath {
   '/admin/verifications': typeof AdminAdminVerificationsRoute
   '/admin/activity': typeof AdminAdminActivityRoute
   '/admin/contributions': typeof AdminAdminContributionsRoute
+  '/admin/capacity': typeof AdminAdminCapacityRoute
   '/admin/payouts': typeof AdminAdminPayoutsRoute
   '/admin/trust': typeof AdminAdminTrustRoute
   '/admin/risk': typeof AdminAdminRiskRoute
@@ -413,6 +420,7 @@ export interface FileRoutesById {
   '/_admin/admin/verifications': typeof AdminAdminVerificationsRoute
   '/_admin/admin/activity': typeof AdminAdminActivityRoute
   '/_admin/admin/contributions': typeof AdminAdminContributionsRoute
+  '/_admin/admin/capacity': typeof AdminAdminCapacityRoute
   '/_admin/admin/payouts': typeof AdminAdminPayoutsRoute
   '/_admin/admin/trust': typeof AdminAdminTrustRoute
   '/_admin/admin/risk': typeof AdminAdminRiskRoute
@@ -462,6 +470,7 @@ export interface FileRouteTypes {
     | '/admin/verifications'
     | '/admin/activity'
     | '/admin/contributions'
+    | '/admin/capacity'
     | '/admin/payouts'
     | '/admin/trust'
     | '/admin/risk'
@@ -507,6 +516,7 @@ export interface FileRouteTypes {
     | '/verify'
     | '/admin/users'
     | '/admin/verifications'
+    | '/admin/capacity'
     | '/admin/dashboard'
     | '/admin/circles'
     | '/circle/$id/approvals'
@@ -549,6 +559,7 @@ export interface FileRouteTypes {
     | '/_admin/admin/verifications'
     | '/_admin/admin/activity'
     | '/_admin/admin/contributions'
+    | '/_admin/admin/capacity'
     | '/_admin/admin/payouts'
     | '/_admin/admin/trust'
     | '/_admin/admin/risk'
@@ -866,6 +877,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdminContributionsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/_admin/admin/capacity': {
+      id: '/_admin/admin/capacity'
+      path: '/admin/capacity'
+      fullPath: '/admin/capacity'
+      preLoaderRoute: typeof AdminAdminCapacityRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/_admin/admin/payouts': {
       id: '/_admin/admin/payouts'
       path: '/admin/payouts'
@@ -932,6 +950,7 @@ interface AdminRouteChildren {
   AdminAdminVerificationsRoute: typeof AdminAdminVerificationsRoute
   AdminAdminActivityRoute: typeof AdminAdminActivityRoute
   AdminAdminContributionsRoute: typeof AdminAdminContributionsRoute
+  AdminAdminCapacityRoute: typeof AdminAdminCapacityRoute
   AdminAdminPayoutsRoute: typeof AdminAdminPayoutsRoute
   AdminAdminTrustRoute: typeof AdminAdminTrustRoute
   AdminAdminRiskRoute: typeof AdminAdminRiskRoute
@@ -949,6 +968,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAdminVerificationsRoute: AdminAdminVerificationsRoute,
   AdminAdminActivityRoute: AdminAdminActivityRoute,
   AdminAdminContributionsRoute: AdminAdminContributionsRoute,
+  AdminAdminCapacityRoute: AdminAdminCapacityRoute,
   AdminAdminPayoutsRoute: AdminAdminPayoutsRoute,
   AdminAdminTrustRoute: AdminAdminTrustRoute,
   AdminAdminRiskRoute: AdminAdminRiskRoute,

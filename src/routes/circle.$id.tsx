@@ -14,7 +14,6 @@ import {
   listCircleContributions,
   listCircleMembers,
   lockCirclePayoutRotation,
-  markContributionPaidForTesting,
   manageCircleMember,
   type Circle,
   type CircleContributionStatus,
@@ -58,7 +57,6 @@ function CircleDetails() {
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingSchedule, setIsGeneratingSchedule] = useState(false);
   const [isUpdatingRotation, setIsUpdatingRotation] = useState(false);
-  const [markingContributionId, setMarkingContributionId] = useState<string | null>(null);
   const [initiatingPaymentId, setInitiatingPaymentId] = useState<string | null>(null);
   const [paymentNotice, setPaymentNotice] = useState("");
   const [message, setMessage] = useState("");
@@ -169,22 +167,6 @@ function CircleDetails() {
     }
 
     setMessage(Number(data ?? 0) > 0 ? "Contribution schedule generated." : "Contribution schedule is already up to date.");
-    await loadCircle();
-  }
-
-  async function handleMarkPaid(contribution: CircleContributionStatus) {
-    setMessage("");
-    setError("");
-    setMarkingContributionId(contribution.contribution_id);
-    const { error: markError } = await markContributionPaidForTesting(contribution.contribution_id);
-    setMarkingContributionId(null);
-
-    if (markError) {
-      setError(markError.message);
-      return;
-    }
-
-    setMessage("Contribution marked as paid for testing.");
     await loadCircle();
   }
 
@@ -450,16 +432,6 @@ function CircleDetails() {
                           Pay Contribution
                         </button>
                       )}
-                      {isAdmin && contribution.status !== "paid" && (
-                        <button
-                          onClick={() => handleMarkPaid(contribution)}
-                          disabled={markingContributionId === contribution.contribution_id}
-                          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-success/10 py-2 text-[11px] font-semibold text-success disabled:opacity-60"
-                        >
-                          {markingContributionId === contribution.contribution_id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                          Mark paid for testing
-                        </button>
-                      )}
                     </li>
                   ))}
                 </ul>
@@ -514,13 +486,22 @@ function MemberGroup({
                   </div>
                   <p className="mt-1 text-[11px] text-muted-foreground">{member.phone ?? "No phone"} - {member.country ?? "No country"} - {member.preferred_currency ?? "GHS"}</p>
                   <p className="text-[11px] text-muted-foreground">Joined {formatDate(member.joined_at)} - {member.role}</p>
+                  {member.requires_capacity_review && (
+                    <p className="mt-2 rounded-xl bg-gold/10 px-3 py-2 text-[11px] font-medium text-[color:var(--gold-foreground)]">
+                      Capacity review {member.capacity_review_status}. SikaCircle must approve this extra-circle request before member approval.
+                    </p>
+                  )}
                 </div>
               </div>
               {isAdmin && member.role !== "creator" && (
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   {member.status === "pending" && (
                     <>
-                      <button onClick={() => onAction(member, "approve")} className="flex items-center justify-center gap-1 rounded-xl bg-success/10 py-2 text-[11px] font-semibold text-success">
+                      <button
+                        onClick={() => onAction(member, "approve")}
+                        disabled={member.requires_capacity_review && member.capacity_review_status !== "approved"}
+                        className="flex items-center justify-center gap-1 rounded-xl bg-success/10 py-2 text-[11px] font-semibold text-success disabled:bg-muted disabled:text-muted-foreground"
+                      >
                         <Check className="h-3.5 w-3.5" /> Approve
                       </button>
                       <button onClick={() => onAction(member, "reject")} className="flex items-center justify-center gap-1 rounded-xl bg-destructive/10 py-2 text-[11px] font-semibold text-destructive">

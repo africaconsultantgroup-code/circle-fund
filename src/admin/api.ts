@@ -28,6 +28,9 @@ export type AdminUser = {
   accountStatus: string;
   profileCompleted: boolean;
   createdAt: string | null;
+  activeCircleCount: number;
+  activeAdminCircleCount: number;
+  periodicObligation: number;
   verification: AdminUserVerification | null;
 };
 
@@ -92,6 +95,29 @@ export type AdminPaymentTransaction = {
   circleName?: string | null;
 };
 
+export type AdminCapacityReview = {
+  id: string;
+  user_id: string;
+  circle_id: string;
+  member_id: string | null;
+  active_circle_count: number;
+  estimated_periodic_obligation: number;
+  requested_reason: string | null;
+  income_employment_info: string | null;
+  missed_late_contribution_count: number;
+  trust_score: number | null;
+  verification_status: string | null;
+  status: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_notes: string | null;
+  created_at: string;
+  updated_at: string;
+  userName?: string | null;
+  userEmail?: string | null;
+  circleName?: string | null;
+};
+
 export type StaffInvitation = {
   id: string;
   email: string;
@@ -123,6 +149,7 @@ export type AdminOverview = {
   }>;
   auditLogs: AdminAuditLog[];
   paymentTransactions: AdminPaymentTransaction[];
+  capacityReviews: AdminCapacityReview[];
   staffInvitations: StaffInvitation[];
 };
 
@@ -160,6 +187,14 @@ export async function manageStaff(action: "invite", payload: { email: string; ro
   return invokeAdminFunction<{ status: string; invitation?: StaffInvitation; matchedExistingUser?: boolean }>("admin-manage-staff", {
     method: "POST",
     body: { action, ...payload },
+  });
+}
+
+export async function manageCapacityReview(reviewId: string, action: "approve" | "reject", notes?: string | null) {
+  return supabase.rpc("admin_manage_capacity_review", {
+    check_review_id: reviewId,
+    action,
+    notes: notes ?? null,
   });
 }
 

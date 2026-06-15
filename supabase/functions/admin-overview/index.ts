@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
     }, 403);
   }
 
-  const [profilesResult, verificationsResult, circlesResult, membersResult, paymentTransactionsResult, auditLogsResult, staffInvitationsResult, authUsers] = await Promise.all([
+  const [profilesResult, verificationsResult, circlesResult, membersResult, capacityReviewsResult, paymentTransactionsResult, auditLogsResult, staffInvitationsResult, authUsers] = await Promise.all([
     serviceClient
       .from("profiles")
       .select("user_id, full_name, phone, country, preferred_currency, account_status, profile_completed, role, created_at")
@@ -51,8 +51,12 @@ Deno.serve(async (req) => {
       .order("created_at", { ascending: false }),
     serviceClient
       .from("circle_members")
-      .select("id, circle_id, user_id, role, status, joined_at, approved_at, approved_by")
+      .select("id, circle_id, user_id, role, status, joined_at, approved_at, approved_by, requires_capacity_review, capacity_review_status")
       .order("joined_at", { ascending: false }),
+    serviceClient
+      .from("capacity_reviews")
+      .select("id, user_id, circle_id, member_id, active_circle_count, estimated_periodic_obligation, requested_reason, income_employment_info, missed_late_contribution_count, trust_score, verification_status, status, reviewed_by, reviewed_at, review_notes, created_at, updated_at")
+      .order("created_at", { ascending: false }),
     serviceClient
       .from("payment_transactions")
       .select("id, user_id, circle_id, contribution_id, amount, currency, payment_method, provider, provider_reference, status, payment_type, provider_response, created_at, updated_at")
@@ -74,6 +78,7 @@ Deno.serve(async (req) => {
   if (verificationsResult.error) return json({ error: verificationsResult.error.message }, 500);
   if (circlesResult.error) return json({ error: circlesResult.error.message }, 500);
   if (membersResult.error) return json({ error: membersResult.error.message }, 500);
+  if (capacityReviewsResult.error) return json({ error: capacityReviewsResult.error.message }, 500);
   if (paymentTransactionsResult.error) return json({ error: paymentTransactionsResult.error.message }, 500);
   if (auditLogsResult.error) return json({ error: auditLogsResult.error.message }, 500);
   if (staffInvitationsResult.error) return json({ error: staffInvitationsResult.error.message }, 500);
@@ -83,6 +88,7 @@ Deno.serve(async (req) => {
   const verifications = verificationsResult.data ?? [];
   const circles = circlesResult.data ?? [];
   const members = membersResult.data ?? [];
+  const capacityReviews = capacityReviewsResult.data ?? [];
   const paymentTransactions = paymentTransactionsResult.data ?? [];
   const auditLogs = auditLogsResult.data ?? [];
   const staffInvitations = staffInvitationsResult.data ?? [];
@@ -100,6 +106,16 @@ Deno.serve(async (req) => {
   const users = profiles.map((profile) => {
     const authUser = authByUser.get(profile.user_id);
     const verification = verificationByUser.get(profile.user_id) ?? null;
+    const activeCircleCount = members.filter((member) => {
+      const circle = circles.find((item) => item.id === member.circle_id);
+      return member.user_id === profile.user_id && ["pending", "approved"].includes(member.status) && circle?.status === "active";
+    }).length;
+    const activeAdminCircleCount = circles.filter((circle) => circle.owner_id === profile.user_id && circle.status === "active").length;
+    const periodicObligation = members.reduce((sum, member) => {
+      const circle = circles.find((item) => item.id === member.circle_id);
+      if (member.user_id !== profile.user_id || !["pending", "approved"].includes(member.status) || circle?.status !== "active") return sum;
+      return sum + Number(circle.contribution_amount ?? 0);
+    }, 0);
     return {
       userId: profile.user_id,
       email: authUser?.email ?? null,
@@ -111,6 +127,9 @@ Deno.serve(async (req) => {
       accountStatus: profile.account_status,
       profileCompleted: profile.profile_completed,
       createdAt: profile.created_at,
+      activeCircleCount,
+      activeAdminCircleCount,
+      periodicObligation,
       verification,
     };
   });
@@ -161,6 +180,17 @@ Deno.serve(async (req) => {
       const circle = circles.find((item) => item.id === transaction.circle_id);
       return {
         ...transaction,
+        userName: profile?.full_name ?? authUser?.email ?? null,
+        userEmail: authUser?.email ?? null,
+        circleName: circle?.name ?? null,
+      };
+    }),
+    capacityReviews: capacityReviews.map((review) => {
+      const profile = profileByUser.get(review.user_id);
+      const authUser = authByUser.get(review.user_id);
+      const circle = circles.find((item) => item.id === review.circle_id);
+      return {
+        ...review,
         userName: profile?.full_name ?? authUser?.email ?? null,
         userEmail: authUser?.email ?? null,
         circleName: circle?.name ?? null,
