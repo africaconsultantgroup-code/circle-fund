@@ -213,6 +213,7 @@ function Metric({ label, value }: { label: string; value: number }) {
 function displayMemberName(value: string | null | undefined) {
   const trimmed = value?.trim();
   if (!trimmed) return "Member";
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return "Member";
 
   const digitsOnly = trimmed.replace(/\D/g, "");
   if (digitsOnly.length >= 7 && digitsOnly.length <= 15 && digitsOnly === trimmed.replace(/[\s()+.-]/g, "")) {

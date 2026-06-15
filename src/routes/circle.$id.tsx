@@ -2,7 +2,7 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { SavingsPlanner } from "@/components/savings-planner";
-import { Calendar, Check, Loader2, LockKeyhole, RefreshCw, Settings, Share2, ShieldAlert, Shuffle, UserCheck, Users, WalletCards, X } from "lucide-react";
+import { Activity, Calendar, Check, HeartPulse, Loader2, LockKeyhole, RefreshCw, Settings, Share2, ShieldAlert, ShieldCheck, Shuffle, TrendingUp, Users, WalletCards, X } from "lucide-react";
 import { getCircle, type Circle as MockCircleType } from "@/lib/mock-data";
 import {
   generateCircleContributionSchedule,
@@ -76,6 +76,7 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
   const maxMembers = Math.min(circle?.max_members ?? 15, 15);
   const myPayoutTurn = useMemo(() => payoutRotation.find((item) => item.is_current_user), [payoutRotation]);
   const rotationLocked = payoutRotation.some((item) => Boolean(item.locked_at));
+  const rotationLockedAt = payoutRotation.find((item) => item.locked_at)?.locked_at ?? null;
   const canChangeRotation = isAdmin && !rotationLocked && !hasCircleStarted(circle?.start_date);
   const rotationByMember = useMemo(() => new Map(payoutRotation.map((turn) => [turn.member_id, turn])), [payoutRotation]);
   const contributionSummary = useMemo(() => {
@@ -94,6 +95,9 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
       overdue,
     };
   }, [contributions]);
+  const cycleHealth = useMemo(() => buildCircleHealth(contributions, approvedMembers.length, amount), [contributions, approvedMembers.length, amount]);
+  const trustSummary = useMemo(() => buildTrustSummary(contributions, circle?.status, user?.id), [contributions, circle?.status, user?.id]);
+  const activityLog = useMemo(() => buildActivityLog(currentMember, contributions, payoutRotation), [currentMember, contributions, payoutRotation]);
 
   useEffect(() => {
     void loadCircle();
@@ -260,6 +264,8 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
           </div>
         )}
 
+        <RotationLockCard generated={payoutRotation.length > 0} lockedAt={rotationLockedAt} />
+
         {isAdmin && (
           <div className="flex flex-col gap-2">
             <button
@@ -390,6 +396,10 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
                 <Metric label="Payout date" value={myPayoutTurn ? formatDate(myPayoutTurn.payout_due_date) : "Not set"} />
                 <Metric label="Payout amount" value={myPayoutTurn ? formatCurrency(Number(myPayoutTurn.payout_amount ?? 0), currency) : "Not set"} />
               </div>
+              <CircleHealthMeter health={cycleHealth} />
+              <PayoutFundingStatus health={cycleHealth} currency={currency} />
+              <TrustScoreFoundation summary={trustSummary} />
+              <CustomerActivityLog items={activityLog} />
               <SavingsPlanner defaultTargetAmount={amount} defaultDueDate={toDateInputValue(circle.start_date)} currency={currency} />
               {renderPayoutRotationSection()}
             </section>
@@ -409,6 +419,10 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
 
           {tab === "contributions" && (
             <section className="flex flex-col gap-4 p-5">
+              <div>
+                <h2 className="font-display text-lg font-semibold">Circle contribution ledger</h2>
+                <p className="mt-1 text-xs text-muted-foreground">Transparent contribution records for this circle. Sensitive member details stay private.</p>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <Metric label="Total expected" value={formatCurrency(contributionSummary.totalExpected, currency)} />
                 <Metric label="Total paid" value={formatCurrency(contributionSummary.totalPaid, currency)} />
@@ -439,10 +453,13 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
                         <p className="text-sm font-semibold">{displayMemberName(contribution.full_name)}</p>
                         <StatusPill status={contribution.status} />
                       </div>
-                      <p className="mt-1 text-[11px] text-muted-foreground">Cycle {formatContributionCycle(contribution.due_date)}</p>
-                      <p className="mt-1 text-[11px] text-muted-foreground">Expected {formatCurrency(Number(contribution.expected_amount ?? amount), currency)} - due {formatDate(contribution.due_date)}</p>
-                      <p className="mt-1 text-[11px] text-muted-foreground">Paid at {formatDate(contribution.paid_at)} - ref {contribution.payment_reference ?? "none"}</p>
-                      <p className="mt-1 text-[11px] text-muted-foreground">Payment {contribution.payment_status ?? "not initiated"} - provider {contribution.payment_provider ?? "none"}</p>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <LedgerField label="Cycle" value={formatContributionCycle(contribution.due_date)} />
+                        <LedgerField label="Amount" value={formatCurrency(Number(contribution.expected_amount ?? amount), currency)} />
+                        <LedgerField label="Due date" value={formatDate(contribution.due_date)} />
+                        <LedgerField label="Paid date" value={formatDate(contribution.paid_at)} />
+                        <LedgerField label="Payment ref" value={contribution.payment_reference ?? "None"} wide />
+                      </div>
                       {user?.id === contribution.user_id && ["unpaid", "overdue", "pending", "failed"].includes(contribution.status) && (
                         <button
                           onClick={() => handleInitiatePayment(contribution)}
@@ -579,6 +596,137 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
+function LedgerField({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
+  return (
+    <div className={`rounded-xl bg-muted/40 px-3 py-2 ${wide ? "col-span-2" : ""}`}>
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-0.5 break-words text-xs font-semibold">{value}</p>
+    </div>
+  );
+}
+
+type CircleHealth = {
+  membersPaid: number;
+  membersPending: number;
+  membersOverdue: number;
+  payoutReadiness: number;
+  requiredAmount: number;
+  collectedAmount: number;
+  outstandingAmount: number;
+  isReady: boolean;
+};
+
+function CircleHealthMeter({ health }: { health: CircleHealth }) {
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-card">
+      <div className="flex items-center gap-2 text-primary">
+        <HeartPulse className="h-4 w-4" />
+        <h2 className="font-display text-base font-semibold">Circle health meter</h2>
+      </div>
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
+        <div className="h-full rounded-full bg-gradient-gold" style={{ width: `${health.payoutReadiness}%` }} />
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <RuleMetric label="Members paid" value={String(health.membersPaid)} />
+        <RuleMetric label="Members pending" value={String(health.membersPending)} />
+        <RuleMetric label="Members overdue" value={String(health.membersOverdue)} />
+        <RuleMetric label="Payout readiness" value={`${health.payoutReadiness}%`} />
+      </div>
+    </section>
+  );
+}
+
+function PayoutFundingStatus({ health, currency }: { health: CircleHealth; currency: CurrencyCode }) {
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-card">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-primary">
+          <ShieldCheck className="h-4 w-4" />
+          <h2 className="font-display text-base font-semibold">Payout funding status</h2>
+        </div>
+        <StatusPill status={health.isReady ? "ready" : "not ready"} />
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <RuleMetric label="Required" value={formatCurrency(health.requiredAmount, currency)} />
+        <RuleMetric label="Collected" value={formatCurrency(health.collectedAmount, currency)} />
+        <RuleMetric label="Outstanding" value={formatCurrency(health.outstandingAmount, currency)} />
+        <RuleMetric label="Status" value={health.isReady ? "Ready" : "Not ready"} />
+      </div>
+    </section>
+  );
+}
+
+function RotationLockCard({ generated, lockedAt }: { generated: boolean; lockedAt: string | null }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+      <div className="flex items-center gap-2 text-primary">
+        <LockKeyhole className="h-4 w-4" />
+        <p className="font-display text-sm font-semibold">Rotation lock</p>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <RuleMetric label="Generated by" value={generated ? "System" : "Not generated"} />
+        <RuleMetric label="Locked date" value={formatDate(lockedAt)} />
+        <RuleMetric label="Edit status" value={lockedAt ? "Cannot be edited" : "Unlocked"} />
+        <RuleMetric label="Sequence" value={generated ? "Automatic" : "Waiting"} />
+      </div>
+    </div>
+  );
+}
+
+type TrustSummary = {
+  score: number;
+  completedCircles: number;
+  latePayments: number;
+  missedPayments: number;
+};
+
+function TrustScoreFoundation({ summary }: { summary: TrustSummary }) {
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-card">
+      <div className="flex items-center gap-2 text-primary">
+        <TrendingUp className="h-4 w-4" />
+        <h2 className="font-display text-base font-semibold">Trust score foundation</h2>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <RuleMetric label="Trust score" value={`${summary.score}/100`} />
+        <RuleMetric label="Completed circles" value={String(summary.completedCircles)} />
+        <RuleMetric label="Late payments" value={String(summary.latePayments)} />
+        <RuleMetric label="Missed payments" value={String(summary.missedPayments)} />
+      </div>
+    </section>
+  );
+}
+
+type ActivityItem = {
+  id: string;
+  title: string;
+  detail: string;
+  date: string | null;
+};
+
+function CustomerActivityLog({ items }: { items: ActivityItem[] }) {
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-card">
+      <div className="flex items-center gap-2 text-primary">
+        <Activity className="h-4 w-4" />
+        <h2 className="font-display text-base font-semibold">Customer activity log</h2>
+      </div>
+      {items.length === 0 ? (
+        <p className="mt-3 text-sm text-muted-foreground">No customer activity yet.</p>
+      ) : (
+        <ul className="mt-3 flex flex-col gap-2">
+          {items.map((item) => (
+            <li key={item.id} className="rounded-xl bg-muted/40 px-3 py-2">
+              <p className="text-xs font-semibold">{item.title}</p>
+              <p className="text-[11px] text-muted-foreground">{item.detail} - {formatDate(item.date)}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function CircleRules({
   circle,
   amount,
@@ -636,6 +784,7 @@ function VerificationBadge({ status }: { status: string | null | undefined }) {
 function displayMemberName(value: string | null | undefined) {
   const trimmed = value?.trim();
   if (!trimmed) return "Member";
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return "Member";
 
   const digitsOnly = trimmed.replace(/\D/g, "");
   if (digitsOnly.length >= 7 && digitsOnly.length <= 15 && digitsOnly === trimmed.replace(/[\s()+.-]/g, "")) {
@@ -696,4 +845,110 @@ function hasCircleStarted(value: string | null | undefined) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return false;
   return parsed.getTime() <= Date.now();
+}
+
+function buildCircleHealth(contributions: CircleContributionStatus[], approvedMemberCount: number, contributionAmount: number): CircleHealth {
+  const paidUsers = new Set<string>();
+  const pendingUsers = new Set<string>();
+  const overdueUsers = new Set<string>();
+
+  contributions.forEach((contribution) => {
+    if (contribution.status === "paid" || contribution.status === "processed") {
+      paidUsers.add(contribution.user_id);
+      return;
+    }
+
+    if (["overdue", "late", "failed"].includes(contribution.status)) {
+      overdueUsers.add(contribution.user_id);
+      return;
+    }
+
+    pendingUsers.add(contribution.user_id);
+  });
+
+  const requiredAmount = Math.max(approvedMemberCount * contributionAmount, 0);
+  const collectedAmount = contributions
+    .filter((contribution) => contribution.status === "paid" || contribution.status === "processed")
+    .reduce((sum, contribution) => sum + Number(contribution.expected_amount ?? contributionAmount ?? 0), 0);
+  const outstandingAmount = Math.max(requiredAmount - collectedAmount, 0);
+  const payoutReadiness = requiredAmount > 0 ? Math.min(Math.round((collectedAmount / requiredAmount) * 100), 100) : 0;
+
+  return {
+    membersPaid: paidUsers.size,
+    membersPending: contributions.length === 0 ? approvedMemberCount : pendingUsers.size,
+    membersOverdue: overdueUsers.size,
+    payoutReadiness,
+    requiredAmount,
+    collectedAmount,
+    outstandingAmount,
+    isReady: requiredAmount > 0 && collectedAmount >= requiredAmount,
+  };
+}
+
+function buildTrustSummary(contributions: CircleContributionStatus[], circleStatus: string | null | undefined, userId: string | null | undefined): TrustSummary {
+  const userContributions = userId ? contributions.filter((contribution) => contribution.user_id === userId) : [];
+  const latePayments = userContributions.filter((contribution) => contribution.status === "overdue" || contribution.status === "late").length;
+  const missedPayments = userContributions.filter((contribution) => contribution.status === "failed").length;
+  const score = Math.max(0, 100 - latePayments * 5 - missedPayments * 10);
+
+  return {
+    score,
+    completedCircles: circleStatus === "completed" ? 1 : 0,
+    latePayments,
+    missedPayments,
+  };
+}
+
+function buildActivityLog(
+  currentMember: CircleMemberDetails | undefined,
+  contributions: CircleContributionStatus[],
+  payoutRotation: PayoutRotationItem[],
+): ActivityItem[] {
+  const items: ActivityItem[] = [];
+
+  if (currentMember?.joined_at) {
+    items.push({
+      id: `joined-${currentMember.membership_id}`,
+      title: "Circle joined",
+      detail: `Membership status ${currentMember.status}`,
+      date: currentMember.joined_at,
+    });
+  }
+
+  contributions
+    .filter((contribution) => contribution.user_id === currentMember?.user_id)
+    .slice(0, 3)
+    .forEach((contribution) => {
+      items.push({
+        id: `due-${contribution.contribution_id}`,
+        title: "Contribution due",
+        detail: `${formatContributionCycle(contribution.due_date)} contribution is ${contribution.status}`,
+        date: contribution.due_date,
+      });
+
+      if (contribution.payment_status) {
+        items.push({
+          id: `payment-${contribution.contribution_id}`,
+          title: "Payment initiated",
+          detail: `Reference ${contribution.payment_reference ?? "pending"}`,
+          date: contribution.payment_created_at ?? contribution.paid_at ?? contribution.due_date,
+        });
+      }
+    });
+
+  payoutRotation
+    .filter((turn) => turn.is_current_user)
+    .slice(0, 1)
+    .forEach((turn) => {
+      items.push({
+        id: `payout-${turn.schedule_id}`,
+        title: "Payout scheduled",
+        detail: `Position #${turn.rotation_position} is ${turn.status}`,
+        date: turn.payout_due_date,
+      });
+    });
+
+  return items
+    .sort((a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime())
+    .slice(0, 6);
 }
