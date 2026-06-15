@@ -26,11 +26,42 @@ export type CapacityReview = Database['public']['Tables']['capacity_reviews']['R
 export type AdminDuePayout = Database['public']['Functions']['list_due_payouts_for_admin']['Returns'][number];
 
 export async function getProfileByUserId(userId: string) {
-  return supabase.from('profiles').select('*').eq('user_id', userId).single();
+  return supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle();
 }
 
 export async function upsertProfile(profile: Partial<Profile> & { user_id: string }) {
-  return supabase.from('profiles').upsert(profile).select('*').single();
+  const existing = await getProfileByUserId(profile.user_id);
+
+  if (existing.error) {
+    return { data: null, error: existing.error };
+  }
+
+  if (existing.data) {
+    return supabase
+      .from('profiles')
+      .update({
+        ...profile,
+        updated_at: profile.updated_at ?? new Date().toISOString(),
+      })
+      .eq('user_id', profile.user_id)
+      .select('*')
+      .single();
+  }
+
+  const inserted = await supabase.from('profiles').insert(profile).select('*').single();
+  if (!inserted.error || !/duplicate key|profiles_user_id_key/i.test(inserted.error.message)) {
+    return inserted;
+  }
+
+  return supabase
+    .from('profiles')
+    .update({
+      ...profile,
+      updated_at: profile.updated_at ?? new Date().toISOString(),
+    })
+    .eq('user_id', profile.user_id)
+    .select('*')
+    .single();
 }
 
 export async function getUserVerification(userId: string) {

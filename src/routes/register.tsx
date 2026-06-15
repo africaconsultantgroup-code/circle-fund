@@ -38,7 +38,15 @@ function RegisterPage() {
       return;
     }
 
-    const result = await signUpWithEmail(email, password);
+    const profileCompleted = Boolean(fullName.trim() && normalizedPhone && countryOption.label);
+    const expectedContribution = expectedMonthlyContribution ? Number(expectedMonthlyContribution) : null;
+    const result = await signUpWithEmail(email, password, {
+      full_name: fullName.trim() || null,
+      phone: normalizedPhone,
+      country: countryOption.label,
+      preferred_currency: preferredCurrency,
+      expected_monthly_contribution: expectedContribution,
+    });
     if (result.error) {
       setLoading(false);
       setError(result.error.message || "Unable to create an account.");
@@ -52,18 +60,26 @@ function RegisterPage() {
     }
 
     if (result.data.user) {
-      await upsertProfile({
+      const profileResult = await upsertProfile({
         user_id: result.data.user.id,
         full_name: fullName.trim() || null,
+        name: fullName.trim() || null,
+        email,
         phone: normalizedPhone,
         country: countryOption.label,
         preferred_currency: preferredCurrency,
-        expected_monthly_contribution: expectedMonthlyContribution ? Number(expectedMonthlyContribution) : null,
-        profile_completed: Boolean(fullName.trim() && normalizedPhone && countryOption.label),
+        expected_monthly_contribution: expectedContribution,
+        profile_completed: profileCompleted,
         account_status: "active",
         role: "customer",
         updated_at: new Date().toISOString(),
       });
+
+      if (profileResult.error) {
+        setLoading(false);
+        setError(profileResult.error.message || "Account created, but we could not save your profile details.");
+        return;
+      }
     }
 
     setLoading(false);

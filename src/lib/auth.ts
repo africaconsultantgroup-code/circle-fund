@@ -61,7 +61,15 @@ export async function signInWithPassword(email: string, password: string): Promi
   };
 }
 
-export async function signUpWithEmail(email: string, password: string): Promise<AuthResponse> {
+export type SignUpProfileMetadata = {
+  full_name?: string | null;
+  phone?: string | null;
+  country?: string | null;
+  preferred_currency?: string | null;
+  expected_monthly_contribution?: number | null;
+};
+
+export async function signUpWithEmail(email: string, password: string, metadata?: SignUpProfileMetadata): Promise<AuthResponse> {
   if (!isSupabaseConfigured) {
     return fallbackSuccess(email);
   }
@@ -69,6 +77,7 @@ export async function signUpWithEmail(email: string, password: string): Promise<
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
+    options: metadata ? { data: metadata } : undefined,
   });
   if (error) {
     console.warn("supabase_auth_signup_failed", {
@@ -187,7 +196,12 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
 export async function upsertUserProfile(profile: {
   user_id: string;
   full_name?: string | null;
+  name?: string | null;
+  email?: string | null;
   phone?: string | null;
+  country?: string | null;
+  preferred_currency?: string | null;
+  expected_monthly_contribution?: number | null;
   avatar_url?: string | null;
   ghana_card_verification_status?: string;
   selfie_image_url?: string | null;
@@ -199,5 +213,40 @@ export async function upsertUserProfile(profile: {
     return { data: null, error: { message: 'Supabase is not configured.' } };
   }
 
-  return supabase.from('profiles').upsert(profile).select('*').single();
+  const existing = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('user_id', profile.user_id)
+    .maybeSingle();
+
+  if (existing.error) {
+    return { data: null, error: { message: existing.error.message } };
+  }
+
+  if (existing.data) {
+    return supabase
+      .from('profiles')
+      .update({
+        ...profile,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', profile.user_id)
+      .select('*')
+      .single();
+  }
+
+  const inserted = await supabase.from('profiles').insert(profile).select('*').single();
+  if (!inserted.error || !/duplicate key|profiles_user_id_key/i.test(inserted.error.message)) {
+    return inserted;
+  }
+
+  return supabase
+    .from('profiles')
+    .update({
+      ...profile,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('user_id', profile.user_id)
+    .select('*')
+    .single();
 }

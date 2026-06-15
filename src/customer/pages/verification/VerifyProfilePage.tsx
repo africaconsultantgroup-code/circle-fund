@@ -33,6 +33,14 @@ export function VerifyProfilePage() {
 
       const { data } = await getProfileByUserId(user.id);
       if (!isMounted) return;
+
+      if (data?.profile_completed) {
+        setMessage("Your profile is already complete.");
+        setIsLoading(false);
+        setTimeout(() => navigate({ to: "/home" }), 500);
+        return;
+      }
+
       setFullName(data?.full_name ?? "");
       setPhone(data?.phone ?? user.phone ?? "");
       const profileCountry = countryForValue(data?.country);
@@ -74,13 +82,14 @@ export function VerifyProfilePage() {
     const { error } = await upsertProfile({
       user_id: user.id,
       full_name: fullName.trim(),
+      name: fullName.trim(),
+      email: user.email,
       phone: normalizedPhone,
       country: countryOption.label,
       preferred_currency: preferredCurrency,
       expected_monthly_contribution: expectedMonthlyContribution ? Number(expectedMonthlyContribution) : null,
       profile_completed: true,
       account_status: "active",
-      role: "customer",
       updated_at: new Date().toISOString(),
     });
     setIsSaving(false);
