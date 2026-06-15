@@ -777,16 +777,18 @@ export interface Database {
         Returns: Array<{
           can_create: boolean;
           active_admin_count: number;
-          message: string;
+          max_admin_circles: number;
+          reason: string;
         }>;
       };
       can_join_circle: {
-        Args: { check_user_id: string; check_circle_id: string; log_review?: boolean };
+        Args: { check_user_id: string; check_circle_id: string; log_block?: boolean };
         Returns: Array<{
           can_join: boolean;
           requires_capacity_review: boolean;
           active_circle_count: number;
-          message: string;
+          max_circles_without_review: number;
+          reason: string;
         }>;
       };
       user_periodic_obligation: {
