@@ -177,7 +177,7 @@ function MemberSection({
             <li key={member.membership_id} className="rounded-2xl border border-border bg-card p-4 shadow-card">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold">{member.full_name ?? "Member"}</p>
+                  <p className="text-sm font-semibold">{displayMemberName(member.full_name)}</p>
                   <p className="mt-1 text-[11px] text-muted-foreground">Joined {formatDate(member.joined_at)} - {member.role}</p>
                   <p className="text-[11px] text-muted-foreground">Verification {member.verification_status ?? "not_started"}</p>
                 </div>
@@ -208,6 +208,18 @@ function Metric({ label, value }: { label: string; value: number }) {
       <p className="mt-1 font-display text-2xl font-bold">{value}</p>
     </div>
   );
+}
+
+function displayMemberName(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) return "Member";
+
+  const digitsOnly = trimmed.replace(/\D/g, "");
+  if (digitsOnly.length >= 7 && digitsOnly.length <= 15 && digitsOnly === trimmed.replace(/[\s()+.-]/g, "")) {
+    return "Member";
+  }
+
+  return trimmed;
 }
 
 function StatusNotice({ text, danger = false }: { text: string; danger?: boolean }) {

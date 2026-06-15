@@ -304,7 +304,7 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold">#{turn.rotation_position} {turn.full_name ?? "Member"} {turn.is_current_user ? "- You" : ""}</p>
+                      <p className="text-sm font-semibold">#{turn.rotation_position} {displayMemberName(turn.full_name)} {turn.is_current_user ? "- You" : ""}</p>
                       <VerificationBadge status={turn.verification_status} />
                     </div>
                     <p className="mt-1 text-[11px] text-muted-foreground">
@@ -434,7 +434,7 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
                   {contributions.map((contribution) => (
                     <li key={contribution.contribution_id} className="rounded-2xl border border-border bg-card p-4 shadow-card">
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold">{contribution.full_name ?? "Member"}</p>
+                        <p className="text-sm font-semibold">{displayMemberName(contribution.full_name)}</p>
                         <StatusPill status={contribution.status} />
                       </div>
                       <p className="mt-1 text-[11px] text-muted-foreground">Cycle {formatContributionCycle(contribution.due_date)}</p>
@@ -500,7 +500,7 @@ function MemberGroup({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold">{member.full_name ?? "Member"}</p>
+                    <p className="text-sm font-semibold">{displayMemberName(member.full_name)}</p>
                     <StatusPill status={member.status} />
                     <VerificationBadge status={member.verification_status} />
                   </div>
@@ -629,6 +629,18 @@ function VerificationBadge({ status }: { status: string | null | undefined }) {
       {verified ? "verified" : "review"}
     </span>
   );
+}
+
+function displayMemberName(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) return "Member";
+
+  const digitsOnly = trimmed.replace(/\D/g, "");
+  if (digitsOnly.length >= 7 && digitsOnly.length <= 15 && digitsOnly === trimmed.replace(/[\s()+.-]/g, "")) {
+    return "Member";
+  }
+
+  return trimmed;
 }
 
 function Notice({ text, tone }: { text: string; tone: "gold" | "danger" | "success" }) {
