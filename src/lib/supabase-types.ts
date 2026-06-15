@@ -4,7 +4,7 @@ export type CircleStatus = 'active' | 'paused' | 'completed' | 'cancelled';
 export type MemberStatus = 'pending' | 'approved' | 'rejected' | 'removed';
 export type ContributionStatus = 'pending' | 'processed' | 'failed' | 'unpaid' | 'paid' | 'late' | 'overdue';
 export type PayoutStatus = 'pending' | 'completed' | 'failed';
-export type PayoutScheduleStatus = 'scheduled' | 'pending' | 'paid' | 'skipped' | 'failed';
+export type PayoutScheduleStatus = 'scheduled' | 'processing' | 'pending' | 'paid' | 'skipped' | 'failed';
 export type TransactionType = 'contribution' | 'payout' | 'refund' | 'fee' | 'adjustment';
 export type TransactionStatus = 'pending' | 'completed' | 'failed';
 export type LegacyVerificationStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
@@ -797,6 +797,7 @@ export interface Database {
           phone: string | null;
           country: string | null;
           preferred_currency: string | null;
+          verification_status: string;
           requires_capacity_review: boolean;
           capacity_review_status: string;
         }>;
@@ -894,6 +895,7 @@ export interface Database {
           user_id: string;
           full_name: string | null;
           role: string | null;
+          verification_status: string;
           rotation_position: number;
           payout_due_date: string | null;
           payout_amount: number;

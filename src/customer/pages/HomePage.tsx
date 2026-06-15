@@ -395,7 +395,7 @@ export function HomePage() {
           <ul className="mt-3 flex flex-col gap-3">
             {dashboard.circles.slice(0, 3).map((circle) => (
               <li key={circle.id}>
-                <Link to="/circle/$id" params={{ id: circle.id }} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-card">
+                <Link to="/circles/$id" params={{ id: circle.id }} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-card">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-primary font-display text-base font-semibold text-primary-foreground">
                     {circle.name.slice(0, 2).toUpperCase()}
                   </div>

@@ -26,7 +26,7 @@ function MembersPage() {
           </p>
         </div>
 
-        <Link to="/circle/$id" params={{ id }} className="mt-auto rounded-2xl bg-gradient-primary py-4 text-center font-display text-sm font-semibold text-primary-foreground shadow-card">
+        <Link to="/circles/$id" params={{ id }} className="mt-auto rounded-2xl bg-gradient-primary py-4 text-center font-display text-sm font-semibold text-primary-foreground shadow-card">
           Open members tab
         </Link>
       </div>

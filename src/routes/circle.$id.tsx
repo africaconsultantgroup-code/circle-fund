@@ -47,6 +47,10 @@ type Tab = "overview" | "members" | "contributions" | "rotation" | "settings";
 
 function CircleDetails() {
   const { circleId, mockCircle } = Route.useLoaderData() as { circleId: string; mockCircle: MockCircleType | null };
+  return <CircleDetailsContent circleId={circleId} mockCircle={mockCircle} />;
+}
+
+export function CircleDetailsContent({ circleId, mockCircle }: { circleId: string; mockCircle: MockCircleType | null }) {
   const [tab, setTab] = useState<Tab>("overview");
   const [user, setUser] = useState<AuthUser | null>(null);
   const [circle, setCircle] = useState<Circle | null>(null);
@@ -73,6 +77,7 @@ function CircleDetails() {
   const myPayoutTurn = useMemo(() => payoutRotation.find((item) => item.is_current_user), [payoutRotation]);
   const rotationLocked = payoutRotation.some((item) => Boolean(item.locked_at));
   const canChangeRotation = isAdmin && !rotationLocked && !hasCircleStarted(circle?.start_date);
+  const rotationByMember = useMemo(() => new Map(payoutRotation.map((turn) => [turn.member_id, turn])), [payoutRotation]);
   const contributionSummary = useMemo(() => {
     const totalExpected = contributions.reduce((sum, contribution) => sum + Number(contribution.expected_amount ?? 0), 0);
     const totalPaid = contributions
@@ -125,7 +130,20 @@ function CircleDetails() {
     }
 
     setCircle(circleResult.data);
-    setMembershipStatus(membershipResult.data?.status ?? (circleResult.data.owner_id === currentUser.id ? "approved" : null));
+    const resolvedMembershipStatus = membershipResult.data?.status ?? (circleResult.data.owner_id === currentUser.id ? "approved" : null);
+    if (resolvedMembershipStatus !== "approved") {
+      setCircle(circleResult.data);
+      setMembershipStatus(resolvedMembershipStatus);
+      setError(resolvedMembershipStatus === "pending"
+        ? "Your join request is pending approval. Circle details are available after approval."
+        : resolvedMembershipStatus === "rejected" || resolvedMembershipStatus === "removed"
+          ? "You do not have access to this circle."
+          : "Only approved members can view circle details.");
+      setIsLoading(false);
+      return;
+    }
+
+    setMembershipStatus(resolvedMembershipStatus);
     setMembers((membersResult.data ?? []) as CircleMemberDetails[]);
     setContributions((contributionResult.data ?? []) as CircleContributionStatus[]);
     setPayoutRotation((rotationResult.data ?? []) as PayoutRotationItem[]);
@@ -285,14 +303,17 @@ function CircleDetails() {
               <li key={turn.schedule_id} className="rounded-2xl border border-border bg-card p-4 shadow-card">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold">#{turn.rotation_position} {turn.full_name ?? "Member"}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold">#{turn.rotation_position} {turn.full_name ?? "Member"} {turn.is_current_user ? "- You" : ""}</p>
+                      <VerificationBadge status={turn.verification_status} />
+                    </div>
                     <p className="mt-1 text-[11px] text-muted-foreground">
                       {formatCurrency(Number(turn.payout_amount ?? 0), currency)} - {formatDate(turn.payout_due_date)}
                     </p>
                   </div>
                   <StatusPill status={turn.status} />
                 </div>
-                {turn.is_current_user && <p className="mt-2 text-[11px] font-semibold text-primary">This is your payout turn.</p>}
+                {turn.is_current_user && <p className="mt-2 text-[11px] font-semibold text-primary">You - Expected payout: {formatDate(turn.payout_due_date)}</p>}
               </li>
             ))}
           </ul>
@@ -359,10 +380,13 @@ function CircleDetails() {
                 <Metric label="Pending" value={String(pendingMembers.length)} />
                 <Metric label="Frequency" value={circle.frequency ?? "Monthly"} />
                 <Metric label="Start date" value={formatDate(circle.start_date)} />
+                <Metric label="End date" value={formatDate(circle.end_date)} />
+                <Metric label="My role" value={currentMember?.role ?? (isAdmin ? "creator" : "member")} />
                 <Metric label="Expected" value={formatCurrency(contributionSummary.totalExpected, currency)} />
                 <Metric label="Outstanding" value={formatCurrency(contributionSummary.outstanding, currency)} />
                 <Metric label="Your turn" value={myPayoutTurn ? `#${myPayoutTurn.rotation_position}` : "Not set"} />
                 <Metric label="Payout date" value={myPayoutTurn ? formatDate(myPayoutTurn.payout_due_date) : "Not set"} />
+                <Metric label="Payout amount" value={myPayoutTurn ? formatCurrency(Number(myPayoutTurn.payout_amount ?? 0), currency) : "Not set"} />
               </div>
               <SavingsPlanner defaultTargetAmount={amount} defaultDueDate={toDateInputValue(circle.start_date)} currency={currency} />
               {renderPayoutRotationSection()}
@@ -371,18 +395,12 @@ function CircleDetails() {
 
           {tab === "members" && (
             <section className="flex flex-col gap-4 p-5">
-              {isAdmin && pendingMembers.length > 0 && (
-                <MemberGroup title="Pending members" members={pendingMembers} isAdmin={isAdmin} onAction={handleMemberAction} />
-              )}
               {membershipStatus === "approved" || isAdmin ? (
-                <MemberGroup title="Approved members" members={approvedMembers} isAdmin={isAdmin} onAction={handleMemberAction} />
+                <MemberGroup title="Approved members" members={approvedMembers} isAdmin={isAdmin} rotationByMember={rotationByMember} onAction={handleMemberAction} />
               ) : (
                 <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
                   {membershipStatus === "pending" ? "Waiting for admin approval." : "Approved members are visible after approval."}
                 </div>
-              )}
-              {isAdmin && rejectedMembers.length > 0 && (
-                <MemberGroup title="Rejected/removed" members={rejectedMembers} isAdmin={isAdmin} onAction={handleMemberAction} />
               )}
             </section>
           )}
@@ -419,6 +437,7 @@ function CircleDetails() {
                         <p className="text-sm font-semibold">{contribution.full_name ?? "Member"}</p>
                         <StatusPill status={contribution.status} />
                       </div>
+                      <p className="mt-1 text-[11px] text-muted-foreground">Cycle {formatContributionCycle(contribution.due_date)}</p>
                       <p className="mt-1 text-[11px] text-muted-foreground">Expected {formatCurrency(Number(contribution.expected_amount ?? amount), currency)} - due {formatDate(contribution.due_date)}</p>
                       <p className="mt-1 text-[11px] text-muted-foreground">Paid at {formatDate(contribution.paid_at)} - ref {contribution.payment_reference ?? "none"}</p>
                       <p className="mt-1 text-[11px] text-muted-foreground">Payment {contribution.payment_status ?? "not initiated"} - provider {contribution.payment_provider ?? "none"}</p>
@@ -447,9 +466,7 @@ function CircleDetails() {
 
           {tab === "settings" && (
             <section className="p-5">
-              <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
-                Circle settings and payment controls will be added later. Payments, payouts, wallets, and contribution collection are not active yet.
-              </div>
+              <CircleRules circle={circle} amount={amount} currency={currency} maxMembers={maxMembers} approvedCount={approvedMembers.length} rotationLocked={rotationLocked} />
             </section>
           )}
         </>
@@ -462,18 +479,20 @@ function MemberGroup({
   title,
   members,
   isAdmin,
+  rotationByMember,
   onAction,
 }: {
   title: string;
   members: CircleMemberDetails[];
   isAdmin: boolean;
+  rotationByMember: Map<string, PayoutRotationItem>;
   onAction: (member: CircleMemberDetails, action: "approve" | "reject" | "remove") => void;
 }) {
   return (
     <div>
       <h2 className="font-display text-base font-semibold">{title}</h2>
       {members.length === 0 ? (
-        <div className="mt-3 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">No members in this section.</div>
+        <div className="mt-3 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">Members will appear here after approval.</div>
       ) : (
         <ul className="mt-3 flex flex-col gap-3">
           {members.map((member) => (
@@ -483,9 +502,12 @@ function MemberGroup({
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold">{member.full_name ?? "Member"}</p>
                     <StatusPill status={member.status} />
+                    <VerificationBadge status={member.verification_status} />
                   </div>
-                  <p className="mt-1 text-[11px] text-muted-foreground">{member.phone ?? "No phone"} - {member.country ?? "No country"} - {member.preferred_currency ?? "GHS"}</p>
-                  <p className="text-[11px] text-muted-foreground">Joined {formatDate(member.joined_at)} - {member.role}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">Joined {formatDate(member.joined_at)} - {member.role}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Rotation position: {rotationByMember.get(member.membership_id)?.rotation_position ? `#${rotationByMember.get(member.membership_id)?.rotation_position}` : "Not set"}
+                  </p>
                   {member.requires_capacity_review && (
                     <p className="mt-2 rounded-xl bg-gold/10 px-3 py-2 text-[11px] font-medium text-[color:var(--gold-foreground)]">
                       Capacity review {member.capacity_review_status}. SikaCircle must approve this extra-circle request before member approval.
@@ -555,6 +577,60 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
+function CircleRules({
+  circle,
+  amount,
+  currency,
+  maxMembers,
+  approvedCount,
+  rotationLocked,
+}: {
+  circle: Circle;
+  amount: number;
+  currency: CurrencyCode;
+  maxMembers: number;
+  approvedCount: number;
+  rotationLocked: boolean;
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+      <h2 className="font-display text-base font-semibold">Circle Rules</h2>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <RuleMetric label="Contribution" value={formatCurrency(amount, currency)} />
+        <RuleMetric label="Frequency" value={circle.frequency ?? "monthly"} />
+        <RuleMetric label="Minimum members" value="2" />
+        <RuleMetric label="Maximum members" value={String(maxMembers)} />
+        <RuleMetric label="Current members" value={`${approvedCount}/${maxMembers}`} />
+        <RuleMetric label="Start date" value={formatDate(circle.start_date)} />
+        <RuleMetric label="End date" value={formatDate(circle.end_date)} />
+        <RuleMetric label="Sequence" value={rotationLocked ? "Locked" : "Unlocked"} />
+      </div>
+      <div className="mt-4 rounded-xl bg-muted/40 px-3 py-2">
+        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Late payment rule</p>
+        <p className="mt-0.5 text-xs font-semibold text-muted-foreground">Late payment rules will be enforced by SikaCircle policy in a later phase.</p>
+      </div>
+    </div>
+  );
+}
+
+function RuleMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-muted/40 px-3 py-2">
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-xs font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function VerificationBadge({ status }: { status: string | null | undefined }) {
+  const verified = status === "verified";
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${verified ? "bg-success/10 text-success" : "bg-gold/15 text-[color:var(--gold-foreground)]"}`}>
+      {verified ? "verified" : "review"}
+    </span>
+  );
+}
+
 function Notice({ text, tone }: { text: string; tone: "gold" | "danger" | "success" }) {
   const classes = tone === "danger"
     ? "border-destructive/30 bg-destructive/5 text-destructive"
@@ -585,6 +661,13 @@ function formatDate(value: string | null | undefined) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "not set";
   return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatContributionCycle(value: string | null | undefined) {
+  if (!value) return "not set";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "not set";
+  return parsed.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 }
 
 function toDateInputValue(value: string | null | undefined) {

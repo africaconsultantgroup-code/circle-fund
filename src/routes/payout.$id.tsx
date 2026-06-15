@@ -71,7 +71,7 @@ function PayoutPage() {
         </div>
 
         <div className="flex gap-3">
-          <Link to="/circle/$id" params={{ id: c.id }} className="flex-1 rounded-2xl border border-border bg-card py-3.5 text-center font-display text-sm font-semibold">
+          <Link to="/circles/$id" params={{ id: c.id }} className="flex-1 rounded-2xl border border-border bg-card py-3.5 text-center font-display text-sm font-semibold">
             Back to circle
           </Link>
           <button className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground">

@@ -32,6 +32,7 @@ import { Route as PayoutIdRouteImport } from './routes/payout.$id'
 import { Route as PiggyBagIdRouteImport } from './routes/piggy-bag.$id'
 import { Route as PiggyBagCreateRouteImport } from './routes/piggy-bag.create'
 import { Route as PaymentIdRouteImport } from './routes/payment.$id'
+import { Route as CirclesIdRouteImport } from './routes/circles.$id'
 import { Route as CircleIdRouteImport } from './routes/circle.$id'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AppPiggyBagRouteImport } from './routes/_app/piggy-bag'
@@ -169,6 +170,11 @@ const PiggyBagCreateRoute = PiggyBagCreateRouteImport.update({
 const PaymentIdRoute = PaymentIdRouteImport.update({
   id: '/payment/$id',
   path: '/payment/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CirclesIdRoute = CirclesIdRouteImport.update({
+  id: '/circles/$id',
+  path: '/circles/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CircleIdRoute = CircleIdRouteImport.update({
@@ -314,6 +320,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof AppProfileRoute
   '/admin/login': typeof AdminLoginRoute
   '/circle/$id': typeof CircleIdRouteWithChildren
+  '/circles/$id': typeof CirclesIdRoute
   '/payment/$id': typeof PaymentIdRoute
   '/piggy-bag/create': typeof PiggyBagCreateRoute
   '/piggy-bag/$id': typeof PiggyBagIdRoute
@@ -362,6 +369,7 @@ export interface FileRoutesByTo {
   '/profile': typeof AppProfileRoute
   '/admin/login': typeof AdminLoginRoute
   '/circle/$id': typeof CircleIdRouteWithChildren
+  '/circles/$id': typeof CirclesIdRoute
   '/payment/$id': typeof PaymentIdRoute
   '/piggy-bag/create': typeof PiggyBagCreateRoute
   '/piggy-bag/$id': typeof PiggyBagIdRoute
@@ -403,6 +411,7 @@ export interface FileRoutesById {
   '/_app/profile': typeof AppProfileRoute
   '/admin/login': typeof AdminLoginRoute
   '/circle/$id': typeof CircleIdRouteWithChildren
+  '/circles/$id': typeof CirclesIdRoute
   '/payment/$id': typeof PaymentIdRoute
   '/piggy-bag/create': typeof PiggyBagCreateRoute
   '/piggy-bag/$id': typeof PiggyBagIdRoute
@@ -453,6 +462,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/admin/login'
     | '/circle/$id'
+    | '/circles/$id'
     | '/payment/$id'
     | '/piggy-bag/create'
     | '/piggy-bag/$id'
@@ -501,6 +511,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/admin/login'
     | '/circle/$id'
+    | '/circles/$id'
     | '/payment/$id'
     | '/piggy-bag/create'
     | '/piggy-bag/$id'
@@ -542,6 +553,7 @@ export interface FileRouteTypes {
     | '/_app/profile'
     | '/admin/login'
     | '/circle/$id'
+    | '/circles/$id'
     | '/payment/$id'
     | '/piggy-bag/create'
     | '/piggy-bag/$id'
@@ -588,6 +600,7 @@ export interface RootRouteChildren {
   TrustScoreRoute: typeof TrustScoreRoute
   AdminLoginRoute: typeof AdminLoginRoute
   CircleIdRoute: typeof CircleIdRouteWithChildren
+  CirclesIdRoute: typeof CirclesIdRoute
   PaymentIdRoute: typeof PaymentIdRoute
   PiggyBagCreateRoute: typeof PiggyBagCreateRoute
   PiggyBagIdRoute: typeof PiggyBagIdRoute
@@ -770,6 +783,13 @@ declare module '@tanstack/react-router' {
       path: '/circle/$id'
       fullPath: '/circle/$id'
       preLoaderRoute: typeof CircleIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/circles/$id': {
+      id: '/circles/$id'
+      path: '/circles/$id'
+      fullPath: '/circles/$id'
+      preLoaderRoute: typeof CirclesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/login': {
@@ -1029,6 +1049,7 @@ const rootRouteChildren: RootRouteChildren = {
   TrustScoreRoute: TrustScoreRoute,
   AdminLoginRoute: AdminLoginRoute,
   CircleIdRoute: CircleIdRouteWithChildren,
+  CirclesIdRoute: CirclesIdRoute,
   PaymentIdRoute: PaymentIdRoute,
   PiggyBagCreateRoute: PiggyBagCreateRoute,
   PiggyBagIdRoute: PiggyBagIdRoute,

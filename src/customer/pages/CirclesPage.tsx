@@ -105,7 +105,7 @@ export function CirclesPage() {
         )}
         {circles.map((c) => (
           <li key={c.id}>
-            <Link to="/circle/$id" params={{ id: c.id }} className="block rounded-3xl border border-border bg-card p-4 shadow-card">
+            <Link to="/circles/$id" params={{ id: c.id }} className="block rounded-3xl border border-border bg-card p-4 shadow-card">
               <div className="flex items-start gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-primary text-primary-foreground font-display font-semibold">
                   {c.name.slice(0, 2).toUpperCase()}
