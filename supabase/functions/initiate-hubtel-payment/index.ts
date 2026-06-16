@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
     const resolved = await resolvePaymentRequest(serviceClient, user.id, body);
     if ("error" in resolved) return resolved.error;
 
-    const providerReference = `hubtel-${crypto.randomUUID()}`;
+    const providerReference = await createUniqueHubtelClientReference(serviceClient);
     const transactionPayload = {
       user_id: user.id,
       circle_id: resolved.circleId,
@@ -250,6 +250,48 @@ function paymentConfig(): PaymentConfig {
     env: Deno.env.get("HUBTEL_PAYMENT_ENV") ?? "sandbox",
     initiateUrl: Deno.env.get("HUBTEL_PAYMENT_INITIATE_URL") ?? "https://payproxyapi.hubtel.com/items/initiate",
   };
+}
+
+async function createUniqueHubtelClientReference(serviceClient: any) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const candidate = generateHubtelClientReference();
+    const { data, error } = await serviceClient
+      .from("payment_transactions")
+      .select("id")
+      .eq("provider_reference", candidate)
+      .maybeSingle();
+
+    if (error) {
+      console.error("hubtel_payment_reference_check_failed", {
+        clientReference: candidate,
+        error: error.message,
+      });
+      throw new Error("Unable to create payment reference.");
+    }
+
+    if (!data) return candidate;
+  }
+
+  throw new Error("Unable to create a unique payment reference.");
+}
+
+function generateHubtelClientReference(now = new Date()) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const dateTime = [
+    String(now.getUTCFullYear()).slice(-2),
+    pad(now.getUTCMonth() + 1),
+    pad(now.getUTCDate()),
+    pad(now.getUTCHours()),
+    pad(now.getUTCMinutes()),
+  ].join("");
+
+  return `SC${dateTime}${randomReferenceCode(4)}`;
+}
+
+function randomReferenceCode(length: number) {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const values = crypto.getRandomValues(new Uint8Array(length));
+  return Array.from(values, (value) => alphabet[value % alphabet.length]).join("");
 }
 
 async function initiateHubtelCheckout(
