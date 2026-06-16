@@ -4,7 +4,8 @@ import { formatCurrency } from "@/lib/diaspora";
 import type { CurrencyCode } from "@/lib/supabase-types";
 import type { PaymentTransaction } from "@/lib/db";
 
-const placeholderMessage = "Hubtel payment is being prepared. Real payment will be enabled once API credentials are added.";
+const livePaymentMessage = "Hubtel checkout has been created. Continue to Hubtel to complete this payment.";
+const fallbackMessage = "Hubtel payment was initiated, but no checkout link was returned. Please try again or contact support.";
 
 export function PaymentPreparationModal({
   open,
@@ -20,6 +21,7 @@ export function PaymentPreparationModal({
   onClose: () => void;
 }) {
   if (!open) return null;
+  const checkoutUrl = getCheckoutUrl(transaction);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 px-4 pb-4 sm:items-center sm:pb-0">
@@ -39,7 +41,7 @@ export function PaymentPreparationModal({
         </div>
 
         <h2 className="mt-4 font-display text-xl font-bold">{title}</h2>
-        <p className="mt-2 text-sm text-muted-foreground">{placeholderMessage}</p>
+        <p className="mt-2 text-sm text-muted-foreground">{checkoutUrl ? livePaymentMessage : fallbackMessage}</p>
 
         {transaction && (
           <div className="mt-4 grid grid-cols-2 gap-2">
@@ -56,10 +58,21 @@ export function PaymentPreparationModal({
 
         {details && <div className="mt-4">{details}</div>}
 
+        {checkoutUrl && (
+          <a
+            href={checkoutUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-5 block w-full rounded-2xl bg-gradient-primary py-3 text-center text-sm font-semibold text-primary-foreground"
+          >
+            Continue to Hubtel
+          </a>
+        )}
+
         <button
           type="button"
           onClick={onClose}
-          className="mt-5 w-full rounded-2xl bg-gradient-primary py-3 text-sm font-semibold text-primary-foreground"
+          className={`${checkoutUrl ? "mt-3 border border-border bg-card text-foreground" : "mt-5 bg-gradient-primary text-primary-foreground"} w-full rounded-2xl py-3 text-sm font-semibold`}
         >
           Done
         </button>
@@ -79,4 +92,15 @@ function PaymentMetric({ label, value }: { label: string; value: ReactNode }) {
 
 function formatPaymentType(value: string) {
   return value.replace(/_/g, " ");
+}
+
+function getCheckoutUrl(transaction: PaymentTransaction | null) {
+  const directUrl = (transaction as PaymentTransaction & { checkoutUrl?: string | null } | null)?.checkoutUrl;
+  if (typeof directUrl === "string" && directUrl.startsWith("http")) return directUrl;
+
+  const response = transaction?.provider_response;
+  if (!response || typeof response !== "object" || Array.isArray(response)) return null;
+
+  const checkoutUrl = response.checkout_url ?? response.checkoutUrl;
+  return typeof checkoutUrl === "string" && checkoutUrl.startsWith("http") ? checkoutUrl : null;
 }

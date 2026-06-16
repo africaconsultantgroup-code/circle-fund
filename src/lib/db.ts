@@ -11,6 +11,9 @@ export type UserVerification = Database['public']['Tables']['user_verifications'
 export type Contribution = Database['public']['Tables']['contributions']['Row'];
 export type Payout = Database['public']['Tables']['payouts']['Row'];
 export type PaymentTransaction = Database['public']['Tables']['payment_transactions']['Row'];
+export type HubtelPaymentTransaction = PaymentTransaction & {
+  checkoutUrl?: string | null;
+};
 export type WalletAccount = Database['public']['Tables']['wallet_accounts']['Row'];
 export type WalletTransaction = Database['public']['Tables']['wallet_transactions']['Row'];
 export type PayoutRotationItem = Database['public']['Functions']['get_circle_payout_rotation']['Returns'][number];
@@ -430,9 +433,17 @@ export async function markContributionPaidForTesting(contributionId: string, pay
 }
 
 export async function initiateHubtelContributionPayment(contributionId: string) {
-  return supabase.rpc('initiate_hubtel_contribution_payment', {
-    check_contribution_id: contributionId,
+  const result = await invokeAuthedFunction<{
+    ok: boolean;
+    transaction: HubtelPaymentTransaction;
+    checkoutUrl?: string | null;
+    providerReference?: string | null;
+    message?: string;
+  }>('initiate-hubtel-payment', {
+    body: { paymentType: 'contribution', contributionId },
   });
+
+  return normalizeHubtelPaymentResult(result);
 }
 
 export async function initiatePlaceholderPayment(payload: {
@@ -443,14 +454,50 @@ export async function initiatePlaceholderPayment(payload: {
   contributionId?: string | null;
   metadata?: Json;
 }) {
-  return supabase.rpc('initiate_placeholder_payment', {
-    payment_type: payload.paymentType,
-    amount: payload.amount,
-    currency: payload.currency ?? 'GHS',
-    circle_id: payload.circleId ?? null,
-    contribution_id: payload.contributionId ?? null,
-    provider_response: payload.metadata ?? {},
+  const result = await invokeAuthedFunction<{
+    ok: boolean;
+    transaction: HubtelPaymentTransaction;
+    checkoutUrl?: string | null;
+    providerReference?: string | null;
+    message?: string;
+  }>('initiate-hubtel-payment', {
+    body: {
+      paymentType: payload.paymentType,
+      amount: payload.amount,
+      currency: payload.currency ?? 'GHS',
+      circleId: payload.circleId ?? null,
+      contributionId: payload.contributionId ?? null,
+      metadata: payload.metadata ?? {},
+    },
   });
+
+  return normalizeHubtelPaymentResult(result);
+}
+
+function normalizeHubtelPaymentResult(result: {
+  data: {
+    ok: boolean;
+    transaction: HubtelPaymentTransaction;
+    checkoutUrl?: string | null;
+    providerReference?: string | null;
+    message?: string;
+  } | null;
+  error: { message: string } | null;
+}) {
+  if (result.error || !result.data?.transaction) {
+    return {
+      data: null as HubtelPaymentTransaction | null,
+      error: result.error ?? { message: 'Unable to initiate Hubtel payment.' },
+    };
+  }
+
+  return {
+    data: {
+      ...result.data.transaction,
+      checkoutUrl: result.data.checkoutUrl ?? null,
+    },
+    error: null,
+  };
 }
 
 export async function listCirclePayouts(circleId: string) {
