@@ -35,8 +35,8 @@ Deno.serve(async (req) => {
 
     return json({
       ok: true,
-      mode: "placeholder",
-      message: "Hubtel webhook placeholder received. Validation will be enabled before real collections.",
+      mode: "hubtel_collection",
+      message: "Hubtel webhook received. Accounting is updated only after successful payment confirmation.",
       event: data,
     });
   } catch (error) {

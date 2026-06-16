@@ -25,18 +25,6 @@ export async function listWalletTransactions(limit = 30) {
     .limit(limit);
 }
 
-export async function prepareWalletDeposit(payload: {
-  amount: number;
-  paymentMethod: "mtn_momo" | "telecel_cash" | "airteltigo_money";
-  currency?: string;
-}) {
-  return supabase.rpc("prepare_wallet_deposit", {
-    amount: payload.amount,
-    payment_method: payload.paymentMethod,
-    currency: payload.currency ?? "GHS",
-  });
-}
-
 export async function payContributionFromWallet(contributionId: string) {
   return supabase.rpc("pay_contribution_from_wallet", {
     check_contribution_id: contributionId,

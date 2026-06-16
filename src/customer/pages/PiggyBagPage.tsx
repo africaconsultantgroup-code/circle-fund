@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { CalendarDays, Loader2, LockKeyhole, PiggyBank, Plus, Wallet } from "lucide-react";
 import { formatGHS } from "@/lib/mock-data";
 import { buildPlanMetrics, formatDate, loadPiggyPlans, type PiggyPlanWithMetrics } from "@/lib/piggy-bag";
-import { getPiggyFinancialSummary, initiatePlaceholderPayment, listPersonalSusuDeposits, type PaymentTransaction, type PersonalSusuPlan, type PiggyFinancialSummaryItem } from "@/lib/db";
+import { getPiggyFinancialSummary, initiateHubtelPayment, listPersonalSusuDeposits, type PaymentTransaction, type PersonalSusuPlan, type PiggyFinancialSummaryItem } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { PaymentPreparationModal } from "@/components/payment-preparation-modal";
 
@@ -66,7 +66,7 @@ export function PiggyBagPage() {
     }
 
     setPreparingPlanId(item.plan.id);
-    const { data, error } = await initiatePlaceholderPayment({
+    const { data, error } = await initiateHubtelPayment({
       paymentType: "piggy_bag",
       amount,
       currency: "GHS",
@@ -83,7 +83,7 @@ export function PiggyBagPage() {
     setPreparingPlanId(null);
 
     if (error || !data) {
-      setError(error?.message ?? "We could not prepare Piggy Bag funding. Please try again.");
+      setError(error?.message ?? "We could not start Piggy Bag funding. Please try again.");
       return;
     }
 
@@ -120,8 +120,8 @@ export function PiggyBagPage() {
             <Wallet className="h-4 w-4" />
           </span>
           <div className="flex-1">
-            <p className="font-display text-sm font-semibold">Hubtel payment preparation</p>
-            <p className="mt-1 text-[11px] text-muted-foreground">Deposits are recorded as locked savings now. Hubtel collections and payouts can plug into these records later.</p>
+            <p className="font-display text-sm font-semibold">Hubtel mobile money</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">Piggy balances update only after Hubtel confirms a successful payment.</p>
           </div>
         </div>
       </div>
@@ -194,7 +194,7 @@ export function PiggyBagPage() {
                   className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-primary py-3 text-sm font-semibold text-primary-foreground disabled:bg-muted disabled:text-muted-foreground"
                 >
                   {preparingPlanId === plan.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
-                  Fund Piggy Bag
+                  Pay with Mobile Money
                 </button>
               </div>
             </li>
@@ -206,7 +206,7 @@ export function PiggyBagPage() {
       <PaymentPreparationModal
         open={Boolean(paymentTransaction)}
         transaction={paymentTransaction}
-        title="Piggy Bag payment prepared"
+        title="Piggy Bag payment started"
         onClose={() => setPaymentTransaction(null)}
       />
     </div>

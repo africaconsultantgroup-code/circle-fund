@@ -474,7 +474,7 @@ export async function initiateHubtelContributionPayment(contributionId: string) 
   return normalizeHubtelPaymentResult(result);
 }
 
-export async function initiatePlaceholderPayment(payload: {
+export async function initiateHubtelPayment(payload: {
   paymentType: PaymentType;
   amount: number;
   currency?: string;

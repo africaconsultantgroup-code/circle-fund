@@ -5,7 +5,7 @@ export const Route = createFileRoute("/_admin/admin/contributions")({
   component: () => (
     <PaymentMonitoringPage
       title="Contributions"
-      description="Monitor prepared Hubtel contribution payments. Real payment collection is not enabled yet."
+      description="Monitor Hubtel contribution payments, pending confirmations, and successful receipts."
       emptyText="No contribution payment transactions have been initiated yet."
     />
   ),

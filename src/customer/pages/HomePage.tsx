@@ -23,7 +23,7 @@ import { SavingsPlanner } from "@/components/savings-planner";
 import { getCurrentUser, getCurrentUserProfile, type UserProfile } from "@/lib/auth";
 import {
   initiateHubtelContributionPayment,
-  initiatePlaceholderPayment,
+  initiateHubtelPayment,
   getCustomerFinancialSummary,
   type Contribution,
   type CustomerFinancialSummary,
@@ -162,7 +162,7 @@ export function HomePage() {
     setBusyPayment("");
 
     if (error || !data) {
-      setPaymentError(error?.message ?? "We could not prepare this contribution payment.");
+      setPaymentError(error?.message ?? "We could not start this contribution payment.");
       return;
     }
 
@@ -173,7 +173,7 @@ export function HomePage() {
   const handleFundPiggyBox = async () => {
     setPaymentError("");
     setBusyPayment("piggy_box");
-    const { data, error } = await initiatePlaceholderPayment({
+    const { data, error } = await initiateHubtelPayment({
       paymentType: "piggy_bag",
       amount: 100,
       currency: "GHS",
@@ -182,7 +182,7 @@ export function HomePage() {
     setBusyPayment("");
 
     if (error || !data) {
-      setPaymentError(error?.message ?? "We could not prepare Piggy Box funding.");
+      setPaymentError(error?.message ?? "We could not start Piggy Box funding.");
       return;
     }
 
@@ -194,7 +194,7 @@ export function HomePage() {
     const amount = Number(nextContribution?.amount_due ?? nextContribution?.amount ?? dashboard.circles[0]?.amount ?? 100);
     setPaymentError("");
     setBusyPayment("savings_plan");
-    const { data, error } = await initiatePlaceholderPayment({
+    const { data, error } = await initiateHubtelPayment({
       paymentType: "savings",
       amount,
       currency: primaryCurrency,
@@ -207,7 +207,7 @@ export function HomePage() {
     setBusyPayment("");
 
     if (error || !data) {
-      setPaymentError(error?.message ?? "We could not prepare savings plan funding.");
+      setPaymentError(error?.message ?? "We could not start savings plan funding.");
       return;
     }
 
@@ -274,7 +274,7 @@ export function HomePage() {
           icon={<Target className="h-4 w-4" />}
           label="Savings Plan Balance"
           value={formatCurrency(dashboard.savingsPlanBalance, "GHS")}
-          emptyText="No savings plan payments prepared yet."
+          emptyText="No confirmed savings plan balance yet."
           actionLabel="Fund Savings Plan"
           loading={busyPayment === "savings_plan"}
           onAction={handleFundSavingsPlan}
@@ -451,7 +451,7 @@ export function HomePage() {
       <PaymentPreparationModal
         open={Boolean(paymentTransaction)}
         transaction={paymentTransaction}
-        title="Payment prepared"
+        title="Payment started"
         onClose={() => setPaymentTransaction(null)}
       />
     </div>

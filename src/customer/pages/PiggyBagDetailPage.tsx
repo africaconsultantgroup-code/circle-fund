@@ -2,15 +2,14 @@ import { useEffect, useState } from "react";
 import { CalendarDays, CheckCircle2, Loader2, LockKeyhole, PiggyBank, ShieldAlert, Wallet } from "lucide-react";
 import { PaymentPreparationModal } from "@/components/payment-preparation-modal";
 import { PageHeader } from "@/components/page-header";
-import { initiatePlaceholderPayment, type PaymentTransaction } from "@/lib/db";
+import { initiateHubtelPayment, type PaymentTransaction } from "@/lib/db";
 import { formatGHS } from "@/lib/mock-data";
-import { formatDate, loadPiggyPlan, recordPiggyDeposit, type PiggyPlanWithMetrics } from "@/lib/piggy-bag";
+import { formatDate, loadPiggyPlan, type PiggyPlanWithMetrics } from "@/lib/piggy-bag";
 
 export function PiggyBagDetailPage({ planId }: { planId: string }) {
   const [details, setDetails] = useState<PiggyPlanWithMetrics | null>(null);
   const [depositAmount, setDepositAmount] = useState(100);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSavingDeposit, setIsSavingDeposit] = useState(false);
   const [isPreparingPayment, setIsPreparingPayment] = useState(false);
   const [paymentTransaction, setPaymentTransaction] = useState<PaymentTransaction | null>(null);
   const [message, setMessage] = useState("");
@@ -28,28 +27,6 @@ export function PiggyBagDetailPage({ planId }: { planId: string }) {
     void loadDetails();
   }, [planId]);
 
-  const handleRecordDeposit = async () => {
-    setMessage("");
-    setError("");
-
-    if (!Number.isFinite(depositAmount) || depositAmount <= 0) {
-      setError("Enter a deposit amount greater than 0.");
-      return;
-    }
-
-    setIsSavingDeposit(true);
-    const result = await recordPiggyDeposit(planId, depositAmount);
-    setIsSavingDeposit(false);
-
-    if (result.error) {
-      setError(result.error);
-      return;
-    }
-
-    setMessage("Deposit recorded and locked in Piggy Bag. Hubtel collections can replace this preparation step later.");
-    await loadDetails();
-  };
-
   const handlePreparePiggyPayment = async () => {
     setMessage("");
     setError("");
@@ -63,7 +40,7 @@ export function PiggyBagDetailPage({ planId }: { planId: string }) {
     }
 
     setIsPreparingPayment(true);
-    const { data, error } = await initiatePlaceholderPayment({
+    const { data, error } = await initiateHubtelPayment({
       paymentType: "personal_susu",
       amount,
       currency: "GHS",
@@ -79,12 +56,12 @@ export function PiggyBagDetailPage({ planId }: { planId: string }) {
     setIsPreparingPayment(false);
 
     if (error || !data) {
-      setError(error?.message ?? "We could not prepare this Personal Susu payment. Please try again.");
+      setError(error?.message ?? "We could not start this Personal Susu payment. Please try again.");
       return;
     }
 
     setPaymentTransaction(data);
-    setMessage("Hubtel payment is being prepared. Real payment will be enabled once API credentials are added.");
+    setMessage("Hubtel payment started. This balance updates after Hubtel confirms success.");
   };
 
   const handleWithdrawalRequest = () => {
@@ -143,11 +120,11 @@ export function PiggyBagDetailPage({ planId }: { planId: string }) {
                 <Wallet className="h-4 w-4" />
               </span>
               <div className="flex-1">
-                <p className="font-display text-sm font-semibold">Add deposit</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">This records savings against the plan and locks it until the target date. Hubtel collections will use this plan and reference later.</p>
+                <p className="font-display text-sm font-semibold">Fund this plan</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Pay with mobile money. Savings are locked after Hubtel confirms success.</p>
               </div>
             </div>
-            <div className="mt-4 flex gap-2">
+            <div className="mt-4">
               <div className="flex flex-1 items-center gap-2 rounded-2xl border border-input bg-muted/40 px-4 py-3">
                 <span className="text-sm font-semibold text-muted-foreground">GHS</span>
                 <input
@@ -158,14 +135,6 @@ export function PiggyBagDetailPage({ planId }: { planId: string }) {
                   className="min-w-0 flex-1 bg-transparent text-sm outline-none"
                 />
               </div>
-              <button
-                type="button"
-                disabled={isSavingDeposit}
-                onClick={handleRecordDeposit}
-                className="rounded-2xl bg-gradient-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-              >
-                {isSavingDeposit ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-              </button>
             </div>
             <button
               type="button"
@@ -174,7 +143,7 @@ export function PiggyBagDetailPage({ planId }: { planId: string }) {
               className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-primary/25 bg-primary/10 py-3 text-sm font-semibold text-primary disabled:opacity-60"
             >
               {isPreparingPayment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
-              Pay Susu Contribution
+              Pay with Mobile Money
             </button>
             <p className="mt-2 text-[11px] text-muted-foreground">
               Contribution amount: <span className="font-semibold text-foreground">{formatGHS(depositAmount)}</span>
@@ -242,7 +211,7 @@ export function PiggyBagDetailPage({ planId }: { planId: string }) {
           <PaymentPreparationModal
             open={Boolean(paymentTransaction)}
             transaction={paymentTransaction}
-            title="Personal Susu payment prepared"
+            title="Personal Susu payment started"
             onClose={() => setPaymentTransaction(null)}
           />
         </div>

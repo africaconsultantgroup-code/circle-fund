@@ -5,7 +5,8 @@ import { ArrowDownLeft, ArrowUpRight, CheckCircle2, Clock, Loader2, ShieldAlert,
 import { PaymentPreparationModal } from "@/components/payment-preparation-modal";
 import { getCurrentUser } from "@/lib/auth";
 import {
-  initiatePlaceholderPayment,
+  initiateHubtelContributionPayment,
+  initiateHubtelPayment,
   getCustomerPaymentHistory,
   listPersonalSusuDeposits,
   listPersonalSusuPlans,
@@ -21,7 +22,6 @@ import { buildPlanMetrics } from "@/lib/piggy-bag";
 import {
   getWalletSummary,
   listWalletTransactions,
-  payContributionFromWallet,
   walletMetadataString,
   walletPaymentMethodLabel,
   walletTransactionLabel,
@@ -161,7 +161,7 @@ function PaymentsPage() {
     }
 
     setPreparingId("wallet_deposit");
-    const { data, error } = await initiatePlaceholderPayment({
+    const { data, error } = await initiateHubtelPayment({
       paymentType: "wallet_deposit",
       amount,
       currency: walletCurrency,
@@ -174,28 +174,29 @@ function PaymentsPage() {
     setPreparingId(null);
 
     if (error || !data) {
-      setError(error?.message ?? "We could not prepare this wallet deposit.");
+      setError(error?.message ?? "We could not start this wallet deposit.");
       return;
     }
 
     setPaymentTransaction(data);
-    setWalletNotice(`Deposit payment prepared through ${walletPaymentMethodLabel(depositMethod)}. Balances update after Hubtel confirms payment.`);
+    setWalletNotice(`Mobile money payment started through ${walletPaymentMethodLabel(depositMethod)}. Balances update after Hubtel confirms payment.`);
     await loadPayments();
   };
 
-  const handlePayContributionFromWallet = async (contribution: ContributionWithCircle) => {
+  const handlePayContribution = async (contribution: ContributionWithCircle) => {
     setError("");
     setWalletNotice("");
     setPreparingId(contribution.id);
-    const { data, error } = await payContributionFromWallet(contribution.id);
+    const { data, error } = await initiateHubtelContributionPayment(contribution.id);
     setPreparingId(null);
 
     if (error || !data) {
-      setError(error?.message ?? "We could not pay this contribution from your wallet.");
+      setError(error?.message ?? "We could not start this contribution payment.");
       return;
     }
 
-    setWalletNotice(`Contribution paid from Sika Wallet. Receipt: ${data.receipt_id}`);
+    setPaymentTransaction(data);
+    setWalletNotice("Contribution payment started. The ledger updates after Hubtel confirms success.");
     await loadPayments();
   };
 
@@ -203,7 +204,7 @@ function PaymentsPage() {
     setError("");
     setWalletNotice("");
     setPreparingId(item.plan.id);
-    const { data, error } = await initiatePlaceholderPayment({
+    const { data, error } = await initiateHubtelPayment({
       paymentType: "personal_susu",
       amount: item.amountDue,
       currency: "GHS",
@@ -217,7 +218,7 @@ function PaymentsPage() {
     setPreparingId(null);
 
     if (error || !data) {
-      setError(error?.message ?? "We could not prepare this Personal Susu payment.");
+      setError(error?.message ?? "We could not start this Personal Susu payment.");
       return;
     }
 
@@ -243,7 +244,7 @@ function PaymentsPage() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="font-display text-base font-semibold">Deposit funds</h2>
-            <p className="mt-1 text-[11px] text-muted-foreground">Hubtel collection is prepared, but live money movement is still disabled.</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">Pay securely with mobile money. Balances update after Hubtel confirms success.</p>
           </div>
           <Wallet className="h-5 w-5 text-primary" />
         </div>
@@ -277,14 +278,14 @@ function PaymentsPage() {
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
           >
             {preparingId === "wallet_deposit" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowDownLeft className="h-4 w-4" />}
-            Prepare Deposit
+            Pay with Mobile Money
           </button>
         </div>
       </section>
 
       <div className="mt-5 grid grid-cols-2 gap-3">
         <SummaryCard label="Amount due" value={formatCurrency(totals.totalDue, "GHS")} tone="plain" />
-        <SummaryCard label="Prepared payments" value={String(totals.initiated)} tone="plain" />
+        <SummaryCard label="Pending payments" value={String(totals.initiated)} tone="plain" />
       </div>
 
       {error && (
@@ -325,11 +326,11 @@ function PaymentsPage() {
                   <button
                     type="button"
                     disabled={preparingId === contribution.id || amount <= 0}
-                    onClick={() => handlePayContributionFromWallet(contribution)}
+                    onClick={() => handlePayContribution(contribution)}
                     className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-primary py-3 text-sm font-semibold text-primary-foreground disabled:bg-muted disabled:text-muted-foreground"
                   >
                     {preparingId === contribution.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
-                    Pay from Wallet
+                    Pay with Mobile Money
                   </button>
                 </li>
               );
@@ -393,7 +394,7 @@ function PaymentsPage() {
       <PaymentPreparationModal
         open={Boolean(paymentTransaction)}
         transaction={paymentTransaction}
-        title="Payment prepared"
+        title="Payment started"
         onClose={() => setPaymentTransaction(null)}
       />
     </div>

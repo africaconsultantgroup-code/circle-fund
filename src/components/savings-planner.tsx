@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { CalendarDays, Calculator, Loader2, Wallet } from "lucide-react";
 import { formatCurrency } from "@/lib/diaspora";
-import { initiatePlaceholderPayment, type PaymentTransaction } from "@/lib/db";
+import { initiateHubtelPayment, type PaymentTransaction } from "@/lib/db";
 import type { CurrencyCode } from "@/lib/supabase-types";
 import { PaymentPreparationModal } from "@/components/payment-preparation-modal";
 
@@ -46,7 +46,7 @@ export function SavingsPlanner({
     }
 
     setIsPreparingPayment(true);
-    const { data, error } = await initiatePlaceholderPayment({
+    const { data, error } = await initiateHubtelPayment({
       paymentType: "savings",
       amount,
       currency,
@@ -62,7 +62,7 @@ export function SavingsPlanner({
     setIsPreparingPayment(false);
 
     if (error || !data) {
-      setPaymentError(error?.message ?? "We could not prepare this payment. Please try again.");
+      setPaymentError(error?.message ?? "We could not start this payment. Please try again.");
       return;
     }
 
@@ -161,7 +161,7 @@ export function SavingsPlanner({
       <PaymentPreparationModal
         open={Boolean(paymentTransaction)}
         transaction={paymentTransaction}
-        title="Savings payment prepared"
+        title="Savings payment started"
         onClose={() => setPaymentTransaction(null)}
       />
     </section>

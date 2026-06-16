@@ -1,5 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { PaymentPreparationModal } from "@/components/payment-preparation-modal";
 import { PageHeader } from "@/components/page-header";
 import { SavingsPlanner } from "@/components/savings-planner";
 import { Activity, Calendar, Check, HeartPulse, Loader2, LockKeyhole, RefreshCw, Settings, Share2, ShieldAlert, ShieldCheck, Shuffle, TrendingUp, Users, WalletCards, X } from "lucide-react";
@@ -10,6 +11,7 @@ import {
   getCircleById,
   getCircleMembership,
   getCirclePaymentSummary,
+  initiateHubtelContributionPayment,
   listCirclePayoutRotation,
   listCircleContributions,
   listCircleMembers,
@@ -18,6 +20,7 @@ import {
   type Circle,
   type CircleContributionStatus,
   type CircleMemberDetails,
+  type PaymentTransaction,
   type CirclePaymentSummary,
   type PayoutRotationItem,
 } from "@/lib/db";
@@ -26,7 +29,6 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { requireAuth } from "@/lib/phone-guard";
 import { formatCurrency } from "@/lib/diaspora";
 import type { CurrencyCode } from "@/lib/supabase-types";
-import { payContributionFromWallet } from "@/lib/wallet";
 
 export const Route = createFileRoute("/circle/$id")({
   beforeLoad: requireAuth,
@@ -66,6 +68,7 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
   const [isUpdatingRotation, setIsUpdatingRotation] = useState(false);
   const [initiatingPaymentId, setInitiatingPaymentId] = useState<string | null>(null);
   const [paymentNotice, setPaymentNotice] = useState("");
+  const [paymentTransaction, setPaymentTransaction] = useState<PaymentTransaction | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -208,12 +211,12 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
     await loadCircle();
   }
 
-  async function handlePayContributionFromWallet(contribution: CircleContributionStatus) {
+  async function handlePayContribution(contribution: CircleContributionStatus) {
     setMessage("");
     setError("");
     setPaymentNotice("");
     setInitiatingPaymentId(contribution.contribution_id);
-    const { data, error: paymentError } = await payContributionFromWallet(contribution.contribution_id);
+    const { data, error: paymentError } = await initiateHubtelContributionPayment(contribution.contribution_id);
     setInitiatingPaymentId(null);
 
     if (paymentError) {
@@ -221,7 +224,8 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
       return;
     }
 
-    setPaymentNotice(`Contribution paid from Sika Wallet. Receipt: ${data?.receipt_id ?? "pending"}`);
+    setPaymentTransaction(data ?? null);
+    setPaymentNotice(`Contribution payment started. Reference: ${data?.provider_reference ?? "pending"}. The ledger updates after Hubtel confirms success.`);
     await loadCircle();
   }
 
@@ -476,12 +480,12 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
                       </div>
                       {user?.id === contribution.user_id && ["unpaid", "overdue", "pending", "failed"].includes(contribution.status) && (
                         <button
-                          onClick={() => handlePayContributionFromWallet(contribution)}
+                          onClick={() => handlePayContribution(contribution)}
                           disabled={initiatingPaymentId === contribution.contribution_id}
                           className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2 text-[11px] font-semibold text-primary-foreground disabled:opacity-60"
                         >
                           {initiatingPaymentId === contribution.contribution_id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                          Pay from Wallet
+                          Pay with Mobile Money
                         </button>
                       )}
                     </li>
@@ -504,6 +508,12 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
           )}
         </>
       ) : null}
+      <PaymentPreparationModal
+        open={Boolean(paymentTransaction)}
+        transaction={paymentTransaction}
+        title="Contribution payment started"
+        onClose={() => setPaymentTransaction(null)}
+      />
     </div>
   );
 }

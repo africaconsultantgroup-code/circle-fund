@@ -4,13 +4,13 @@ import { formatCurrency } from "@/lib/diaspora";
 import type { CurrencyCode } from "@/lib/supabase-types";
 import type { PaymentTransaction } from "@/lib/db";
 
-const livePaymentMessage = "Hubtel checkout has been created. Continue to Hubtel to complete this payment.";
+const livePaymentMessage = "Hubtel checkout has been created. Continue to Hubtel to complete this payment. Balances update after Hubtel confirms success.";
 const fallbackMessage = "Hubtel payment was initiated, but no checkout link was returned. Please try again or contact support.";
 
 export function PaymentPreparationModal({
   open,
   transaction,
-  title = "Payment prepared",
+  title = "Payment started",
   details,
   onClose,
 }: {
@@ -34,7 +34,7 @@ export function PaymentPreparationModal({
             type="button"
             onClick={onClose}
             className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground"
-            aria-label="Close payment preparation"
+            aria-label="Close payment"
           >
             <X className="h-4 w-4" />
           </button>

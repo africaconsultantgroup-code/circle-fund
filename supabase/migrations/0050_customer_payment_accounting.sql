@@ -168,9 +168,9 @@ begin
     'initiated',
     payment_type,
     jsonb_build_object(
-      'mode', 'placeholder',
-      'message', 'Hubtel payment is being prepared. Real payment will be enabled once API credentials are added.',
-      'real_collection_enabled', false,
+      'mode', 'hubtel_collection',
+      'message', 'Hubtel payment initiated. Balances update after Hubtel confirms success.',
+      'real_collection_enabled', true,
       'money_movement_allowed', public.user_can_access_money_movement(current_user_id)
     ) || coalesce(provider_response, '{}'::jsonb),
     now(),
@@ -216,7 +216,7 @@ begin
       'amount', created_transaction.amount,
       'currency', created_transaction.currency,
       'provider_reference', created_transaction.provider_reference,
-      'mode', 'placeholder'
+      'mode', 'hubtel_collection'
     )
   );
 
