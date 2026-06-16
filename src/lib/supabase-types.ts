@@ -19,8 +19,8 @@ export type PersonalSusuDurationUnit = 'weeks' | 'months';
 export type PersonalSusuPlanStatus = 'active' | 'completed' | 'cancelled';
 export type PersonalSusuPaymentStatus = 'pending' | 'paid' | 'failed';
 export type PaymentTransactionStatus = 'initiated' | 'pending' | 'successful' | 'failed' | 'cancelled' | 'reversed';
-export type PaymentType = 'contribution' | 'savings' | 'piggy_bag' | 'personal_susu';
-export type WalletTransactionType = 'deposit' | 'contribution_payment' | 'payout_received' | 'piggy_bag_deposit' | 'piggy_bag_withdrawal' | 'refund';
+export type PaymentType = 'contribution' | 'savings' | 'piggy_bag' | 'personal_susu' | 'wallet_deposit';
+export type WalletTransactionType = 'deposit' | 'contribution_payment' | 'payout_received' | 'piggy_bag_deposit' | 'piggy_bag_withdrawal' | 'savings_deposit' | 'personal_susu_deposit' | 'refund';
 export type WalletTransactionDirection = 'inflow' | 'outflow' | 'lock' | 'unlock';
 export type WalletTransactionStatus = 'pending' | 'successful' | 'failed' | 'cancelled';
 
@@ -655,6 +655,7 @@ export interface Database {
           circle_id: string | null;
           contribution_id: string | null;
           payout_schedule_id: string | null;
+          payment_transaction_id: string | null;
           transaction_type: WalletTransactionType;
           amount: number;
           currency: string;
@@ -676,6 +677,7 @@ export interface Database {
           circle_id?: string | null;
           contribution_id?: string | null;
           payout_schedule_id?: string | null;
+          payment_transaction_id?: string | null;
           transaction_type: WalletTransactionType;
           amount: number;
           currency?: string;
@@ -694,6 +696,7 @@ export interface Database {
           circle_id?: string | null;
           contribution_id?: string | null;
           payout_schedule_id?: string | null;
+          payment_transaction_id?: string | null;
           transaction_type?: WalletTransactionType;
           amount?: number;
           currency?: string;
@@ -799,6 +802,7 @@ export interface Database {
           payment_status: PersonalSusuPaymentStatus;
           provider: string | null;
           transaction_reference: string | null;
+          payment_transaction_id: string | null;
           deposited_at: string;
           created_at: string;
         };
@@ -810,6 +814,7 @@ export interface Database {
           payment_status?: PersonalSusuPaymentStatus;
           provider?: string | null;
           transaction_reference?: string | null;
+          payment_transaction_id?: string | null;
           deposited_at?: string;
           created_at?: string;
         };
@@ -818,6 +823,7 @@ export interface Database {
           payment_status?: PersonalSusuPaymentStatus;
           provider?: string | null;
           transaction_reference?: string | null;
+          payment_transaction_id?: string | null;
           deposited_at?: string;
         };
       };
@@ -1004,6 +1010,66 @@ export interface Database {
           monthly_inflow: number;
           monthly_outflow: number;
           currency: string;
+        }>;
+      };
+      get_customer_financial_summary: {
+        Args: Record<PropertyKey, never>;
+        Returns: Array<{
+          total_paid: number;
+          total_deposited: number;
+          total_contributed: number;
+          piggy_balance: number;
+          savings_balance: number;
+          available_wallet_balance: number;
+          locked_balance: number;
+          total_received: number;
+          currency: string;
+        }>;
+      };
+      get_customer_payment_history: {
+        Args: Record<PropertyKey, never>;
+        Returns: Array<{
+          transaction_id: string;
+          wallet_transaction_id: string | null;
+          payment_type: string;
+          service_type: string;
+          amount: number;
+          currency: string;
+          status: string;
+          provider: string;
+          provider_reference: string | null;
+          receipt_id: string | null;
+          payment_method: string | null;
+          created_at: string;
+          completed_at: string | null;
+        }>;
+      };
+      get_piggy_financial_summary: {
+        Args: Record<PropertyKey, never>;
+        Returns: Array<{
+          plan_id: string;
+          plan_name: string;
+          target_amount: number;
+          total_deposited: number;
+          locked_amount: number;
+          progress_percentage: number;
+          payment_count: number;
+          last_payment_at: string | null;
+        }>;
+      };
+      get_circle_payment_summary: {
+        Args: { check_circle_id: string };
+        Returns: Array<{
+          circle_id: string;
+          total_expected: number;
+          total_paid: number;
+          pending_amount: number;
+          overdue_amount: number;
+          failed_amount: number;
+          members_paid: number;
+          members_pending: number;
+          members_overdue: number;
+          funding_progress: number;
         }>;
       };
       prepare_wallet_deposit: {

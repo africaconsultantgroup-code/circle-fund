@@ -3,12 +3,13 @@ import { useEffect, useState } from "react";
 import { CalendarDays, Loader2, LockKeyhole, PiggyBank, Plus, Wallet } from "lucide-react";
 import { formatGHS } from "@/lib/mock-data";
 import { buildPlanMetrics, formatDate, loadPiggyPlans, type PiggyPlanWithMetrics } from "@/lib/piggy-bag";
-import { initiatePlaceholderPayment, listPersonalSusuDeposits, type PaymentTransaction, type PersonalSusuPlan } from "@/lib/db";
+import { getPiggyFinancialSummary, initiatePlaceholderPayment, listPersonalSusuDeposits, type PaymentTransaction, type PersonalSusuPlan, type PiggyFinancialSummaryItem } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { PaymentPreparationModal } from "@/components/payment-preparation-modal";
 
 export function PiggyBagPage() {
   const [plans, setPlans] = useState<PiggyPlanWithMetrics[]>([]);
+  const [summaries, setSummaries] = useState<Record<string, PiggyFinancialSummaryItem>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [preparingPlanId, setPreparingPlanId] = useState<string | null>(null);
   const [paymentTransaction, setPaymentTransaction] = useState<PaymentTransaction | null>(null);
@@ -20,7 +21,7 @@ export function PiggyBagPage() {
     async function loadPlans() {
       setIsLoading(true);
       const user = await getCurrentUser();
-      const result = await loadPiggyPlans();
+      const [result, summaryResult] = await Promise.all([loadPiggyPlans(), getPiggyFinancialSummary()]);
 
       if (!user) {
         if (!isMounted) return;
@@ -39,7 +40,8 @@ export function PiggyBagPage() {
 
       if (!isMounted) return;
       setPlans(metrics);
-      setError(result.error ?? "");
+      setSummaries(Object.fromEntries((summaryResult.data ?? []).map((summary) => [summary.plan_id, summary])));
+      setError(result.error ?? summaryResult.error?.message ?? "");
       setIsLoading(false);
     }
 
@@ -50,7 +52,7 @@ export function PiggyBagPage() {
     };
   }, []);
 
-  const lockedBalance = plans.reduce((total, item) => total + item.lockedBalance, 0);
+  const lockedBalance = Object.values(summaries).reduce((total, item) => total + Number(item.locked_amount ?? 0), 0);
   const availableBalance = plans.reduce((total, item) => total + item.availableBalance, 0);
   const activePlans = plans.filter((item) => item.plan.status === "active").length;
 
@@ -148,6 +150,10 @@ export function PiggyBagPage() {
           )}
           {plans.map((item) => {
             const { plan, metrics, lockedBalance: locked } = item;
+            const summary = summaries[plan.id];
+            const displayLocked = Number(summary?.locked_amount ?? locked);
+            const displayProgress = Number(summary?.progress_percentage ?? metrics.progressPercentage);
+            const displayDeposited = Number(summary?.total_deposited ?? locked);
             const amountDue = metrics.expectedContributionPerPeriod || metrics.remainingBalance;
             return (
             <li key={plan.id}>
@@ -168,16 +174,16 @@ export function PiggyBagPage() {
                   </div>
                 </div>
                 <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
-                  <div className="h-full rounded-full bg-gradient-gold" style={{ width: `${metrics.progressPercentage}%` }} />
+                  <div className="h-full rounded-full bg-gradient-gold" style={{ width: `${displayProgress}%` }} />
                 </div>
                 <div className="mt-3 flex items-center justify-between text-[11px]">
-                  <span className="text-muted-foreground">Locked: <span className="font-semibold text-foreground">{formatGHS(locked)}</span></span>
+                  <span className="text-muted-foreground">Locked: <span className="font-semibold text-foreground">{formatGHS(displayLocked)}</span></span>
                   <span className="flex items-center gap-1 text-muted-foreground">
                     <CalendarDays className="h-3.5 w-3.5" /> {formatDate(plan.locked_until)}
                   </span>
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
-                  <span>Duration: <span className="font-semibold text-foreground">{plan.duration} {plan.duration_unit}</span></span>
+                  <span>Deposited: <span className="font-semibold text-foreground">{formatGHS(displayDeposited)}</span></span>
                   <span className="text-right">Due: <span className="font-semibold text-foreground">{formatGHS(amountDue)}</span></span>
                 </div>
               </Link>

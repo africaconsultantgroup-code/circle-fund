@@ -24,14 +24,13 @@ import { getCurrentUser, getCurrentUserProfile, type UserProfile } from "@/lib/a
 import {
   initiateHubtelContributionPayment,
   initiatePlaceholderPayment,
-  listPersonalSusuDeposits,
-  listPersonalSusuPlans,
+  getCustomerFinancialSummary,
   type Contribution,
+  type CustomerFinancialSummary,
   type PaymentTransaction,
   type Payout,
 } from "@/lib/db";
 import { formatCurrency } from "@/lib/diaspora";
-import { buildPlanMetrics } from "@/lib/piggy-bag";
 import { supabase } from "@/lib/supabase";
 import { loadUserCircles, type UserCircle } from "@/lib/user-circles";
 import { getVerificationGateSummary, type VerificationGateSummary } from "@/lib/onboarding";
@@ -79,8 +78,12 @@ type DashboardData = {
   upcomingContributions: ContributionWithCircle[];
   totalContributed: number;
   totalReceived: number;
+  totalPaid: number;
+  totalDeposited: number;
   piggyBoxBalance: number;
   savingsPlanBalance: number;
+  availableWalletBalance: number;
+  lockedBalance: number;
   nextPayout: PayoutTurn | null;
   circleFinancials: Record<string, CircleFinancialSummary>;
   notifications: NotificationItem[];
@@ -93,8 +96,12 @@ const emptyDashboard: DashboardData = {
   upcomingContributions: [],
   totalContributed: 0,
   totalReceived: 0,
+  totalPaid: 0,
+  totalDeposited: 0,
   piggyBoxBalance: 0,
   savingsPlanBalance: 0,
+  availableWalletBalance: 0,
+  lockedBalance: 0,
   nextPayout: null,
   circleFinancials: {},
   notifications: [],
@@ -113,7 +120,7 @@ export function HomePage() {
   const canUseCircles = Boolean(gateSummary?.canUseCircleActions);
   const nextContribution = dashboard.upcomingContributions[0] ?? null;
   const primaryCurrency = (nextContribution?.circles?.base_currency ?? dashboard.circles[0]?.baseCurrency ?? "GHS") as CurrencyCode;
-  const totalFinancialPosition = dashboard.totalContributed + dashboard.piggyBoxBalance + dashboard.savingsPlanBalance;
+  const totalFinancialPosition = dashboard.availableWalletBalance + dashboard.lockedBalance + dashboard.totalContributed;
   const unread = dashboard.notifications.length;
   const activeParticipationCircles = dashboard.circles.filter((circle) => ["pending", "pending_capacity_review", "approved"].includes(circle.membershipStatus)).length;
   const creatorLimitReached = canUseCircles && Boolean(createLimit && !createLimit.canCreate);
@@ -226,7 +233,7 @@ export function HomePage() {
         <div className="mt-8">
           <p className="text-xs uppercase tracking-wider text-primary-foreground/60">Tracked balance</p>
           <p className="mt-1 font-display text-4xl font-bold tracking-tight">{formatCurrency(totalFinancialPosition, primaryCurrency)}</p>
-          <p className="mt-2 text-xs text-primary-foreground/70">Contributions, Piggy Box, and prepared savings plans.</p>
+          <p className="mt-2 text-xs text-primary-foreground/70">Confirmed wallet, contributions, Piggy Box, and savings balances.</p>
         </div>
       </header>
 
@@ -282,7 +289,11 @@ export function HomePage() {
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2">
             <BreakdownMetric label="Total contributed" value={formatCurrency(dashboard.totalContributed, primaryCurrency)} />
+            <BreakdownMetric label="Total paid" value={formatCurrency(dashboard.totalPaid, primaryCurrency)} />
+            <BreakdownMetric label="Total deposited" value={formatCurrency(dashboard.totalDeposited, primaryCurrency)} />
             <BreakdownMetric label="Total received" value={formatCurrency(dashboard.totalReceived, primaryCurrency)} />
+            <BreakdownMetric label="Wallet available" value={formatCurrency(dashboard.availableWalletBalance, primaryCurrency)} />
+            <BreakdownMetric label="Locked balance" value={formatCurrency(dashboard.lockedBalance, primaryCurrency)} />
             <BreakdownMetric label="Piggy Box" value={formatCurrency(dashboard.piggyBoxBalance, "GHS")} />
             <BreakdownMetric label="Savings plan" value={formatCurrency(dashboard.savingsPlanBalance, primaryCurrency)} />
           </div>
@@ -453,7 +464,7 @@ async function loadFinancialDashboard(): Promise<DashboardData> {
     return { ...emptyDashboard, error: "Please sign in to view your financial dashboard." };
   }
 
-  const [upcomingResult, allContributionsResult, paidContributionsResult, payoutsResult, savingsTransactionsResult, piggyResult, payoutTurnResult, payoutTurnsResult] = await Promise.all([
+  const [upcomingResult, allContributionsResult, payoutsResult, financialSummaryResult, payoutTurnResult, payoutTurnsResult] = await Promise.all([
     supabase
       .from("contributions")
       .select("*, circles(id, name, base_currency)")
@@ -465,22 +476,11 @@ async function loadFinancialDashboard(): Promise<DashboardData> {
       .select("circle_id, status")
       .eq("user_id", user.id),
     supabase
-      .from("contributions")
-      .select("amount, amount_due, status")
-      .eq("user_id", user.id)
-      .in("status", ["paid", "processed"]),
-    supabase
       .from("payouts")
       .select("*")
       .eq("user_id", user.id)
       .eq("status", "completed"),
-    supabase
-      .from("payment_transactions")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("payment_type", "savings")
-      .in("status", ["initiated", "pending", "successful"]),
-    loadPiggyBalance(user.id),
+    getCustomerFinancialSummary(),
     loadNextPayoutTurn(user.id),
     loadPayoutTurns(user.id),
   ]);
@@ -489,55 +489,50 @@ async function loadFinancialDashboard(): Promise<DashboardData> {
     circleResult.error,
     upcomingResult.error?.message,
     allContributionsResult.error?.message,
-    paidContributionsResult.error?.message,
     payoutsResult.error?.message,
-    savingsTransactionsResult.error?.message,
-    piggyResult.error,
+    financialSummaryResult.error?.message,
     payoutTurnResult.error,
     payoutTurnsResult.error,
   ].filter(Boolean);
 
-  const totalContributed = (paidContributionsResult.data ?? []).reduce(
-    (sum, contribution) => sum + Number(contribution.amount_due ?? contribution.amount ?? 0),
-    0,
-  );
-  const totalReceived = ((payoutsResult.data ?? []) as Payout[]).reduce((sum, payout) => sum + Number(payout.amount ?? 0), 0);
-  const savingsPlanBalance = ((savingsTransactionsResult.data ?? []) as PaymentTransaction[]).reduce((sum, transaction) => sum + Number(transaction.amount ?? 0), 0);
+  const summary = financialSummaryResult.data ?? emptyFinancialSummary();
+  const totalReceived = Number(summary.total_received ?? 0) || ((payoutsResult.data ?? []) as Payout[]).reduce((sum, payout) => sum + Number(payout.amount ?? 0), 0);
 
   return {
     profile,
     circles: circleResult.data,
     upcomingContributions: (upcomingResult.data ?? []) as ContributionWithCircle[],
-    totalContributed,
+    totalContributed: Number(summary.total_contributed ?? 0),
     totalReceived,
-    piggyBoxBalance: piggyResult.balance,
-    savingsPlanBalance,
+    totalPaid: Number(summary.total_paid ?? 0),
+    totalDeposited: Number(summary.total_deposited ?? 0),
+    piggyBoxBalance: Number(summary.piggy_balance ?? 0),
+    savingsPlanBalance: Number(summary.savings_balance ?? 0),
+    availableWalletBalance: Number(summary.available_wallet_balance ?? 0),
+    lockedBalance: Number(summary.locked_balance ?? 0),
     nextPayout: payoutTurnResult.data,
     circleFinancials: buildCircleFinancials(circleResult.data, allContributionsResult.data ?? [], payoutTurnsResult.data),
     notifications: buildNotifications({
       upcomingContributions: (upcomingResult.data ?? []) as ContributionWithCircle[],
       nextPayout: payoutTurnResult.data,
-      piggyBoxBalance: piggyResult.balance,
+      piggyBoxBalance: Number(summary.piggy_balance ?? 0),
       participationReviewNeeded: circleResult.data.filter((circle) => ["pending", "approved"].includes(circle.membershipStatus)).length >= 3,
     }),
     error: errors.length > 0 ? errors.join(" ") : null,
   };
 }
 
-async function loadPiggyBalance(userId: string) {
-  const planResult = await listPersonalSusuPlans(userId);
-  if (planResult.error) return { balance: 0, error: planResult.error.message };
-
-  const metrics = await Promise.all(
-    (planResult.data ?? []).map(async (plan) => {
-      const deposits = await listPersonalSusuDeposits(plan.id, userId);
-      return deposits.error ? null : buildPlanMetrics(plan, deposits.data ?? []);
-    }),
-  );
-
+function emptyFinancialSummary(): CustomerFinancialSummary {
   return {
-    balance: metrics.filter(Boolean).reduce((sum, item) => sum + (item?.lockedBalance ?? 0) + (item?.availableBalance ?? 0), 0),
-    error: null,
+    total_paid: 0,
+    total_deposited: 0,
+    total_contributed: 0,
+    piggy_balance: 0,
+    savings_balance: 0,
+    available_wallet_balance: 0,
+    locked_balance: 0,
+    total_received: 0,
+    currency: "GHS",
   };
 }
 

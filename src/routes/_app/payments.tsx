@@ -6,9 +6,11 @@ import { PaymentPreparationModal } from "@/components/payment-preparation-modal"
 import { getCurrentUser } from "@/lib/auth";
 import {
   initiatePlaceholderPayment,
+  getCustomerPaymentHistory,
   listPersonalSusuDeposits,
   listPersonalSusuPlans,
   type Contribution,
+  type CustomerPaymentHistoryItem,
   type PaymentTransaction,
   type PersonalSusuPlan,
 } from "@/lib/db";
@@ -20,7 +22,6 @@ import {
   getWalletSummary,
   listWalletTransactions,
   payContributionFromWallet,
-  prepareWalletDeposit,
   walletMetadataString,
   walletPaymentMethodLabel,
   walletTransactionLabel,
@@ -57,7 +58,7 @@ const depositMethods: Array<{ value: DepositMethod; label: string }> = [
 function PaymentsPage() {
   const [contributions, setContributions] = useState<ContributionWithCircle[]>([]);
   const [personalSusuDue, setPersonalSusuDue] = useState<PersonalSusuDue[]>([]);
-  const [transactions, setTransactions] = useState<PaymentTransaction[]>([]);
+  const [transactions, setTransactions] = useState<CustomerPaymentHistoryItem[]>([]);
   const [walletSummary, setWalletSummary] = useState<WalletSummary | null>(null);
   const [walletTransactions, setWalletTransactions] = useState<WalletTransactionWithCircle[]>([]);
   const [depositAmount, setDepositAmount] = useState("100");
@@ -91,12 +92,7 @@ function PaymentsPage() {
         .eq("user_id", user.id)
         .in("status", ["pending", "unpaid", "overdue", "late", "failed"])
         .order("due_date", { ascending: true }),
-      supabase
-        .from("payment_transactions")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(10),
+      getCustomerPaymentHistory(),
       listPersonalSusuPlans(user.id),
       getWalletSummary(),
       listWalletTransactions(12),
@@ -165,7 +161,16 @@ function PaymentsPage() {
     }
 
     setPreparingId("wallet_deposit");
-    const { data, error } = await prepareWalletDeposit({ amount, paymentMethod: depositMethod, currency: walletCurrency });
+    const { data, error } = await initiatePlaceholderPayment({
+      paymentType: "wallet_deposit",
+      amount,
+      currency: walletCurrency,
+      metadata: {
+        source: "payments_tab",
+        paymentMethod: depositMethod,
+        label: "wallet_deposit",
+      },
+    });
     setPreparingId(null);
 
     if (error || !data) {
@@ -173,7 +178,8 @@ function PaymentsPage() {
       return;
     }
 
-    setWalletNotice(`Deposit prepared through ${walletPaymentMethodLabel(depositMethod)}. Hubtel live collection is not enabled yet. Receipt: ${data.receipt_id}`);
+    setPaymentTransaction(data);
+    setWalletNotice(`Deposit payment prepared through ${walletPaymentMethodLabel(depositMethod)}. Balances update after Hubtel confirms payment.`);
     await loadPayments();
   };
 
@@ -354,8 +360,22 @@ function PaymentsPage() {
           </MoneySection>
 
           <div className="mt-7 flex items-center justify-between">
-            <h2 className="font-display text-base font-semibold">Wallet receipts</h2>
+            <h2 className="font-display text-base font-semibold">All transactions</h2>
             <Link to="/transactions" className="text-xs font-medium text-primary">View all</Link>
+          </div>
+          <ul className="mt-3 flex flex-col gap-2">
+            {transactions.map((transaction) => (
+              <PaymentHistoryRow key={transaction.transaction_id} transaction={transaction} />
+            ))}
+            {transactions.length === 0 && (
+              <li className="rounded-2xl border border-border bg-card p-4 text-center text-sm text-muted-foreground shadow-card">
+                No payment transactions yet.
+              </li>
+            )}
+          </ul>
+
+          <div className="mt-7 flex items-center justify-between">
+            <h2 className="font-display text-base font-semibold">Wallet receipts</h2>
           </div>
           <ul className="mt-3 flex flex-col gap-2">
             {walletTransactions.map((transaction) => (
@@ -363,7 +383,7 @@ function PaymentsPage() {
             ))}
             {walletTransactions.length === 0 && (
               <li className="rounded-2xl border border-border bg-card p-4 text-center text-sm text-muted-foreground shadow-card">
-                No wallet transactions yet.
+                Receipts appear after Hubtel confirms successful payment.
               </li>
             )}
           </ul>
@@ -377,6 +397,29 @@ function PaymentsPage() {
         onClose={() => setPaymentTransaction(null)}
       />
     </div>
+  );
+}
+
+function PaymentHistoryRow({ transaction }: { transaction: CustomerPaymentHistoryItem }) {
+  const isPaid = transaction.status === "paid" || transaction.status === "successful";
+  return (
+    <li className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5">
+      <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${isPaid ? "bg-success/10 text-success" : "bg-secondary text-primary"}`}>
+        {isPaid ? <CheckCircle2 className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold">{transaction.service_type}</p>
+        <p className="truncate text-[11px] text-muted-foreground">
+          {transaction.provider_reference ?? "pending"} - {transaction.receipt_id ?? "No receipt yet"} - {formatDate(transaction.created_at)}
+        </p>
+      </div>
+      <div className="text-right">
+        <p className="font-display text-sm font-semibold">{formatCurrency(Number(transaction.amount), (transaction.currency || "GHS") as CurrencyCode)}</p>
+        <p className="flex items-center justify-end gap-1 text-[10px] capitalize text-muted-foreground">
+          <StatusIcon status={transaction.status} /> {transaction.status}
+        </p>
+      </div>
+    </li>
   );
 }
 

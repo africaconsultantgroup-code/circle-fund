@@ -16,6 +16,10 @@ export type HubtelPaymentTransaction = PaymentTransaction & {
 };
 export type WalletAccount = Database['public']['Tables']['wallet_accounts']['Row'];
 export type WalletTransaction = Database['public']['Tables']['wallet_transactions']['Row'];
+export type CustomerFinancialSummary = Database['public']['Functions']['get_customer_financial_summary']['Returns'][number];
+export type CustomerPaymentHistoryItem = Database['public']['Functions']['get_customer_payment_history']['Returns'][number];
+export type PiggyFinancialSummaryItem = Database['public']['Functions']['get_piggy_financial_summary']['Returns'][number];
+export type CirclePaymentSummary = Database['public']['Functions']['get_circle_payment_summary']['Returns'][number];
 export type PayoutRotationItem = Database['public']['Functions']['get_circle_payout_rotation']['Returns'][number];
 export type Transaction = Database['public']['Tables']['transactions']['Row'];
 export type PersonalSusuPlan = Database['public']['Tables']['personal_susu_plans']['Row'];
@@ -416,6 +420,30 @@ export async function listTransactionsForUser(userId: string) {
 
 export async function listCircleContributions(circleId: string) {
   return supabase.rpc('get_circle_contribution_status', { check_circle_id: circleId });
+}
+
+export async function getCustomerFinancialSummary() {
+  const result = await supabase.rpc('get_customer_financial_summary');
+  return {
+    data: result.data?.[0] ?? null,
+    error: result.error,
+  };
+}
+
+export async function getCustomerPaymentHistory() {
+  return supabase.rpc('get_customer_payment_history');
+}
+
+export async function getPiggyFinancialSummary() {
+  return supabase.rpc('get_piggy_financial_summary');
+}
+
+export async function getCirclePaymentSummary(circleId: string) {
+  const result = await supabase.rpc('get_circle_payment_summary', { check_circle_id: circleId });
+  return {
+    data: result.data?.[0] ?? null,
+    error: result.error,
+  };
 }
 
 export async function generateCircleContributionSchedule(circleId: string, periods = 1) {

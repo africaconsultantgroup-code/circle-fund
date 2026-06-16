@@ -9,6 +9,7 @@ import {
   generateCirclePayoutRotation,
   getCircleById,
   getCircleMembership,
+  getCirclePaymentSummary,
   listCirclePayoutRotation,
   listCircleContributions,
   listCircleMembers,
@@ -17,6 +18,7 @@ import {
   type Circle,
   type CircleContributionStatus,
   type CircleMemberDetails,
+  type CirclePaymentSummary,
   type PayoutRotationItem,
 } from "@/lib/db";
 import { getCurrentUser, type AuthUser } from "@/lib/auth";
@@ -56,6 +58,7 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
   const [circle, setCircle] = useState<Circle | null>(null);
   const [members, setMembers] = useState<CircleMemberDetails[]>([]);
   const [contributions, setContributions] = useState<CircleContributionStatus[]>([]);
+  const [paymentSummary, setPaymentSummary] = useState<CirclePaymentSummary | null>(null);
   const [payoutRotation, setPayoutRotation] = useState<PayoutRotationItem[]>([]);
   const [membershipStatus, setMembershipStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -80,6 +83,15 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
   const canChangeRotation = isAdmin && !rotationLocked && !hasCircleStarted(circle?.start_date);
   const rotationByMember = useMemo(() => new Map(payoutRotation.map((turn) => [turn.member_id, turn])), [payoutRotation]);
   const contributionSummary = useMemo(() => {
+    if (paymentSummary) {
+      return {
+        totalExpected: Number(paymentSummary.total_expected ?? 0),
+        totalPaid: Number(paymentSummary.total_paid ?? 0),
+        outstanding: Number(paymentSummary.pending_amount ?? 0) + Number(paymentSummary.overdue_amount ?? 0) + Number(paymentSummary.failed_amount ?? 0),
+        overdue: Number(paymentSummary.overdue_amount ?? 0),
+      };
+    }
+
     const totalExpected = contributions.reduce((sum, contribution) => sum + Number(contribution.expected_amount ?? 0), 0);
     const totalPaid = contributions
       .filter((contribution) => contribution.status === "paid")
@@ -94,8 +106,8 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
       outstanding: Math.max(totalExpected - totalPaid, 0),
       overdue,
     };
-  }, [contributions]);
-  const cycleHealth = useMemo(() => buildCircleHealth(contributions, approvedMembers.length, amount), [contributions, approvedMembers.length, amount]);
+  }, [contributions, paymentSummary]);
+  const cycleHealth = useMemo(() => buildCircleHealth(contributions, approvedMembers.length, amount, paymentSummary), [contributions, approvedMembers.length, amount, paymentSummary]);
   const trustSummary = useMemo(() => buildTrustSummary(contributions, circle?.status, user?.id), [contributions, circle?.status, user?.id]);
   const activityLog = useMemo(() => buildActivityLog(currentMember, contributions, payoutRotation), [currentMember, contributions, payoutRotation]);
 
@@ -119,12 +131,13 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
       return;
     }
 
-    const [circleResult, membershipResult, membersResult, contributionResult, rotationResult] = await Promise.all([
+    const [circleResult, membershipResult, membersResult, contributionResult, rotationResult, paymentSummaryResult] = await Promise.all([
       getCircleById(circleId),
       getCircleMembership(circleId, currentUser.id),
       listCircleMembers(circleId),
       listCircleContributions(circleId),
       listCirclePayoutRotation(circleId),
+      getCirclePaymentSummary(circleId),
     ]);
 
     if (circleResult.error || !circleResult.data) {
@@ -153,6 +166,7 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
     setMembers((membersResult.data ?? []) as CircleMemberDetails[]);
     setContributions((contributionResult.data ?? []) as CircleContributionStatus[]);
     setPayoutRotation((rotationResult.data ?? []) as PayoutRotationItem[]);
+    setPaymentSummary(paymentSummaryResult.data);
     console.log("payout_rotation_fetch_debug", {
       circle_id: circleId,
       user_id: currentUser.id,
@@ -847,7 +861,32 @@ function hasCircleStarted(value: string | null | undefined) {
   return parsed.getTime() <= Date.now();
 }
 
-function buildCircleHealth(contributions: CircleContributionStatus[], approvedMemberCount: number, contributionAmount: number): CircleHealth {
+function buildCircleHealth(
+  contributions: CircleContributionStatus[],
+  approvedMemberCount: number,
+  contributionAmount: number,
+  paymentSummary: CirclePaymentSummary | null,
+): CircleHealth {
+  if (paymentSummary) {
+    const requiredAmount = Number(paymentSummary.total_expected ?? 0);
+    const collectedAmount = Number(paymentSummary.total_paid ?? 0);
+    const outstandingAmount = Math.max(
+      Number(paymentSummary.pending_amount ?? 0) + Number(paymentSummary.overdue_amount ?? 0) + Number(paymentSummary.failed_amount ?? 0),
+      0,
+    );
+
+    return {
+      membersPaid: Number(paymentSummary.members_paid ?? 0),
+      membersPending: Number(paymentSummary.members_pending ?? 0),
+      membersOverdue: Number(paymentSummary.members_overdue ?? 0),
+      payoutReadiness: Number(paymentSummary.funding_progress ?? 0),
+      requiredAmount,
+      collectedAmount,
+      outstandingAmount,
+      isReady: requiredAmount > 0 && collectedAmount >= requiredAmount,
+    };
+  }
+
   const paidUsers = new Set<string>();
   const pendingUsers = new Set<string>();
   const overdueUsers = new Set<string>();
