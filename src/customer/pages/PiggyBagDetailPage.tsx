@@ -41,7 +41,7 @@ export function PiggyBagDetailPage({ planId }: { planId: string }) {
 
     setIsPreparingPayment(true);
     const { data, error } = await initiateHubtelPayment({
-      paymentType: "personal_susu",
+      paymentType: "piggy_bag",
       amount,
       currency: "GHS",
       metadata: {
@@ -56,7 +56,7 @@ export function PiggyBagDetailPage({ planId }: { planId: string }) {
     setIsPreparingPayment(false);
 
     if (error || !data) {
-      setError(error?.message ?? "We could not start this Personal Susu payment. Please try again.");
+      setError(error?.message ?? "We could not start this Piggy Bag payment. Please try again.");
       return;
     }
 
@@ -211,7 +211,7 @@ export function PiggyBagDetailPage({ planId }: { planId: string }) {
           <PaymentPreparationModal
             open={Boolean(paymentTransaction)}
             transaction={paymentTransaction}
-            title="Personal Susu payment started"
+            title="Piggy Bag payment started"
             onClose={() => setPaymentTransaction(null)}
           />
         </div>
