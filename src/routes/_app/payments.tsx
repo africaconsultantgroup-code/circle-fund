@@ -7,10 +7,14 @@ import { getCurrentUser } from "@/lib/auth";
 import {
   initiateHubtelContributionPayment,
   initiateHubtelPayment,
+  getCustomerFinancialSummary,
+  getCustomerPaymentBreakdown,
   getCustomerPaymentHistory,
   listPersonalSusuDeposits,
   listPersonalSusuPlans,
   type Contribution,
+  type CustomerFinancialSummary,
+  type CustomerPaymentBreakdownItem,
   type CustomerPaymentHistoryItem,
   type PaymentTransaction,
   type PersonalSusuPlan,
@@ -59,6 +63,8 @@ function PaymentsPage() {
   const [contributions, setContributions] = useState<ContributionWithCircle[]>([]);
   const [personalSusuDue, setPersonalSusuDue] = useState<PersonalSusuDue[]>([]);
   const [transactions, setTransactions] = useState<CustomerPaymentHistoryItem[]>([]);
+  const [financialSummary, setFinancialSummary] = useState<CustomerFinancialSummary | null>(null);
+  const [breakdown, setBreakdown] = useState<CustomerPaymentBreakdownItem[]>([]);
   const [walletSummary, setWalletSummary] = useState<WalletSummary | null>(null);
   const [walletTransactions, setWalletTransactions] = useState<WalletTransactionWithCircle[]>([]);
   const [depositAmount, setDepositAmount] = useState("100");
@@ -85,7 +91,7 @@ function PaymentsPage() {
       return;
     }
 
-    const [contributionResult, transactionResult, planResult, walletResult, walletTxResult] = await Promise.all([
+    const [contributionResult, transactionResult, planResult, walletResult, walletTxResult, financialResult, breakdownResult] = await Promise.all([
       supabase
         .from("contributions")
         .select("*, circles(id, name, base_currency)")
@@ -96,6 +102,8 @@ function PaymentsPage() {
       listPersonalSusuPlans(user.id),
       getWalletSummary(),
       listWalletTransactions(12),
+      getCustomerFinancialSummary(),
+      getCustomerPaymentBreakdown(),
     ]);
 
     const planDues = await Promise.all(
@@ -118,6 +126,8 @@ function PaymentsPage() {
       planResult.error,
       walletResult.error,
       walletTxResult.error,
+      financialResult.error,
+      breakdownResult.error,
     ].filter(Boolean);
     if (errors.length > 0) {
       setError(errors.map((item) => item?.message).join(" "));
@@ -125,6 +135,8 @@ function PaymentsPage() {
 
     setContributions((contributionResult.data ?? []) as ContributionWithCircle[]);
     setTransactions(transactionResult.data ?? []);
+    setFinancialSummary(financialResult.data);
+    setBreakdown(breakdownResult.data ?? []);
     setWalletSummary(walletResult.data);
     setWalletTransactions((walletTxResult.data ?? []) as WalletTransactionWithCircle[]);
     setPersonalSusuDue(planDues.filter((item) => item.amountDue > 0));
@@ -284,8 +296,16 @@ function PaymentsPage() {
       </section>
 
       <div className="mt-5 grid grid-cols-2 gap-3">
+        <SummaryCard label="Total Paid" value={formatCurrency(Number(financialSummary?.total_paid ?? 0), walletCurrency)} tone="gold" />
+        <SummaryCard label="Susu Contributions" value={formatCurrency(Number(financialSummary?.susu_contributions ?? financialSummary?.total_contributed ?? 0), walletCurrency)} tone="plain" />
+        <SummaryCard label="Savings Toward Susu" value={formatCurrency(Number(financialSummary?.savings_toward_susu ?? 0), walletCurrency)} tone="plain" />
+        <SummaryCard label="Piggy Savings" value={formatCurrency(Number(financialSummary?.piggy_savings ?? financialSummary?.piggy_balance ?? 0), walletCurrency)} tone="plain" />
+        <SummaryCard label="Wallet Deposits" value={formatCurrency(Number(financialSummary?.wallet_deposits ?? 0), walletCurrency)} tone="plain" />
+        <SummaryCard label="Total Received" value={formatCurrency(Number(financialSummary?.total_received ?? 0), walletCurrency)} tone="plain" />
+        <SummaryCard label="Expected Payout" value={formatCurrency(Number(financialSummary?.expected_payout_total ?? 0), walletCurrency)} tone="plain" />
+        <SummaryCard label="Pending Payments" value={formatCurrency(Number(financialSummary?.pending_payments ?? 0), walletCurrency)} tone="plain" />
         <SummaryCard label="Amount due" value={formatCurrency(totals.totalDue, "GHS")} tone="plain" />
-        <SummaryCard label="Pending payments" value={String(totals.initiated)} tone="plain" />
+        <SummaryCard label="Pending count" value={String(totals.initiated)} tone="plain" />
       </div>
 
       {error && (
@@ -335,6 +355,22 @@ function PaymentsPage() {
                 </li>
               );
             })}
+          </MoneySection>
+
+          <MoneySection title="Payment breakdown" emptyText="No payment records yet.">
+            {breakdown.map((item) => (
+              <li key={item.payment_type} className="rounded-2xl border border-border bg-card p-4 shadow-card">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-display text-sm font-semibold">{item.label}</p>
+                  <p className="text-sm font-semibold">{formatCurrency(Number(item.confirmed_amount ?? 0), walletCurrency)}</p>
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <SmallAmount label="Confirmed" value={formatCurrency(Number(item.confirmed_amount ?? 0), walletCurrency)} />
+                  <SmallAmount label="Pending" value={formatCurrency(Number(item.pending_amount ?? 0), walletCurrency)} />
+                  <SmallAmount label="Failed" value={formatCurrency(Number(item.failed_amount ?? 0), walletCurrency)} />
+                </div>
+              </li>
+            ))}
           </MoneySection>
 
           <MoneySection title="Personal Susu" emptyText="No Personal Susu contribution is due.">
@@ -456,6 +492,15 @@ function SummaryCard({ label, value, tone }: { label: string; value: string; ton
     <div className={`rounded-2xl p-4 shadow-card ${className}`}>
       <p className={`text-[11px] uppercase tracking-wide ${tone === "gold" ? "text-gold-foreground/80" : "text-muted-foreground"}`}>{label}</p>
       <p className="mt-1 font-display text-lg font-bold">{value}</p>
+    </div>
+  );
+}
+
+function SmallAmount({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-muted/40 px-2 py-2">
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-0.5 truncate text-[11px] font-semibold">{value}</p>
     </div>
   );
 }

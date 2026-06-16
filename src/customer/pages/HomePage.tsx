@@ -80,6 +80,12 @@ type DashboardData = {
   totalReceived: number;
   totalPaid: number;
   totalDeposited: number;
+  susuContributions: number;
+  savingsTowardSusu: number;
+  piggySavings: number;
+  walletDeposits: number;
+  expectedPayoutTotal: number;
+  pendingPayments: number;
   piggyBoxBalance: number;
   savingsPlanBalance: number;
   availableWalletBalance: number;
@@ -98,6 +104,12 @@ const emptyDashboard: DashboardData = {
   totalReceived: 0,
   totalPaid: 0,
   totalDeposited: 0,
+  susuContributions: 0,
+  savingsTowardSusu: 0,
+  piggySavings: 0,
+  walletDeposits: 0,
+  expectedPayoutTotal: 0,
+  pendingPayments: 0,
   piggyBoxBalance: 0,
   savingsPlanBalance: 0,
   availableWalletBalance: 0,
@@ -288,14 +300,16 @@ export function HomePage() {
             <h2 className="font-display text-sm font-semibold">Detailed balance breakdown</h2>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2">
-            <BreakdownMetric label="Total contributed" value={formatCurrency(dashboard.totalContributed, primaryCurrency)} />
-            <BreakdownMetric label="Total paid" value={formatCurrency(dashboard.totalPaid, primaryCurrency)} />
-            <BreakdownMetric label="Total deposited" value={formatCurrency(dashboard.totalDeposited, primaryCurrency)} />
-            <BreakdownMetric label="Total received" value={formatCurrency(dashboard.totalReceived, primaryCurrency)} />
+            <BreakdownMetric label="Total Paid" value={formatCurrency(dashboard.totalPaid, primaryCurrency)} />
+            <BreakdownMetric label="Susu Contributions" value={formatCurrency(dashboard.susuContributions, primaryCurrency)} />
+            <BreakdownMetric label="Savings Toward Susu" value={formatCurrency(dashboard.savingsTowardSusu, primaryCurrency)} />
+            <BreakdownMetric label="Piggy Savings" value={formatCurrency(dashboard.piggySavings, "GHS")} />
+            <BreakdownMetric label="Wallet Deposits" value={formatCurrency(dashboard.walletDeposits, primaryCurrency)} />
+            <BreakdownMetric label="Total Received" value={formatCurrency(dashboard.totalReceived, primaryCurrency)} />
+            <BreakdownMetric label="Expected Payout" value={formatCurrency(dashboard.expectedPayoutTotal, primaryCurrency)} />
+            <BreakdownMetric label="Pending Payments" value={formatCurrency(dashboard.pendingPayments, primaryCurrency)} />
             <BreakdownMetric label="Wallet available" value={formatCurrency(dashboard.availableWalletBalance, primaryCurrency)} />
             <BreakdownMetric label="Locked balance" value={formatCurrency(dashboard.lockedBalance, primaryCurrency)} />
-            <BreakdownMetric label="Piggy Box" value={formatCurrency(dashboard.piggyBoxBalance, "GHS")} />
-            <BreakdownMetric label="Savings plan" value={formatCurrency(dashboard.savingsPlanBalance, primaryCurrency)} />
           </div>
         </div>
       </section>
@@ -506,6 +520,12 @@ async function loadFinancialDashboard(): Promise<DashboardData> {
     totalReceived,
     totalPaid: Number(summary.total_paid ?? 0),
     totalDeposited: Number(summary.total_deposited ?? 0),
+    susuContributions: Number(summary.susu_contributions ?? summary.total_contributed ?? 0),
+    savingsTowardSusu: Number(summary.savings_toward_susu ?? summary.savings_balance ?? 0),
+    piggySavings: Number(summary.piggy_savings ?? summary.piggy_balance ?? 0),
+    walletDeposits: Number(summary.wallet_deposits ?? 0),
+    expectedPayoutTotal: Number(summary.expected_payout_total ?? 0),
+    pendingPayments: Number(summary.pending_payments ?? 0),
     piggyBoxBalance: Number(summary.piggy_balance ?? 0),
     savingsPlanBalance: Number(summary.savings_balance ?? 0),
     availableWalletBalance: Number(summary.available_wallet_balance ?? 0),
@@ -533,6 +553,13 @@ function emptyFinancialSummary(): CustomerFinancialSummary {
     locked_balance: 0,
     total_received: 0,
     currency: "GHS",
+    susu_contributions: 0,
+    savings_toward_susu: 0,
+    piggy_savings: 0,
+    wallet_deposits: 0,
+    expected_payout_total: 0,
+    pending_payments: 0,
+    failed_payments: 0,
   };
 }
 

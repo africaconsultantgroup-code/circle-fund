@@ -22,7 +22,7 @@ export type PaymentTransactionStatus = 'initiated' | 'pending' | 'successful' | 
 export type PaymentType = 'contribution' | 'savings' | 'piggy_bag' | 'personal_susu' | 'wallet_deposit';
 export type WalletTransactionType = 'deposit' | 'contribution_payment' | 'payout_received' | 'piggy_bag_deposit' | 'piggy_bag_withdrawal' | 'savings_deposit' | 'personal_susu_deposit' | 'refund';
 export type WalletTransactionDirection = 'inflow' | 'outflow' | 'lock' | 'unlock';
-export type WalletTransactionStatus = 'pending' | 'successful' | 'failed' | 'cancelled';
+export type WalletTransactionStatus = 'pending' | 'successful' | 'confirmed' | 'failed' | 'cancelled';
 
 export interface Database {
   public: {
@@ -1052,6 +1052,56 @@ export interface Database {
           available_wallet_balance: number;
           locked_balance: number;
           total_received: number;
+          currency: string;
+          susu_contributions: number;
+          savings_toward_susu: number;
+          piggy_savings: number;
+          wallet_deposits: number;
+          expected_payout_total: number;
+          pending_payments: number;
+          failed_payments: number;
+        }>;
+      };
+      get_customer_payment_breakdown: {
+        Args: Record<PropertyKey, never>;
+        Returns: Array<{
+          payment_type: string;
+          label: string;
+          confirmed_amount: number;
+          pending_amount: number;
+          failed_amount: number;
+          confirmed_count: number;
+          pending_count: number;
+          failed_count: number;
+        }>;
+      };
+      get_customer_received_summary: {
+        Args: Record<PropertyKey, never>;
+        Returns: Array<{
+          total_received: number;
+          expected_payout_total: number;
+          next_expected_payout_amount: number;
+          next_expected_payout_date: string | null;
+          active_group_count: number;
+          currency: string;
+        }>;
+      };
+      get_circle_member_financial_summary: {
+        Args: { check_circle_id: string };
+        Returns: Array<{
+          circle_id: string;
+          user_id: string;
+          susu_contributions_paid: number;
+          contribution_pending: number;
+          contribution_overdue: number;
+          contribution_failed: number;
+          confirmed_payments: number;
+          pending_payments: number;
+          failed_payments: number;
+          total_received: number;
+          expected_payout: number;
+          expected_payout_date: string | null;
+          receipt_count: number;
           currency: string;
         }>;
       };

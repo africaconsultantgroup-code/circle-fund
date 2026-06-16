@@ -3,13 +3,14 @@ import { useEffect, useState } from "react";
 import { CalendarDays, Loader2, LockKeyhole, PiggyBank, Plus, Wallet } from "lucide-react";
 import { formatGHS } from "@/lib/mock-data";
 import { buildPlanMetrics, formatDate, loadPiggyPlans, type PiggyPlanWithMetrics } from "@/lib/piggy-bag";
-import { getPiggyFinancialSummary, initiateHubtelPayment, listPersonalSusuDeposits, type PaymentTransaction, type PersonalSusuPlan, type PiggyFinancialSummaryItem } from "@/lib/db";
+import { getCustomerPaymentBreakdown, getPiggyFinancialSummary, initiateHubtelPayment, listPersonalSusuDeposits, type CustomerPaymentBreakdownItem, type PaymentTransaction, type PersonalSusuPlan, type PiggyFinancialSummaryItem } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { PaymentPreparationModal } from "@/components/payment-preparation-modal";
 
 export function PiggyBagPage() {
   const [plans, setPlans] = useState<PiggyPlanWithMetrics[]>([]);
   const [summaries, setSummaries] = useState<Record<string, PiggyFinancialSummaryItem>>({});
+  const [paymentBreakdown, setPaymentBreakdown] = useState<CustomerPaymentBreakdownItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [preparingPlanId, setPreparingPlanId] = useState<string | null>(null);
   const [paymentTransaction, setPaymentTransaction] = useState<PaymentTransaction | null>(null);
@@ -21,7 +22,7 @@ export function PiggyBagPage() {
     async function loadPlans() {
       setIsLoading(true);
       const user = await getCurrentUser();
-      const [result, summaryResult] = await Promise.all([loadPiggyPlans(), getPiggyFinancialSummary()]);
+      const [result, summaryResult, breakdownResult] = await Promise.all([loadPiggyPlans(), getPiggyFinancialSummary(), getCustomerPaymentBreakdown()]);
 
       if (!user) {
         if (!isMounted) return;
@@ -41,7 +42,8 @@ export function PiggyBagPage() {
       if (!isMounted) return;
       setPlans(metrics);
       setSummaries(Object.fromEntries((summaryResult.data ?? []).map((summary) => [summary.plan_id, summary])));
-      setError(result.error ?? summaryResult.error?.message ?? "");
+      setPaymentBreakdown(breakdownResult.data ?? []);
+      setError(result.error ?? summaryResult.error?.message ?? breakdownResult.error?.message ?? "");
       setIsLoading(false);
     }
 
@@ -55,6 +57,9 @@ export function PiggyBagPage() {
   const lockedBalance = Object.values(summaries).reduce((total, item) => total + Number(item.locked_amount ?? 0), 0);
   const availableBalance = plans.reduce((total, item) => total + item.availableBalance, 0);
   const activePlans = plans.filter((item) => item.plan.status === "active").length;
+  const piggyBreakdown = paymentBreakdown.find((item) => item.payment_type === "piggy_bag");
+  const piggyConfirmed = Number(piggyBreakdown?.confirmed_amount ?? lockedBalance);
+  const piggyPending = Number(piggyBreakdown?.pending_amount ?? 0);
 
   const handleFundPlan = async (item: PiggyPlanWithMetrics) => {
     setError("");
@@ -111,6 +116,8 @@ export function PiggyBagPage() {
         <div className="mt-4 grid grid-cols-2 gap-3">
           <SummaryMetric icon={<Wallet className="h-4 w-4" />} label="Available" value={formatGHS(availableBalance)} />
           <SummaryMetric icon={<LockKeyhole className="h-4 w-4" />} label="Active plans" value={activePlans} />
+          <SummaryMetric icon={<PiggyBank className="h-4 w-4" />} label="Piggy Savings" value={formatGHS(piggyConfirmed)} />
+          <SummaryMetric icon={<Wallet className="h-4 w-4" />} label="Pending Payments" value={formatGHS(piggyPending)} />
         </div>
       </section>
 

@@ -5,9 +5,12 @@ import { loadUserCircles, type UserCircle } from "@/lib/user-circles";
 import { getVerificationGateSummary, type VerificationGateSummary } from "@/lib/onboarding";
 import { formatCurrency } from "@/lib/diaspora";
 import { canCreateCircle, type CreateCircleLimitResult } from "@/lib/circle-limits";
+import { getCircleMemberFinancialSummary, type CircleMemberFinancialSummary } from "@/lib/db";
+import type { CurrencyCode } from "@/lib/supabase-types";
 
 export function CirclesPage() {
   const [circles, setCircles] = useState<UserCircle[]>([]);
+  const [financials, setFinancials] = useState<Record<string, CircleMemberFinancialSummary>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [gateSummary, setGateSummary] = useState<VerificationGateSummary | null>(null);
@@ -20,9 +23,14 @@ export function CirclesPage() {
   useEffect(() => {
     let isMounted = true;
 
-    Promise.all([loadUserCircles(), getVerificationGateSummary(), canCreateCircle()]).then(([circleResult, gateResult, createResult]) => {
+    Promise.all([loadUserCircles(), getVerificationGateSummary(), canCreateCircle()]).then(async ([circleResult, gateResult, createResult]) => {
       if (!isMounted) return;
+      const financialResults = await Promise.all(circleResult.data.map(async (circle) => {
+        const result = await getCircleMemberFinancialSummary(circle.id);
+        return [circle.id, result.data] as const;
+      }));
       setCircles(circleResult.data);
+      setFinancials(Object.fromEntries(financialResults.filter(([, summary]) => Boolean(summary))) as Record<string, CircleMemberFinancialSummary>);
       setError(circleResult.error ?? "");
       setGateSummary(gateResult);
       setCreateLimit(createResult);
@@ -131,6 +139,7 @@ export function CirclesPage() {
                   {c.pendingMemberCount > 0 && (
                     <p className="text-[10px] font-semibold text-[color:var(--gold-foreground)]">{c.pendingMemberCount} pending request{c.pendingMemberCount === 1 ? "" : "s"}</p>
                   )}
+                  <CircleMoneySummary summary={financials[c.id]} fallbackCurrency={c.baseCurrency} />
                 </div>
               </div>
               <div className="mt-3 flex items-center gap-3">
@@ -147,6 +156,27 @@ export function CirclesPage() {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function CircleMoneySummary({ summary, fallbackCurrency }: { summary?: CircleMemberFinancialSummary; fallbackCurrency: string }) {
+  const currency = (summary?.currency ?? fallbackCurrency) as CurrencyCode;
+  return (
+    <div className="mt-3 grid grid-cols-2 gap-2">
+      <MiniMoney label="Paid" value={formatCurrency(Number(summary?.susu_contributions_paid ?? 0), currency)} />
+      <MiniMoney label="Pending" value={formatCurrency(Number(summary?.pending_payments ?? summary?.contribution_pending ?? 0), currency)} />
+      <MiniMoney label="Received" value={formatCurrency(Number(summary?.total_received ?? 0), currency)} />
+      <MiniMoney label="Expected Payout" value={formatCurrency(Number(summary?.expected_payout ?? 0), currency)} />
+    </div>
+  );
+}
+
+function MiniMoney({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-muted/40 px-2 py-1.5">
+      <p className="text-[9px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-0.5 truncate text-[11px] font-semibold">{value}</p>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   generateCircleContributionSchedule,
   generateCirclePayoutRotation,
   getCircleById,
+  getCircleMemberFinancialSummary,
   getCircleMembership,
   getCirclePaymentSummary,
   initiateHubtelContributionPayment,
@@ -22,6 +23,7 @@ import {
   type CircleMemberDetails,
   type PaymentTransaction,
   type CirclePaymentSummary,
+  type CircleMemberFinancialSummary,
   type PayoutRotationItem,
 } from "@/lib/db";
 import { getCurrentUser, type AuthUser } from "@/lib/auth";
@@ -61,6 +63,7 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
   const [members, setMembers] = useState<CircleMemberDetails[]>([]);
   const [contributions, setContributions] = useState<CircleContributionStatus[]>([]);
   const [paymentSummary, setPaymentSummary] = useState<CirclePaymentSummary | null>(null);
+  const [memberFinancialSummary, setMemberFinancialSummary] = useState<CircleMemberFinancialSummary | null>(null);
   const [payoutRotation, setPayoutRotation] = useState<PayoutRotationItem[]>([]);
   const [membershipStatus, setMembershipStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -134,13 +137,14 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
       return;
     }
 
-    const [circleResult, membershipResult, membersResult, contributionResult, rotationResult, paymentSummaryResult] = await Promise.all([
+    const [circleResult, membershipResult, membersResult, contributionResult, rotationResult, paymentSummaryResult, memberFinancialResult] = await Promise.all([
       getCircleById(circleId),
       getCircleMembership(circleId, currentUser.id),
       listCircleMembers(circleId),
       listCircleContributions(circleId),
       listCirclePayoutRotation(circleId),
       getCirclePaymentSummary(circleId),
+      getCircleMemberFinancialSummary(circleId),
     ]);
 
     if (circleResult.error || !circleResult.data) {
@@ -170,6 +174,7 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
     setContributions((contributionResult.data ?? []) as CircleContributionStatus[]);
     setPayoutRotation((rotationResult.data ?? []) as PayoutRotationItem[]);
     setPaymentSummary(paymentSummaryResult.data);
+    setMemberFinancialSummary(memberFinancialResult.data);
     console.log("payout_rotation_fetch_debug", {
       circle_id: circleId,
       user_id: currentUser.id,
@@ -410,6 +415,10 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
                 <Metric label="My role" value={currentMember?.role ?? (isAdmin ? "creator" : "member")} />
                 <Metric label="Expected" value={formatCurrency(contributionSummary.totalExpected, currency)} />
                 <Metric label="Outstanding" value={formatCurrency(contributionSummary.outstanding, currency)} />
+                <Metric label="Total Paid" value={formatCurrency(Number(memberFinancialSummary?.confirmed_payments ?? 0), currency)} />
+                <Metric label="Pending Payments" value={formatCurrency(Number(memberFinancialSummary?.pending_payments ?? 0), currency)} />
+                <Metric label="Total Received" value={formatCurrency(Number(memberFinancialSummary?.total_received ?? 0), currency)} />
+                <Metric label="Expected Payout" value={formatCurrency(Number(memberFinancialSummary?.expected_payout ?? myPayoutTurn?.payout_amount ?? 0), currency)} />
                 <Metric label="Your turn" value={myPayoutTurn ? `#${myPayoutTurn.rotation_position}` : "Not set"} />
                 <Metric label="Payout date" value={myPayoutTurn ? formatDate(myPayoutTurn.payout_due_date) : "Not set"} />
                 <Metric label="Payout amount" value={myPayoutTurn ? formatCurrency(Number(myPayoutTurn.payout_amount ?? 0), currency) : "Not set"} />
@@ -446,6 +455,8 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
                 <Metric label="Total paid" value={formatCurrency(contributionSummary.totalPaid, currency)} />
                 <Metric label="Outstanding" value={formatCurrency(contributionSummary.outstanding, currency)} />
                 <Metric label="Overdue" value={formatCurrency(contributionSummary.overdue, currency)} />
+                <Metric label="My paid" value={formatCurrency(Number(memberFinancialSummary?.susu_contributions_paid ?? 0), currency)} />
+                <Metric label="Pending Payments" value={formatCurrency(Number(memberFinancialSummary?.pending_payments ?? 0), currency)} />
               </div>
 
               {isAdmin && (

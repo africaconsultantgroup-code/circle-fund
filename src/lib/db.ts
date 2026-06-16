@@ -17,6 +17,9 @@ export type HubtelPaymentTransaction = PaymentTransaction & {
 export type WalletAccount = Database['public']['Tables']['wallet_accounts']['Row'];
 export type WalletTransaction = Database['public']['Tables']['wallet_transactions']['Row'];
 export type CustomerFinancialSummary = Database['public']['Functions']['get_customer_financial_summary']['Returns'][number];
+export type CustomerPaymentBreakdownItem = Database['public']['Functions']['get_customer_payment_breakdown']['Returns'][number];
+export type CustomerReceivedSummary = Database['public']['Functions']['get_customer_received_summary']['Returns'][number];
+export type CircleMemberFinancialSummary = Database['public']['Functions']['get_circle_member_financial_summary']['Returns'][number];
 export type CustomerPaymentHistoryItem = Database['public']['Functions']['get_customer_payment_history']['Returns'][number];
 export type PiggyFinancialSummaryItem = Database['public']['Functions']['get_piggy_financial_summary']['Returns'][number];
 export type CirclePaymentSummary = Database['public']['Functions']['get_circle_payment_summary']['Returns'][number];
@@ -432,6 +435,26 @@ export async function getCustomerFinancialSummary() {
 
 export async function getCustomerPaymentHistory() {
   return supabase.rpc('get_customer_payment_history');
+}
+
+export async function getCustomerPaymentBreakdown() {
+  return supabase.rpc('get_customer_payment_breakdown');
+}
+
+export async function getCustomerReceivedSummary() {
+  const result = await supabase.rpc('get_customer_received_summary');
+  return {
+    data: result.data?.[0] ?? null,
+    error: result.error,
+  };
+}
+
+export async function getCircleMemberFinancialSummary(circleId: string) {
+  const result = await supabase.rpc('get_circle_member_financial_summary', { check_circle_id: circleId });
+  return {
+    data: result.data?.[0] ?? null,
+    error: result.error,
+  };
 }
 
 export async function getPiggyFinancialSummary() {
