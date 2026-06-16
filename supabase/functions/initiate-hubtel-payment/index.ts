@@ -1,6 +1,6 @@
 import { getAuthedServiceClient, corsHeaders, isOptions, json } from "../_shared/verification.ts";
 
-type PaymentType = "contribution" | "savings" | "piggy_bag" | "personal_susu" | "wallet_deposit";
+type PaymentType = "contribution" | "savings" | "piggy_bag" | "wallet_deposit";
 
 type PaymentRequest = {
   paymentType?: PaymentType;
@@ -187,7 +187,7 @@ Deno.serve(async (req) => {
 
 async function resolvePaymentRequest(serviceClient: any, userId: string, body: PaymentRequest) {
   const paymentType = body.paymentType ?? (body.contributionId ? "contribution" : null);
-  if (!paymentType || !["contribution", "savings", "piggy_bag", "personal_susu", "wallet_deposit"].includes(paymentType)) {
+  if (!paymentType || !["contribution", "savings", "piggy_bag", "wallet_deposit"].includes(paymentType)) {
     return { error: json({ ok: false, error: "Unsupported payment type." }, 400) };
   }
 

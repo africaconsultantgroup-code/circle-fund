@@ -302,7 +302,6 @@ export function HomePage() {
           <div className="mt-4 grid grid-cols-2 gap-2">
             <BreakdownMetric label="Total Paid" value={formatCurrency(dashboard.totalPaid, primaryCurrency)} />
             <BreakdownMetric label="Susu Contributions" value={formatCurrency(dashboard.susuContributions, primaryCurrency)} />
-            <BreakdownMetric label="Savings Toward Susu" value={formatCurrency(dashboard.savingsTowardSusu, primaryCurrency)} />
             <BreakdownMetric label="Piggy Savings" value={formatCurrency(dashboard.piggySavings, "GHS")} />
             <BreakdownMetric label="Wallet Deposits" value={formatCurrency(dashboard.walletDeposits, primaryCurrency)} />
             <BreakdownMetric label="Total Received" value={formatCurrency(dashboard.totalReceived, primaryCurrency)} />

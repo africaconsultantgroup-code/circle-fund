@@ -35,7 +35,7 @@ export function PiggyBagDetailPage({ planId }: { planId: string }) {
 
     const amount = depositAmount || details.metrics.expectedContributionPerPeriod || details.metrics.remainingBalance;
     if (!Number.isFinite(amount) || amount <= 0) {
-      setError("No amount is due for this Personal Susu plan.");
+      setError("No amount is due for this Piggy Bag plan.");
       return;
     }
 

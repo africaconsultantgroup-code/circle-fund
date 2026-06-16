@@ -45,7 +45,6 @@ export function walletTransactionLabel(type: WalletTransaction["transaction_type
     piggy_bag_deposit: "Piggy Box deposit",
     piggy_bag_withdrawal: "Piggy Box withdrawal",
     savings_deposit: "Savings deposit",
-    personal_susu_deposit: "Personal Susu deposit",
     refund: "Refund",
   };
 

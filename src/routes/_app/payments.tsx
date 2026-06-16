@@ -212,12 +212,12 @@ function PaymentsPage() {
     await loadPayments();
   };
 
-  const handlePayPersonalSusu = async (item: PersonalSusuDue) => {
+  const handlePayPiggyBagPlan = async (item: PersonalSusuDue) => {
     setError("");
     setWalletNotice("");
     setPreparingId(item.plan.id);
     const { data, error } = await initiateHubtelPayment({
-      paymentType: "personal_susu",
+      paymentType: "piggy_bag",
       amount: item.amountDue,
       currency: "GHS",
       metadata: {
@@ -230,7 +230,7 @@ function PaymentsPage() {
     setPreparingId(null);
 
     if (error || !data) {
-      setError(error?.message ?? "We could not start this Personal Susu payment.");
+      setError(error?.message ?? "We could not start this Piggy Bag payment.");
       return;
     }
 
@@ -298,7 +298,6 @@ function PaymentsPage() {
       <div className="mt-5 grid grid-cols-2 gap-3">
         <SummaryCard label="Total Paid" value={formatCurrency(Number(financialSummary?.total_paid ?? 0), walletCurrency)} tone="gold" />
         <SummaryCard label="Susu Contributions" value={formatCurrency(Number(financialSummary?.susu_contributions ?? financialSummary?.total_contributed ?? 0), walletCurrency)} tone="plain" />
-        <SummaryCard label="Savings Toward Susu" value={formatCurrency(Number(financialSummary?.savings_toward_susu ?? 0), walletCurrency)} tone="plain" />
         <SummaryCard label="Piggy Savings" value={formatCurrency(Number(financialSummary?.piggy_savings ?? financialSummary?.piggy_balance ?? 0), walletCurrency)} tone="plain" />
         <SummaryCard label="Wallet Deposits" value={formatCurrency(Number(financialSummary?.wallet_deposits ?? 0), walletCurrency)} tone="plain" />
         <SummaryCard label="Total Received" value={formatCurrency(Number(financialSummary?.total_received ?? 0), walletCurrency)} tone="plain" />
@@ -373,7 +372,7 @@ function PaymentsPage() {
             ))}
           </MoneySection>
 
-          <MoneySection title="Personal Susu" emptyText="No Personal Susu contribution is due.">
+          <MoneySection title="Piggy Bag" emptyText="No Piggy Bag contribution is due.">
             {personalSusuDue.map((item) => (
               <li key={item.plan.id} className="rounded-2xl border border-border bg-card p-4 shadow-card">
                 <div className="flex items-start justify-between gap-3">
@@ -386,11 +385,11 @@ function PaymentsPage() {
                 <button
                   type="button"
                   disabled={preparingId === item.plan.id}
-                  onClick={() => handlePayPersonalSusu(item)}
+                  onClick={() => handlePayPiggyBagPlan(item)}
                   className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
                 >
                   {preparingId === item.plan.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
-                  Pay Susu Contribution
+                  Fund Piggy Bag
                 </button>
               </li>
             ))}

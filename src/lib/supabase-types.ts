@@ -19,8 +19,8 @@ export type PersonalSusuDurationUnit = 'weeks' | 'months';
 export type PersonalSusuPlanStatus = 'active' | 'completed' | 'cancelled';
 export type PersonalSusuPaymentStatus = 'pending' | 'paid' | 'failed';
 export type PaymentTransactionStatus = 'initiated' | 'pending' | 'successful' | 'failed' | 'cancelled' | 'reversed';
-export type PaymentType = 'contribution' | 'savings' | 'piggy_bag' | 'personal_susu' | 'wallet_deposit';
-export type WalletTransactionType = 'deposit' | 'contribution_payment' | 'payout_received' | 'piggy_bag_deposit' | 'piggy_bag_withdrawal' | 'savings_deposit' | 'personal_susu_deposit' | 'refund';
+export type PaymentType = 'contribution' | 'savings' | 'piggy_bag' | 'wallet_deposit';
+export type WalletTransactionType = 'deposit' | 'contribution_payment' | 'payout_received' | 'piggy_bag_deposit' | 'piggy_bag_withdrawal' | 'savings_deposit' | 'refund';
 export type WalletTransactionDirection = 'inflow' | 'outflow' | 'lock' | 'unlock';
 export type WalletTransactionStatus = 'pending' | 'successful' | 'confirmed' | 'failed' | 'cancelled';
 

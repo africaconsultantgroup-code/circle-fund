@@ -126,7 +126,6 @@ function ProfilePage() {
           <div className="mt-4 grid grid-cols-2 gap-2">
             <Money label="Total Paid" value={formatCurrency(Number(financialSummary?.total_paid ?? 0), currency)} />
             <Money label="Susu Contributions" value={formatCurrency(Number(financialSummary?.susu_contributions ?? 0), currency)} />
-            <Money label="Savings Toward Susu" value={formatCurrency(Number(financialSummary?.savings_toward_susu ?? 0), currency)} />
             <Money label="Piggy Savings" value={formatCurrency(Number(financialSummary?.piggy_savings ?? 0), currency)} />
             <Money label="Wallet Deposits" value={formatCurrency(Number(financialSummary?.wallet_deposits ?? 0), currency)} />
             <Money label="Total Received" value={formatCurrency(Number(financialSummary?.total_received ?? 0), currency)} />
