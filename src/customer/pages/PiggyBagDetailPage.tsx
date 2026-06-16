@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { CalendarDays, CheckCircle2, Loader2, LockKeyhole, PiggyBank, ShieldAlert, Wallet } from "lucide-react";
 import { PaymentPreparationModal } from "@/components/payment-preparation-modal";
 import { PageHeader } from "@/components/page-header";
-import { initiateHubtelPayment, type PaymentTransaction } from "@/lib/db";
+import { initiateHubtelPayment, payFromWallet, type PaymentTransaction } from "@/lib/db";
 import { formatGHS } from "@/lib/mock-data";
 import { formatDate, loadPiggyPlan, type PiggyPlanWithMetrics } from "@/lib/piggy-bag";
 
@@ -62,6 +62,42 @@ export function PiggyBagDetailPage({ planId }: { planId: string }) {
 
     setPaymentTransaction(data);
     setMessage("Hubtel payment started. This balance updates after Hubtel confirms success.");
+  };
+
+  const handlePayFromWallet = async () => {
+    setMessage("");
+    setError("");
+
+    if (!details) return;
+
+    const amount = depositAmount || details.metrics.expectedContributionPerPeriod || details.metrics.remainingBalance;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("No amount is due for this Piggy Bag plan.");
+      return;
+    }
+
+    setIsPreparingPayment(true);
+    const { data, error } = await payFromWallet({
+      paymentType: "piggy_bag",
+      amount,
+      currency: "GHS",
+      planId: details.plan.id,
+      metadata: {
+        source: "piggy_bag_detail",
+        planName: details.plan.name,
+        targetAmount: details.plan.target_amount,
+        lockedUntil: details.plan.locked_until,
+      },
+    });
+    setIsPreparingPayment(false);
+
+    if (error || !data) {
+      setError(error?.message ?? "We could not fund this Piggy Bag from your wallet.");
+      return;
+    }
+
+    setMessage(`Piggy Bag funded from SikaCircle Wallet. Receipt: ${data.receipt_id}.`);
+    await loadDetails();
   };
 
   const handleWithdrawalRequest = () => {
@@ -144,6 +180,15 @@ export function PiggyBagDetailPage({ planId }: { planId: string }) {
             >
               {isPreparingPayment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
               Pay with Mobile Money
+            </button>
+            <button
+              type="button"
+              disabled={isPreparingPayment}
+              onClick={handlePayFromWallet}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-card py-3 text-sm font-semibold text-foreground disabled:opacity-60"
+            >
+              {isPreparingPayment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
+              Pay from SikaCircle Wallet
             </button>
             <p className="mt-2 text-[11px] text-muted-foreground">
               Contribution amount: <span className="font-semibold text-foreground">{formatGHS(depositAmount)}</span>

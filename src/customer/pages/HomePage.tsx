@@ -24,6 +24,7 @@ import { getCurrentUser, getCurrentUserProfile, type UserProfile } from "@/lib/a
 import {
   initiateHubtelContributionPayment,
   initiateHubtelPayment,
+  payFromWallet,
   getCustomerFinancialSummary,
   type Contribution,
   type CustomerFinancialSummary,
@@ -182,6 +183,35 @@ export function HomePage() {
     void loadDashboard();
   };
 
+  const handlePayContributionFromWallet = async (contribution: ContributionWithCircle) => {
+    const amount = Number(contribution.amount_due ?? contribution.amount ?? 0);
+    setPaymentError("");
+
+    if (dashboard.availableWalletBalance < amount) {
+      setPaymentError("Insufficient available balance. Please fund your wallet.");
+      return;
+    }
+
+    setBusyPayment(`wallet-${contribution.id}`);
+    const { data, error } = await payFromWallet({
+      paymentType: "contribution",
+      contributionId: contribution.id,
+      currency: contribution.circles?.base_currency ?? primaryCurrency,
+      metadata: {
+        source: "customer_dashboard",
+        circleName: contribution.circles?.name ?? null,
+      },
+    });
+    setBusyPayment("");
+
+    if (error || !data) {
+      setPaymentError(error?.message ?? "We could not pay this contribution from your wallet.");
+      return;
+    }
+
+    void loadDashboard();
+  };
+
   const handleFundPiggyBox = async () => {
     setPaymentError("");
     setBusyPayment("piggy_box");
@@ -199,6 +229,32 @@ export function HomePage() {
     }
 
     setPaymentTransaction(data);
+    void loadDashboard();
+  };
+
+  const handleFundPiggyBoxFromWallet = async () => {
+    const amount = 100;
+    setPaymentError("");
+
+    if (dashboard.availableWalletBalance < amount) {
+      setPaymentError("Insufficient available balance. Please fund your wallet.");
+      return;
+    }
+
+    setBusyPayment("wallet-piggy_box");
+    const { error } = await payFromWallet({
+      paymentType: "piggy_bag",
+      amount,
+      currency: "GHS",
+      metadata: { source: "customer_dashboard", label: "quick_piggy_box_funding" },
+    });
+    setBusyPayment("");
+
+    if (error) {
+      setPaymentError(error.message);
+      return;
+    }
+
     void loadDashboard();
   };
 
@@ -224,6 +280,36 @@ export function HomePage() {
     }
 
     setPaymentTransaction(data);
+    void loadDashboard();
+  };
+
+  const handleFundSavingsPlanFromWallet = async () => {
+    const amount = Number(nextContribution?.amount_due ?? nextContribution?.amount ?? dashboard.circles[0]?.amount ?? 100);
+    setPaymentError("");
+
+    if (dashboard.availableWalletBalance < amount) {
+      setPaymentError("Insufficient available balance. Please fund your wallet.");
+      return;
+    }
+
+    setBusyPayment("wallet-savings_plan");
+    const { error } = await payFromWallet({
+      paymentType: "savings",
+      amount,
+      currency: primaryCurrency,
+      metadata: {
+        source: "customer_dashboard",
+        label: "quick_savings_plan_funding",
+        contributionId: nextContribution?.id ?? null,
+      },
+    });
+    setBusyPayment("");
+
+    if (error) {
+      setPaymentError(error.message);
+      return;
+    }
+
     void loadDashboard();
   };
 
@@ -281,6 +367,9 @@ export function HomePage() {
           actionLabel="Fund Piggy Box"
           loading={busyPayment === "piggy_box"}
           onAction={handleFundPiggyBox}
+          secondaryActionLabel="Pay from Wallet"
+          secondaryLoading={busyPayment === "wallet-piggy_box"}
+          onSecondaryAction={handleFundPiggyBoxFromWallet}
         />
         <BalanceCard
           icon={<Target className="h-4 w-4" />}
@@ -290,6 +379,9 @@ export function HomePage() {
           actionLabel="Fund Savings Plan"
           loading={busyPayment === "savings_plan"}
           onAction={handleFundSavingsPlan}
+          secondaryActionLabel="Pay from Wallet"
+          secondaryLoading={busyPayment === "wallet-savings_plan"}
+          onSecondaryAction={handleFundSavingsPlanFromWallet}
         />
       </section>
 
@@ -399,6 +491,15 @@ export function HomePage() {
                   >
                     {busyPayment === contribution.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
                     Pay Contribution
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyPayment === `wallet-${contribution.id}`}
+                    onClick={() => handlePayContributionFromWallet(contribution)}
+                    className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-card py-3 text-sm font-semibold text-foreground disabled:opacity-60"
+                  >
+                    {busyPayment === `wallet-${contribution.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
+                    Pay from SikaCircle Wallet
                   </button>
                 </li>
               );
@@ -751,6 +852,9 @@ function BalanceCard({
   actionLabel,
   loading,
   onAction,
+  secondaryActionLabel,
+  secondaryLoading,
+  onSecondaryAction,
 }: {
   icon: ReactNode;
   label: string;
@@ -759,6 +863,9 @@ function BalanceCard({
   actionLabel?: string;
   loading?: boolean;
   onAction?: () => void;
+  secondaryActionLabel?: string;
+  secondaryLoading?: boolean;
+  onSecondaryAction?: () => void;
 }) {
   const isEmpty = value.includes("0.00") || value.endsWith("0");
 
@@ -779,6 +886,17 @@ function BalanceCard({
         >
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wallet className="h-3.5 w-3.5" />}
           {actionLabel}
+        </button>
+      )}
+      {secondaryActionLabel && onSecondaryAction && (
+        <button
+          type="button"
+          disabled={secondaryLoading}
+          onClick={onSecondaryAction}
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-[11px] font-semibold text-foreground disabled:opacity-60"
+        >
+          {secondaryLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wallet className="h-3.5 w-3.5" />}
+          {secondaryActionLabel}
         </button>
       )}
     </div>

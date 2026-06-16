@@ -525,6 +525,26 @@ export async function initiateHubtelPayment(payload: {
   return normalizeHubtelPaymentResult(result);
 }
 
+export async function payFromWallet(payload: {
+  paymentType: 'contribution' | 'piggy_bag' | 'savings';
+  amount?: number | null;
+  currency?: string | null;
+  circleId?: string | null;
+  contributionId?: string | null;
+  planId?: string | null;
+  metadata?: Json;
+}) {
+  return supabase.rpc('pay_from_wallet', {
+    payment_type: payload.paymentType,
+    amount: payload.amount ?? null,
+    currency: payload.currency ?? 'GHS',
+    circle_id: payload.circleId ?? null,
+    contribution_id: payload.contributionId ?? null,
+    plan_id: payload.planId ?? null,
+    metadata: payload.metadata ?? {},
+  });
+}
+
 function normalizeHubtelPaymentResult(result: {
   data: {
     ok: boolean;

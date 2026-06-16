@@ -1159,6 +1159,18 @@ export interface Database {
         Args: { check_contribution_id: string };
         Returns: Database['public']['Tables']['wallet_transactions']['Row'];
       };
+      pay_from_wallet: {
+        Args: {
+          payment_type: 'contribution' | 'piggy_bag' | 'savings';
+          amount?: number | null;
+          currency?: string | null;
+          circle_id?: string | null;
+          contribution_id?: string | null;
+          plan_id?: string | null;
+          metadata?: Json;
+        };
+        Returns: Database['public']['Tables']['wallet_transactions']['Row'];
+      };
       receive_payout_to_wallet: {
         Args: { check_schedule_id: string };
         Returns: Database['public']['Tables']['wallet_transactions']['Row'];

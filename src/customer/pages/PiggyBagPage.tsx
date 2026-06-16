@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { CalendarDays, Loader2, LockKeyhole, PiggyBank, Plus, Wallet } from "lucide-react";
 import { formatGHS } from "@/lib/mock-data";
 import { buildPlanMetrics, formatDate, loadPiggyPlans, type PiggyPlanWithMetrics } from "@/lib/piggy-bag";
-import { getCustomerPaymentBreakdown, getPiggyFinancialSummary, initiateHubtelPayment, listPersonalSusuDeposits, type CustomerPaymentBreakdownItem, type PaymentTransaction, type PersonalSusuPlan, type PiggyFinancialSummaryItem } from "@/lib/db";
+import { getCustomerPaymentBreakdown, getPiggyFinancialSummary, initiateHubtelPayment, listPersonalSusuDeposits, payFromWallet, type CustomerPaymentBreakdownItem, type PaymentTransaction, type PersonalSusuPlan, type PiggyFinancialSummaryItem } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { PaymentPreparationModal } from "@/components/payment-preparation-modal";
 
@@ -93,6 +93,38 @@ export function PiggyBagPage() {
     }
 
     setPaymentTransaction(data);
+  };
+
+  const handleFundPlanFromWallet = async (item: PiggyPlanWithMetrics) => {
+    setError("");
+    const amount = item.metrics.expectedContributionPerPeriod || item.metrics.remainingBalance;
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("No amount is due for this Piggy Bag plan.");
+      return;
+    }
+
+    setPreparingPlanId(`wallet-${item.plan.id}`);
+    const { error } = await payFromWallet({
+      paymentType: "piggy_bag",
+      amount,
+      currency: "GHS",
+      planId: item.plan.id,
+      metadata: {
+        source: "piggy_bag_list",
+        planName: item.plan.name,
+        targetAmount: item.plan.target_amount,
+        lockedUntil: item.plan.locked_until,
+      },
+    });
+    setPreparingPlanId(null);
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    window.location.reload();
   };
 
   return (
@@ -202,6 +234,15 @@ export function PiggyBagPage() {
                 >
                   {preparingPlanId === plan.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
                   Pay with Mobile Money
+                </button>
+                <button
+                  type="button"
+                  disabled={preparingPlanId === `wallet-${plan.id}` || amountDue <= 0}
+                  onClick={() => handleFundPlanFromWallet(item)}
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-card py-3 text-sm font-semibold text-foreground disabled:bg-muted disabled:text-muted-foreground"
+                >
+                  {preparingPlanId === `wallet-${plan.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
+                  Pay from SikaCircle Wallet
                 </button>
               </div>
             </li>

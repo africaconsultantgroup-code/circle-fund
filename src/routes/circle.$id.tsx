@@ -18,6 +18,7 @@ import {
   listCircleMembers,
   lockCirclePayoutRotation,
   manageCircleMember,
+  payFromWallet,
   type Circle,
   type CircleContributionStatus,
   type CircleMemberDetails,
@@ -231,6 +232,31 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
 
     setPaymentTransaction(data ?? null);
     setPaymentNotice(`Contribution payment started. Reference: ${data?.provider_reference ?? "pending"}. The ledger updates after Hubtel confirms success.`);
+    await loadCircle();
+  }
+
+  async function handlePayContributionFromWallet(contribution: CircleContributionStatus) {
+    setMessage("");
+    setError("");
+    setPaymentNotice("");
+    setInitiatingPaymentId(`wallet-${contribution.contribution_id}`);
+    const { data, error: walletError } = await payFromWallet({
+      paymentType: "contribution",
+      contributionId: contribution.contribution_id,
+      currency,
+      metadata: {
+        source: "circle_details",
+        circleName: circle?.name ?? null,
+      },
+    });
+    setInitiatingPaymentId(null);
+
+    if (walletError || !data) {
+      setError(walletError?.message ?? "We could not pay this contribution from your wallet.");
+      return;
+    }
+
+    setPaymentNotice(`Contribution paid from SikaCircle Wallet. Receipt: ${data.receipt_id}.`);
     await loadCircle();
   }
 
@@ -490,14 +516,24 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
                         <LedgerField label="Payment ref" value={contribution.payment_reference ?? "None"} wide />
                       </div>
                       {user?.id === contribution.user_id && ["unpaid", "overdue", "pending", "failed"].includes(contribution.status) && (
-                        <button
-                          onClick={() => handlePayContribution(contribution)}
-                          disabled={initiatingPaymentId === contribution.contribution_id}
-                          className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2 text-[11px] font-semibold text-primary-foreground disabled:opacity-60"
-                        >
-                          {initiatingPaymentId === contribution.contribution_id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                          Pay with Mobile Money
-                        </button>
+                        <div className="mt-3 grid gap-2">
+                          <button
+                            onClick={() => handlePayContribution(contribution)}
+                            disabled={initiatingPaymentId === contribution.contribution_id}
+                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2 text-[11px] font-semibold text-primary-foreground disabled:opacity-60"
+                          >
+                            {initiatingPaymentId === contribution.contribution_id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                            Pay with Mobile Money
+                          </button>
+                          <button
+                            onClick={() => handlePayContributionFromWallet(contribution)}
+                            disabled={initiatingPaymentId === `wallet-${contribution.contribution_id}`}
+                            className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-2 text-[11px] font-semibold text-foreground disabled:opacity-60"
+                          >
+                            {initiatingPaymentId === `wallet-${contribution.contribution_id}` && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                            Pay from SikaCircle Wallet
+                          </button>
+                        </div>
                       )}
                     </li>
                   ))}

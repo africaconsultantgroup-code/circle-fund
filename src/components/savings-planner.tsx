@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { CalendarDays, Calculator, Loader2, Wallet } from "lucide-react";
 import { formatCurrency } from "@/lib/diaspora";
-import { initiateHubtelPayment, type PaymentTransaction } from "@/lib/db";
+import { initiateHubtelPayment, payFromWallet, type PaymentTransaction } from "@/lib/db";
 import type { CurrencyCode } from "@/lib/supabase-types";
 import { PaymentPreparationModal } from "@/components/payment-preparation-modal";
 
@@ -67,6 +67,38 @@ export function SavingsPlanner({
     }
 
     setPaymentTransaction(data);
+  };
+
+  const handleWalletPayment = async (amount: number, label: string) => {
+    setPaymentError("");
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setPaymentError("No amount is due for this savings plan.");
+      return;
+    }
+
+    setIsPreparingPayment(true);
+    const { data, error } = await payFromWallet({
+      paymentType: "savings",
+      amount,
+      currency,
+      metadata: {
+        source: "savings_planner",
+        label,
+        targetAmount,
+        savedAmount,
+        dueDate,
+        frequency,
+      },
+    });
+    setIsPreparingPayment(false);
+
+    if (error || !data) {
+      setPaymentError(error?.message ?? "We could not pay from your wallet.");
+      return;
+    }
+
+    setSavedAmount((current) => current + amount);
   };
 
   return (
@@ -149,6 +181,24 @@ export function SavingsPlanner({
               >
                 {isPreparingPayment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
                 Add Money
+              </button>
+              <button
+                type="button"
+                disabled={isPreparingPayment}
+                onClick={() => handleWalletPayment(plan.remainingAmount, "full_remaining_amount")}
+                className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground disabled:opacity-60"
+              >
+                {isPreparingPayment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
+                Start from Wallet
+              </button>
+              <button
+                type="button"
+                disabled={isPreparingPayment}
+                onClick={() => handleWalletPayment(selectedAmount, `${frequency}_amount`)}
+                className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground disabled:opacity-60"
+              >
+                {isPreparingPayment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
+                Add from Wallet
               </button>
             </div>
           ) : (

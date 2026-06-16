@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth";
 import {
   initiateHubtelContributionPayment,
   initiateHubtelPayment,
+  payFromWallet,
   getCustomerFinancialSummary,
   getCustomerPaymentBreakdown,
   getCustomerPaymentHistory,
@@ -212,6 +213,37 @@ function PaymentsPage() {
     await loadPayments();
   };
 
+  const handlePayContributionFromWallet = async (contribution: ContributionWithCircle) => {
+    const amount = Number(contribution.amount_due ?? contribution.amount ?? 0);
+    setError("");
+    setWalletNotice("");
+
+    if (Number(walletSummary?.available_balance ?? 0) < amount) {
+      setError("Insufficient available balance. Please fund your wallet.");
+      return;
+    }
+
+    setPreparingId(`wallet-${contribution.id}`);
+    const { data, error } = await payFromWallet({
+      paymentType: "contribution",
+      contributionId: contribution.id,
+      currency: contribution.circles?.base_currency ?? walletCurrency,
+      metadata: {
+        source: "payments_tab",
+        circleName: contribution.circles?.name ?? null,
+      },
+    });
+    setPreparingId(null);
+
+    if (error || !data) {
+      setError(error?.message ?? "We could not pay this contribution from your wallet.");
+      return;
+    }
+
+    setWalletNotice(`Contribution paid from SikaCircle Wallet. Receipt: ${data.receipt_id}.`);
+    await loadPayments();
+  };
+
   const handlePayPiggyBagPlan = async (item: PersonalSusuDue) => {
     setError("");
     setWalletNotice("");
@@ -235,6 +267,38 @@ function PaymentsPage() {
     }
 
     setPaymentTransaction(data);
+    await loadPayments();
+  };
+
+  const handlePayPiggyBagFromWallet = async (item: PersonalSusuDue) => {
+    setError("");
+    setWalletNotice("");
+
+    if (Number(walletSummary?.available_balance ?? 0) < item.amountDue) {
+      setError("Insufficient available balance. Please fund your wallet.");
+      return;
+    }
+
+    setPreparingId(`wallet-${item.plan.id}`);
+    const { data, error } = await payFromWallet({
+      paymentType: "piggy_bag",
+      amount: item.amountDue,
+      currency: "GHS",
+      planId: item.plan.id,
+      metadata: {
+        source: "payments_tab",
+        planName: item.plan.name,
+        dueDate: item.dueDate,
+      },
+    });
+    setPreparingId(null);
+
+    if (error || !data) {
+      setError(error?.message ?? "We could not fund this Piggy Bag from your wallet.");
+      return;
+    }
+
+    setWalletNotice(`Piggy Bag funded from SikaCircle Wallet. Receipt: ${data.receipt_id}.`);
     await loadPayments();
   };
 
@@ -351,6 +415,15 @@ function PaymentsPage() {
                     {preparingId === contribution.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
                     Pay with Mobile Money
                   </button>
+                  <button
+                    type="button"
+                    disabled={preparingId === `wallet-${contribution.id}` || amount <= 0}
+                    onClick={() => handlePayContributionFromWallet(contribution)}
+                    className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-card py-3 text-sm font-semibold text-foreground disabled:bg-muted disabled:text-muted-foreground"
+                  >
+                    {preparingId === `wallet-${contribution.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
+                    Pay from SikaCircle Wallet
+                  </button>
                 </li>
               );
             })}
@@ -390,6 +463,15 @@ function PaymentsPage() {
                 >
                   {preparingId === item.plan.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
                   Fund Piggy Bag
+                </button>
+                <button
+                  type="button"
+                  disabled={preparingId === `wallet-${item.plan.id}`}
+                  onClick={() => handlePayPiggyBagFromWallet(item)}
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-card py-3 text-sm font-semibold text-foreground disabled:opacity-60"
+                >
+                  {preparingId === `wallet-${item.plan.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
+                  Pay from SikaCircle Wallet
                 </button>
               </li>
             ))}
