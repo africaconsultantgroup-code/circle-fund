@@ -954,6 +954,31 @@ export interface Database {
         Args: { check_provider_reference: string; reconciliation_notes?: string | null };
         Returns: Database['public']['Tables']['payment_transactions']['Row'];
       };
+      admin_find_hubtel_payment: {
+        Args: { check_provider_reference: string };
+        Returns: Array<{
+          id: string;
+          user_id: string;
+          circle_id: string | null;
+          contribution_id: string | null;
+          amount: number;
+          currency: string;
+          payment_method: string | null;
+          provider: string;
+          provider_reference: string | null;
+          status: string;
+          payment_type: string;
+          provider_response: Json;
+          created_at: string;
+          updated_at: string;
+          user_name: string | null;
+          user_email: string | null;
+          circle_name: string | null;
+          wallet_transaction_id: string | null;
+          wallet_status: string | null;
+          receipt_id: string | null;
+        }>;
+      };
       get_circle_contribution_status: {
         Args: { check_circle_id: string };
         Returns: Array<{

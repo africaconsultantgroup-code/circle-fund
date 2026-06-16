@@ -93,6 +93,9 @@ export type AdminPaymentTransaction = {
   userName?: string | null;
   userEmail?: string | null;
   circleName?: string | null;
+  walletTransactionId?: string | null;
+  walletStatus?: string | null;
+  receiptId?: string | null;
 };
 
 export type AdminCapacityReview = {
@@ -203,6 +206,47 @@ export async function reconcileHubtelPayment(providerReference: string, notes?: 
     check_provider_reference: providerReference,
     reconciliation_notes: notes ?? null,
   });
+}
+
+export async function findHubtelPayment(providerReference: string): Promise<AdminFunctionResult<AdminPaymentTransaction>> {
+  const { data, error } = await supabase.rpc("admin_find_hubtel_payment", {
+    check_provider_reference: providerReference,
+  });
+
+  if (error) {
+    return { data: null, error: { message: error.message } };
+  }
+
+  const row = data?.[0];
+  if (!row) {
+    return { data: null, error: { message: "No Hubtel payment found for that reference." } };
+  }
+
+  return {
+    data: {
+      id: row.id,
+      user_id: row.user_id,
+      circle_id: row.circle_id,
+      contribution_id: row.contribution_id,
+      amount: row.amount,
+      currency: row.currency,
+      payment_method: row.payment_method,
+      provider: row.provider,
+      provider_reference: row.provider_reference,
+      status: row.status,
+      payment_type: row.payment_type,
+      provider_response: (row.provider_response ?? {}) as Record<string, unknown>,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      userName: row.user_name,
+      userEmail: row.user_email,
+      circleName: row.circle_name,
+      walletTransactionId: row.wallet_transaction_id,
+      walletStatus: row.wallet_status,
+      receiptId: row.receipt_id,
+    },
+    error: null,
+  };
 }
 
 export async function cancelStaffInvitation(invitationId: string) {

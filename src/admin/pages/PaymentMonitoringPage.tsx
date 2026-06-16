@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
-import { getAdminOverview, reconcileHubtelPayment, type AdminPaymentTransaction } from "@/admin/api";
+import { findHubtelPayment, getAdminOverview, reconcileHubtelPayment, type AdminPaymentTransaction } from "@/admin/api";
 import { formatCurrency } from "@/lib/diaspora";
 import type { CurrencyCode } from "@/lib/supabase-types";
 
@@ -12,8 +12,13 @@ type PaymentMonitoringPageProps = {
 
 export function PaymentMonitoringPage({ title, description, emptyText }: PaymentMonitoringPageProps) {
   const [transactions, setTransactions] = useState<AdminPaymentTransaction[]>([]);
+  const [staffRole, setStaffRole] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [reconcilingReference, setReconcilingReference] = useState<string | null>(null);
+  const [searchReference, setSearchReference] = useState("");
+  const [searchedTransaction, setSearchedTransaction] = useState<AdminPaymentTransaction | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [reconciliationReason, setReconciliationReason] = useState("Customer debited; Hubtel callback did not arrive.");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -21,6 +26,7 @@ export function PaymentMonitoringPage({ title, description, emptyText }: Payment
     setIsLoading(true);
     const { data, error } = await getAdminOverview();
     setTransactions(data?.paymentTransactions ?? []);
+    setStaffRole(data?.staffRole ?? "");
     setError(error?.message ?? "");
     setIsLoading(false);
   };
@@ -38,15 +44,46 @@ export function PaymentMonitoringPage({ title, description, emptyText }: Payment
     };
   }, [transactions]);
 
+  const canManuallyConfirm = staffRole === "finance" || staffRole === "super_admin";
+
+  const handleSearch = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const reference = searchReference.trim();
+    if (!reference) {
+      setError("Enter a Hubtel provider reference to search.");
+      return;
+    }
+
+    setError("");
+    setMessage("");
+    setSearchedTransaction(null);
+    setIsSearching(true);
+    const { data, error } = await findHubtelPayment(reference);
+    setIsSearching(false);
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    setSearchedTransaction(data);
+    setMessage(`Loaded payment ${data?.provider_reference}. Review the details before confirming.`);
+  };
+
   const handleReconcile = async (transaction: AdminPaymentTransaction) => {
     if (!transaction.provider_reference) return;
 
-    const notes = window.prompt(
-      `Reconcile Hubtel payment ${transaction.provider_reference} as successful?\n\nOnly continue if Hubtel confirms the customer was debited.`,
-      "Customer debited; Hubtel callback did not arrive.",
+    const notes = reconciliationReason.trim();
+    if (!notes) {
+      setError("Enter a reconciliation reason before confirming the payment.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Confirm Hubtel payment ${transaction.provider_reference} manually?\n\nOnly continue if Hubtel confirms the customer was debited.`,
     );
 
-    if (notes === null) return;
+    if (!confirmed) return;
 
     setError("");
     setMessage("");
@@ -60,6 +97,10 @@ export function PaymentMonitoringPage({ title, description, emptyText }: Payment
     }
 
     setMessage(`Payment ${transaction.provider_reference} reconciled successfully.`);
+    if (searchedTransaction?.provider_reference === transaction.provider_reference) {
+      const { data } = await findHubtelPayment(transaction.provider_reference);
+      setSearchedTransaction(data);
+    }
     await loadTransactions();
   };
 
@@ -100,6 +141,83 @@ export function PaymentMonitoringPage({ title, description, emptyText }: Payment
             <Metric label="Failed/cancelled" value={totals.failed} />
           </div>
 
+          {canManuallyConfirm && (
+            <div className="mt-5 rounded-2xl border border-border bg-card p-5 shadow-card">
+              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">Manual reconciliation</p>
+                  <h2 className="mt-1 font-display text-xl font-semibold">Search by Hubtel reference</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Use this only when Hubtel confirms the customer was debited but the callback did not arrive.</p>
+                </div>
+              </div>
+              <form onSubmit={handleSearch} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
+                <input
+                  value={searchReference}
+                  onChange={(event) => setSearchReference(event.target.value)}
+                  placeholder="SC2606161404BF82"
+                  className="h-11 rounded-xl border border-border bg-background px-3 font-mono text-sm outline-none focus:border-primary"
+                />
+                <button
+                  type="submit"
+                  disabled={isSearching}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                >
+                  {isSearching && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Search payment
+                </button>
+              </form>
+
+              {searchedTransaction && (
+                <div className="mt-4 rounded-2xl border border-border bg-background p-4">
+                  <div className="grid gap-3 md:grid-cols-4">
+                    <Detail label="Reference" value={searchedTransaction.provider_reference ?? "none"} mono />
+                    <Detail label="Customer" value={searchedTransaction.userName ?? searchedTransaction.userEmail ?? searchedTransaction.user_id} />
+                    <Detail label="Amount" value={formatCurrency(Number(searchedTransaction.amount ?? 0), (searchedTransaction.currency || "GHS") as CurrencyCode)} />
+                    <Detail label="Service" value={formatPaymentType(searchedTransaction.payment_type ?? "payment")} />
+                    <Detail label="Payment status" value={searchedTransaction.status} />
+                    <Detail label="Wallet status" value={searchedTransaction.walletStatus ?? "No wallet ledger entry"} />
+                    <Detail label="Receipt" value={searchedTransaction.receiptId ?? "No receipt yet"} mono />
+                    <Detail label="Created" value={formatDate(searchedTransaction.created_at)} />
+                  </div>
+
+                  {canReconcile(searchedTransaction, staffRole) ? (
+                    <div className="mt-4 grid gap-3">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground" htmlFor="reconciliation-reason">
+                        Confirmation reason
+                      </label>
+                      <textarea
+                        id="reconciliation-reason"
+                        value={reconciliationReason}
+                        onChange={(event) => setReconciliationReason(event.target.value)}
+                        rows={3}
+                        className="rounded-xl border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary"
+                      />
+                      <button
+                        type="button"
+                        disabled={reconcilingReference === searchedTransaction.provider_reference}
+                        onClick={() => handleReconcile(searchedTransaction)}
+                        className="inline-flex w-fit items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                      >
+                        {reconcilingReference === searchedTransaction.provider_reference ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                        Confirm Payment Manually
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="mt-4 rounded-xl border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
+                      This payment cannot be manually confirmed from its current state.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!canManuallyConfirm && (
+            <div className="mt-5 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
+              Manual reconciliation is restricted to Finance Admin and Super Admin.
+            </div>
+          )}
+
           <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-card shadow-card">
             <div className="grid min-w-[1220px] grid-cols-[1.1fr_1fr_0.8fr_0.8fr_0.9fr_0.8fr_0.9fr_1fr_0.9fr] gap-4 border-b border-border px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               <span>User</span>
@@ -126,7 +244,7 @@ export function PaymentMonitoringPage({ title, description, emptyText }: Payment
                   <p className="text-xs font-medium uppercase text-muted-foreground">{transaction.provider}</p>
                   <p className="truncate font-mono text-[11px] text-muted-foreground">{transaction.provider_reference ?? "none"}</p>
                   <p className="text-xs text-muted-foreground">{formatDate(transaction.created_at)}</p>
-                  {canReconcile(transaction) ? (
+                  {canReconcile(transaction, staffRole) ? (
                     <button
                       type="button"
                       disabled={reconcilingReference === transaction.provider_reference}
@@ -152,10 +270,20 @@ export function PaymentMonitoringPage({ title, description, emptyText }: Payment
   );
 }
 
-function canReconcile(transaction: AdminPaymentTransaction) {
-  return transaction.provider === "hubtel"
+function canReconcile(transaction: AdminPaymentTransaction, staffRole: string) {
+  return ["finance", "super_admin"].includes(staffRole)
+    && transaction.provider === "hubtel"
     && Boolean(transaction.provider_reference)
     && ["initiated", "pending"].includes(transaction.status);
+}
+
+function Detail({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className={`mt-1 truncate text-sm font-semibold ${mono ? "font-mono" : ""}`}>{value}</p>
+    </div>
+  );
 }
 
 function Metric({ label, value }: { label: string; value: number }) {
