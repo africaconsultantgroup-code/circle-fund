@@ -950,6 +950,10 @@ export interface Database {
         Args: { check_review_id: string; action: 'approve' | 'reject'; notes?: string | null };
         Returns: Database['public']['Tables']['capacity_reviews']['Row'];
       };
+      admin_reconcile_hubtel_payment: {
+        Args: { check_provider_reference: string; reconciliation_notes?: string | null };
+        Returns: Database['public']['Tables']['payment_transactions']['Row'];
+      };
       get_circle_contribution_status: {
         Args: { check_circle_id: string };
         Returns: Array<{

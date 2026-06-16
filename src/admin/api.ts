@@ -198,6 +198,13 @@ export async function manageCapacityReview(reviewId: string, action: "approve" |
   });
 }
 
+export async function reconcileHubtelPayment(providerReference: string, notes?: string | null) {
+  return supabase.rpc("admin_reconcile_hubtel_payment", {
+    check_provider_reference: providerReference,
+    reconciliation_notes: notes ?? null,
+  });
+}
+
 export async function cancelStaffInvitation(invitationId: string) {
   return invokeAdminFunction<{ status: string; invitation: StaffInvitation }>("admin-manage-staff", {
     method: "POST",

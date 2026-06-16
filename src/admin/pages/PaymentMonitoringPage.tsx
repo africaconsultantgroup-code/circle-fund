@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, ShieldAlert } from "lucide-react";
-import { getAdminOverview, type AdminPaymentTransaction } from "@/admin/api";
+import { CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
+import { getAdminOverview, reconcileHubtelPayment, type AdminPaymentTransaction } from "@/admin/api";
 import { formatCurrency } from "@/lib/diaspora";
 import type { CurrencyCode } from "@/lib/supabase-types";
 
@@ -13,21 +13,20 @@ type PaymentMonitoringPageProps = {
 export function PaymentMonitoringPage({ title, description, emptyText }: PaymentMonitoringPageProps) {
   const [transactions, setTransactions] = useState<AdminPaymentTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [reconcilingReference, setReconcilingReference] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  const loadTransactions = async () => {
+    setIsLoading(true);
+    const { data, error } = await getAdminOverview();
+    setTransactions(data?.paymentTransactions ?? []);
+    setError(error?.message ?? "");
+    setIsLoading(false);
+  };
 
   useEffect(() => {
-    let isMounted = true;
-
-    getAdminOverview().then(({ data, error }) => {
-      if (!isMounted) return;
-      setTransactions(data?.paymentTransactions ?? []);
-      setError(error?.message ?? "");
-      setIsLoading(false);
-    });
-
-    return () => {
-      isMounted = false;
-    };
+    void loadTransactions();
   }, []);
 
   const totals = useMemo(() => {
@@ -38,6 +37,31 @@ export function PaymentMonitoringPage({ title, description, emptyText }: Payment
       failed: transactions.filter((transaction) => ["failed", "cancelled", "reversed"].includes(transaction.status)).length,
     };
   }, [transactions]);
+
+  const handleReconcile = async (transaction: AdminPaymentTransaction) => {
+    if (!transaction.provider_reference) return;
+
+    const notes = window.prompt(
+      `Reconcile Hubtel payment ${transaction.provider_reference} as successful?\n\nOnly continue if Hubtel confirms the customer was debited.`,
+      "Customer debited; Hubtel callback did not arrive.",
+    );
+
+    if (notes === null) return;
+
+    setError("");
+    setMessage("");
+    setReconcilingReference(transaction.provider_reference);
+    const { error } = await reconcileHubtelPayment(transaction.provider_reference, notes);
+    setReconcilingReference(null);
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    setMessage(`Payment ${transaction.provider_reference} reconciled successfully.`);
+    await loadTransactions();
+  };
 
   return (
     <section>
@@ -60,6 +84,13 @@ export function PaymentMonitoringPage({ title, description, emptyText }: Payment
         </div>
       )}
 
+      {message && (
+        <div className="mt-5 flex items-start gap-2 rounded-2xl border border-success/30 bg-success/10 p-4 text-success">
+          <CheckCircle2 className="mt-0.5 h-4 w-4" />
+          <p className="text-sm font-medium">{message}</p>
+        </div>
+      )}
+
       {!isLoading && !error && (
         <>
           <div className="mt-5 grid gap-3 md:grid-cols-4">
@@ -70,7 +101,7 @@ export function PaymentMonitoringPage({ title, description, emptyText }: Payment
           </div>
 
           <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-card shadow-card">
-            <div className="grid min-w-[1080px] grid-cols-[1.1fr_1fr_0.8fr_0.8fr_0.9fr_0.8fr_0.9fr_1fr] gap-4 border-b border-border px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="grid min-w-[1220px] grid-cols-[1.1fr_1fr_0.8fr_0.8fr_0.9fr_0.8fr_0.9fr_1fr_0.9fr] gap-4 border-b border-border px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               <span>User</span>
               <span>Circle</span>
               <span>Amount</span>
@@ -79,10 +110,11 @@ export function PaymentMonitoringPage({ title, description, emptyText }: Payment
               <span>Provider</span>
               <span>Reference</span>
               <span>Date</span>
+              <span>Action</span>
             </div>
             <ul className="divide-y divide-border overflow-x-auto">
               {transactions.map((transaction) => (
-                <li key={transaction.id} className="grid min-w-[1080px] grid-cols-[1.1fr_1fr_0.8fr_0.8fr_0.9fr_0.8fr_0.9fr_1fr] items-center gap-4 px-5 py-3 text-sm">
+                <li key={transaction.id} className="grid min-w-[1220px] grid-cols-[1.1fr_1fr_0.8fr_0.8fr_0.9fr_0.8fr_0.9fr_1fr_0.9fr] items-center gap-4 px-5 py-3 text-sm">
                   <div className="min-w-0">
                     <p className="truncate font-medium">{transaction.userName ?? transaction.userEmail ?? transaction.user_id}</p>
                     <p className="truncate text-xs text-muted-foreground">{transaction.userEmail ?? transaction.user_id}</p>
@@ -94,6 +126,19 @@ export function PaymentMonitoringPage({ title, description, emptyText }: Payment
                   <p className="text-xs font-medium uppercase text-muted-foreground">{transaction.provider}</p>
                   <p className="truncate font-mono text-[11px] text-muted-foreground">{transaction.provider_reference ?? "none"}</p>
                   <p className="text-xs text-muted-foreground">{formatDate(transaction.created_at)}</p>
+                  {canReconcile(transaction) ? (
+                    <button
+                      type="button"
+                      disabled={reconcilingReference === transaction.provider_reference}
+                      onClick={() => handleReconcile(transaction)}
+                      className="inline-flex w-fit items-center justify-center gap-1 rounded-xl bg-primary px-3 py-2 text-[11px] font-semibold text-primary-foreground disabled:opacity-60"
+                    >
+                      {reconcilingReference === transaction.provider_reference ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                      Reconcile
+                    </button>
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground">No action</span>
+                  )}
                 </li>
               ))}
               {transactions.length === 0 && (
@@ -105,6 +150,12 @@ export function PaymentMonitoringPage({ title, description, emptyText }: Payment
       )}
     </section>
   );
+}
+
+function canReconcile(transaction: AdminPaymentTransaction) {
+  return transaction.provider === "hubtel"
+    && Boolean(transaction.provider_reference)
+    && ["initiated", "pending"].includes(transaction.status);
 }
 
 function Metric({ label, value }: { label: string; value: number }) {
