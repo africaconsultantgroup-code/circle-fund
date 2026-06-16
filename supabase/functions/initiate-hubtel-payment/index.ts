@@ -245,8 +245,8 @@ function paymentConfig(): PaymentConfig {
     clientId: Deno.env.get("HUBTEL_PAYMENT_CLIENT_ID") ?? "",
     clientSecret: Deno.env.get("HUBTEL_PAYMENT_CLIENT_SECRET") ?? "",
     merchantAccount: Deno.env.get("HUBTEL_PAYMENT_MERCHANT_ACCOUNT") ?? "",
-    callbackUrl: Deno.env.get("HUBTEL_PAYMENT_CALLBACK_URL") ?? Deno.env.get("HUBTEL_CALLBACK_URL") ?? "",
-    returnUrl: Deno.env.get("HUBTEL_PAYMENT_RETURN_URL") ?? Deno.env.get("HUBTEL_RETURN_URL") ?? "",
+    callbackUrl: Deno.env.get("HUBTEL_CALLBACK_URL") ?? "",
+    returnUrl: Deno.env.get("HUBTEL_RETURN_URL") ?? "",
     env: Deno.env.get("HUBTEL_PAYMENT_ENV") ?? "sandbox",
     initiateUrl: Deno.env.get("HUBTEL_PAYMENT_INITIATE_URL") ?? "https://payproxyapi.hubtel.com/items/initiate",
   };
