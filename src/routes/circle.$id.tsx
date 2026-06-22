@@ -75,6 +75,7 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
   const [paymentTransaction, setPaymentTransaction] = useState<PaymentTransaction | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [updatingMembershipId, setUpdatingMembershipId] = useState<string | null>(null);
 
   const currentMember = useMemo(() => members.find((member) => member.user_id === user?.id), [members, user?.id]);
   const isAdmin = Boolean(circle?.owner_id === user?.id || (currentMember?.status === "approved" && ["creator", "admin"].includes(currentMember.role)));
@@ -191,7 +192,9 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
   async function handleMemberAction(member: CircleMemberDetails, action: "approve" | "reject" | "remove") {
     setMessage("");
     setError("");
+    setUpdatingMembershipId(member.membership_id);
     const { error: actionError } = await manageCircleMember(member.membership_id, action);
+    setUpdatingMembershipId(null);
     if (actionError) {
       setError(actionError.message);
       return;
@@ -387,7 +390,7 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
       <PageHeader
         title={circle?.name ?? "Circle"}
-        subtitle={`${approvedMembers.length}/${maxMembers} approved members`}
+        subtitle={`${approvedMembers.length}/${maxMembers} approved members${isAdmin && pendingMembers.length ? ` · ${pendingMembers.length} pending` : ""}`}
         back="/circles"
         right={<button className="flex h-9 w-9 items-center justify-center rounded-full bg-muted"><Share2 className="h-4 w-4" /></button>}
       />
@@ -460,6 +463,13 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
 
           {tab === "members" && (
             <section className="flex flex-col gap-4 p-5">
+              {isAdmin && (
+                <PendingRequests
+                  members={pendingMembers}
+                  updatingMembershipId={updatingMembershipId}
+                  onAction={handleMemberAction}
+                />
+              )}
               {membershipStatus === "approved" || isAdmin ? (
                 <MemberGroup title="Approved members" members={approvedMembers} isAdmin={isAdmin} rotationByMember={rotationByMember} onAction={handleMemberAction} />
               ) : (
@@ -561,6 +571,77 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
         title="Contribution payment started"
         onClose={() => setPaymentTransaction(null)}
       />
+    </div>
+  );
+}
+
+function PendingRequests({
+  members,
+  updatingMembershipId,
+  onAction,
+}: {
+  members: CircleMemberDetails[];
+  updatingMembershipId: string | null;
+  onAction: (member: CircleMemberDetails, action: "approve" | "reject") => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-gold/30 bg-gold/5 p-4 shadow-card">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="font-display text-base font-semibold">Pending Requests</h2>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">Review applicants before adding them to active members.</p>
+        </div>
+        <span className="rounded-full bg-gold/20 px-2.5 py-1 text-xs font-bold text-[color:var(--gold-foreground)]">{members.length}</span>
+      </div>
+
+      {members.length === 0 ? (
+        <p className="mt-4 rounded-xl bg-card px-3 py-4 text-sm text-muted-foreground">No pending join requests.</p>
+      ) : (
+        <ul className="mt-4 flex flex-col gap-3">
+          {members.map((member) => {
+            const isUpdating = updatingMembershipId === member.membership_id;
+            return (
+              <li key={member.membership_id} className="rounded-xl border border-border bg-card p-3">
+                <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
+                  <RequestField label="Full Name" value={displayMemberName(member.full_name)} />
+                  <RequestField label="Phone Number" value={member.phone?.trim() || "Not provided"} />
+                  <RequestField label="Request Date" value={formatDate(member.joined_at)} wide />
+                </dl>
+                {member.requires_capacity_review && member.capacity_review_status !== "approved" && (
+                  <p className="mt-3 rounded-lg bg-gold/10 px-3 py-2 text-[10px] font-medium text-[color:var(--gold-foreground)]">
+                    SikaCircle capacity review is {member.capacity_review_status}; approval is available after that review.
+                  </p>
+                )}
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => onAction(member, "approve")}
+                    disabled={isUpdating || (member.requires_capacity_review && member.capacity_review_status !== "approved")}
+                    className="flex items-center justify-center gap-1.5 rounded-xl bg-success/10 py-2.5 text-[11px] font-semibold text-success disabled:opacity-50"
+                  >
+                    {isUpdating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />} Approve
+                  </button>
+                  <button
+                    onClick={() => onAction(member, "reject")}
+                    disabled={isUpdating}
+                    className="flex items-center justify-center gap-1.5 rounded-xl bg-destructive/10 py-2.5 text-[11px] font-semibold text-destructive disabled:opacity-50"
+                  >
+                    <X className="h-3.5 w-3.5" /> Reject
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function RequestField({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
+  return (
+    <div className={wide ? "col-span-2" : ""}>
+      <dt className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 text-xs font-medium">{value}</dd>
     </div>
   );
 }

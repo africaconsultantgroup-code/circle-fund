@@ -249,6 +249,33 @@ export interface Database {
           updated_at?: string | null;
         };
       };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          circle_id: string | null;
+          membership_id: string | null;
+          type: 'join_request' | 'membership_approved' | 'membership_rejected';
+          title: string;
+          body: string;
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          circle_id?: string | null;
+          membership_id?: string | null;
+          type: 'join_request' | 'membership_approved' | 'membership_rejected';
+          title: string;
+          body: string;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          read_at?: string | null;
+        };
+      };
       capacity_reviews: {
         Row: {
           id: string;

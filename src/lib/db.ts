@@ -33,6 +33,7 @@ export type CircleMemberDetails = Database['public']['Functions']['get_circle_me
 export type CircleContributionStatus = Database['public']['Functions']['get_circle_contribution_status']['Returns'][number];
 export type CircleAccess = Database['public']['Functions']['get_circle_access']['Returns'][number];
 export type CapacityReview = Database['public']['Tables']['capacity_reviews']['Row'];
+export type Notification = Database['public']['Tables']['notifications']['Row'];
 export type AdminDuePayout = Database['public']['Functions']['list_due_payouts_for_admin']['Returns'][number];
 
 export async function getProfileByUserId(userId: string) {
@@ -369,6 +370,10 @@ export async function listCircleMembers(circleId: string) {
 
 export async function manageCircleMember(membershipId: string, action: 'approve' | 'reject' | 'remove') {
   return supabase.rpc('manage_circle_member', { check_membership_id: membershipId, action });
+}
+
+export async function listNotifications() {
+  return supabase.from('notifications').select('*').order('created_at', { ascending: false });
 }
 
 export async function addContribution(payload: {
