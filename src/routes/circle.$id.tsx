@@ -88,7 +88,9 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
   const myPayoutTurn = useMemo(() => payoutRotation.find((item) => item.is_current_user), [payoutRotation]);
   const rotationLocked = payoutRotation.some((item) => Boolean(item.locked_at));
   const rotationLockedAt = payoutRotation.find((item) => item.locked_at)?.locked_at ?? null;
-  const canChangeRotation = isAdmin && !rotationLocked && !hasCircleStarted(circle?.start_date);
+  const hasEnoughMembersForRotation = approvedMembers.length >= 2;
+  const canGenerateRotation = isAdmin && hasEnoughMembersForRotation && !rotationLocked;
+  const canRegenerateRotation = canGenerateRotation && !hasCircleStarted(circle?.start_date);
   const rotationByMember = useMemo(() => new Map(payoutRotation.map((turn) => [turn.member_id, turn])), [payoutRotation]);
   const contributionSummary = useMemo(() => {
     if (paymentSummary) {
@@ -322,7 +324,7 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
           <div className="flex flex-col gap-2">
             <button
               onClick={() => handleGenerateRotation(false)}
-              disabled={isUpdatingRotation || !canChangeRotation || payoutRotation.length > 0}
+              disabled={isUpdatingRotation || !canGenerateRotation || payoutRotation.length > 0}
               className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
             >
               {isUpdatingRotation ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shuffle className="h-4 w-4" />}
@@ -332,7 +334,7 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => handleGenerateRotation(true)}
-                  disabled={isUpdatingRotation || !canChangeRotation}
+                  disabled={isUpdatingRotation || !canRegenerateRotation}
                   className="flex items-center justify-center gap-2 rounded-xl bg-muted px-3 py-2 text-[11px] font-semibold disabled:opacity-60"
                 >
                   <RefreshCw className="h-3.5 w-3.5" /> Regenerate Payout Order
@@ -348,6 +350,9 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
             )}
             {payoutRotation.length > 0 && !rotationLocked && (
               <p className="text-[11px] text-muted-foreground">Regenerating replaces this fair random order and is only available before the circle starts.</p>
+            )}
+            {payoutRotation.length === 0 && !hasEnoughMembersForRotation && (
+              <p className="text-[11px] text-muted-foreground">Approve at least 2 members to generate the payout order.</p>
             )}
             {rotationLocked && <p className="text-[11px] text-muted-foreground">This payout order is locked and will not change automatically.</p>}
           </div>
