@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as TrustScoreRouteImport } from './routes/trust-score'
 import { Route as TransactionsRouteImport } from './routes/transactions'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SupabaseHealthRouteImport } from './routes/supabase-health'
 import { Route as RiskAlertRouteImport } from './routes/risk-alert'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
@@ -72,6 +73,11 @@ const TransactionsRoute = TransactionsRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SupabaseHealthRoute = SupabaseHealthRouteImport.update({
+  id: '/supabase-health',
+  path: '/supabase-health',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RiskAlertRoute = RiskAlertRouteImport.update({
@@ -311,6 +317,7 @@ export interface FileRoutesByFullPath {
   '/register': typeof RegisterRoute
   '/risk-alert': typeof RiskAlertRoute
   '/settings': typeof SettingsRoute
+  '/supabase-health': typeof SupabaseHealthRoute
   '/transactions': typeof TransactionsRoute
   '/trust-score': typeof TrustScoreRoute
   '/circles': typeof AppCirclesRoute
@@ -360,6 +367,7 @@ export interface FileRoutesByTo {
   '/register': typeof RegisterRoute
   '/risk-alert': typeof RiskAlertRoute
   '/settings': typeof SettingsRoute
+  '/supabase-health': typeof SupabaseHealthRoute
   '/transactions': typeof TransactionsRoute
   '/trust-score': typeof TrustScoreRoute
   '/circles': typeof AppCirclesRoute
@@ -402,6 +410,7 @@ export interface FileRoutesById {
   '/register': typeof RegisterRoute
   '/risk-alert': typeof RiskAlertRoute
   '/settings': typeof SettingsRoute
+  '/supabase-health': typeof SupabaseHealthRoute
   '/transactions': typeof TransactionsRoute
   '/trust-score': typeof TrustScoreRoute
   '/_app/circles': typeof AppCirclesRoute
@@ -453,6 +462,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/risk-alert'
     | '/settings'
+    | '/supabase-health'
     | '/transactions'
     | '/trust-score'
     | '/circles'
@@ -502,6 +512,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/risk-alert'
     | '/settings'
+    | '/supabase-health'
     | '/transactions'
     | '/trust-score'
     | '/circles'
@@ -596,6 +607,7 @@ export interface RootRouteChildren {
   RegisterRoute: typeof RegisterRoute
   RiskAlertRoute: typeof RiskAlertRoute
   SettingsRoute: typeof SettingsRoute
+  SupabaseHealthRoute: typeof SupabaseHealthRoute
   TransactionsRoute: typeof TransactionsRoute
   TrustScoreRoute: typeof TrustScoreRoute
   AdminLoginRoute: typeof AdminLoginRoute
@@ -636,6 +648,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/supabase-health': {
+      id: '/supabase-health'
+      path: '/supabase-health'
+      fullPath: '/supabase-health'
+      preLoaderRoute: typeof SupabaseHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/risk-alert': {
@@ -1045,6 +1064,7 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterRoute: RegisterRoute,
   RiskAlertRoute: RiskAlertRoute,
   SettingsRoute: SettingsRoute,
+  SupabaseHealthRoute: SupabaseHealthRoute,
   TransactionsRoute: TransactionsRoute,
   TrustScoreRoute: TrustScoreRoute,
   AdminLoginRoute: AdminLoginRoute,
