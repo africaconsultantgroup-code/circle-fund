@@ -46,5 +46,6 @@ export function staffCanAccessAdminRoute(role: StaffRole | null, pathname: strin
     .find((route) => pathname === route.to || pathname.startsWith(`${route.to}/`));
 
   const route = match ?? adminRoutes.find((item) => item.to === "/admin");
-  return Boolean(route?.roles.includes("staff") || route?.roles.includes(role));
+  const permissions = route?.roles as readonly AdminRoutePermission[] | undefined;
+  return Boolean(permissions?.includes("staff") || permissions?.includes(role));
 }

@@ -1,6 +1,6 @@
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
-export type CircleStatus = 'active' | 'paused' | 'completed' | 'cancelled';
+export type CircleStatus = 'active' | 'paused' | 'completed' | 'cancelled' | 'archived';
 export type MemberStatus = 'pending' | 'pending_capacity_review' | 'approved' | 'rejected' | 'removed';
 export type ContributionStatus = 'pending' | 'processed' | 'failed' | 'unpaid' | 'paid' | 'late' | 'overdue';
 export type PayoutStatus = 'pending' | 'completed' | 'failed';
@@ -166,6 +166,7 @@ export interface Database {
           start_date: string | null;
           end_date: string | null;
           status: CircleStatus;
+          archived_at: string | null;
           created_at: string | null;
           updated_at: string | null;
         };
@@ -184,6 +185,7 @@ export interface Database {
           start_date?: string | null;
           end_date?: string | null;
           status?: CircleStatus;
+          archived_at?: string | null;
           created_at?: string | null;
           updated_at?: string | null;
         };
@@ -200,6 +202,7 @@ export interface Database {
           start_date?: string | null;
           end_date?: string | null;
           status?: CircleStatus;
+          archived_at?: string | null;
           updated_at?: string | null;
         };
       };
@@ -875,6 +878,27 @@ export interface Database {
       };
     };
     Functions: {
+      get_circle_lifecycle_eligibility: {
+        Args: { check_circle_id: string };
+        Returns: Array<{
+          can_delete: boolean;
+          approved_member_count: number;
+          pending_member_count: number;
+          contribution_count: number;
+          payout_count: number;
+          payment_transaction_count: number;
+          wallet_transaction_count: number;
+          transaction_count: number;
+        }>;
+      };
+      delete_circle: {
+        Args: { check_circle_id: string };
+        Returns: boolean;
+      };
+      archive_circle: {
+        Args: { check_circle_id: string };
+        Returns: Database['public']['Tables']['circles']['Row'];
+      };
       user_passes_circle_onboarding: {
         Args: { check_user_id: string };
         Returns: boolean;
@@ -1288,3 +1312,44 @@ export interface Database {
     };
   };
 }
+
+/**
+ * Supabase's query builder expects generated table definitions to include a
+ * Relationships field. The schema in this project is maintained by hand, so
+ * add the empty relationship metadata without duplicating it on every table.
+ */
+export type SupabaseDatabase = {
+  public: Omit<Database['public'], 'Tables'> & {
+    Tables: {
+      [TableName in keyof Database['public']['Tables']]:
+        Database['public']['Tables'][TableName] & {
+          Relationships: TableName extends 'circle_members'
+            ? [{
+                foreignKeyName: 'circle_members_circle_id_fkey';
+                columns: ['circle_id'];
+                isOneToOne: false;
+                referencedRelation: 'circles';
+                referencedColumns: ['id'];
+              }]
+            : TableName extends 'contributions'
+              ? [{
+                  foreignKeyName: 'contributions_circle_id_fkey';
+                  columns: ['circle_id'];
+                  isOneToOne: false;
+                  referencedRelation: 'circles';
+                  referencedColumns: ['id'];
+                }]
+              : TableName extends 'wallet_transactions'
+                ? [{
+                    foreignKeyName: 'wallet_transactions_circle_id_fkey';
+                    columns: ['circle_id'];
+                    isOneToOne: false;
+                    referencedRelation: 'circles';
+                    referencedColumns: ['id'];
+                  }]
+                : [];
+        };
+    };
+    Views: Record<string, never>;
+  };
+};

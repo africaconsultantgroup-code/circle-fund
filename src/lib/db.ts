@@ -48,10 +48,11 @@ export async function upsertProfile(profile: Partial<Profile> & { user_id: strin
   }
 
   if (existing.data) {
+    const { id: _id, user_id: _userId, created_at: _createdAt, ...updates } = profile;
     return supabase
       .from('profiles')
       .update({
-        ...profile,
+        ...updates,
         updated_at: profile.updated_at ?? new Date().toISOString(),
       })
       .eq('user_id', profile.user_id)
@@ -64,10 +65,11 @@ export async function upsertProfile(profile: Partial<Profile> & { user_id: strin
     return inserted;
   }
 
+  const { id: _id, user_id: _userId, created_at: _createdAt, ...updates } = profile;
   return supabase
     .from('profiles')
     .update({
-      ...profile,
+      ...updates,
       updated_at: profile.updated_at ?? new Date().toISOString(),
     })
     .eq('user_id', profile.user_id)
@@ -236,9 +238,32 @@ export async function getCircleMembership(circleId: string, userId: string) {
 export async function listCirclesForUser(userId: string) {
   return supabase
     .from('circle_members')
-    .select('circle_id, role, status, joined_at, circles(*)')
+    .select('circle_id, role, status, joined_at, circles!inner(*)')
     .eq('user_id', userId)
+    .neq('circles.status', 'archived')
     .order('joined_at', { ascending: false });
+}
+
+export async function listArchivedCirclesForUser(userId: string) {
+  return supabase
+    .from('circle_members')
+    .select('circle_id, role, status, joined_at, circles!inner(*)')
+    .eq('user_id', userId)
+    .eq('circles.status', 'archived')
+    .order('joined_at', { ascending: false });
+}
+
+export async function getCircleLifecycleEligibility(circleId: string) {
+  const result = await supabase.rpc('get_circle_lifecycle_eligibility', { check_circle_id: circleId });
+  return { data: result.data?.[0] ?? null, error: result.error };
+}
+
+export async function deleteCircle(circleId: string) {
+  return supabase.rpc('delete_circle', { check_circle_id: circleId });
+}
+
+export async function archiveCircle(circleId: string) {
+  return supabase.rpc('archive_circle', { check_circle_id: circleId });
 }
 
 export async function createCircleMember(payload: Partial<CircleMember> & { circle_id: string; user_id: string }) {

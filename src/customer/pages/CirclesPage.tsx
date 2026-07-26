@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus, Search, LogIn, Loader2 } from "lucide-react";
-import { loadUserCircles, type UserCircle } from "@/lib/user-circles";
+import { Archive, Plus, Search, LogIn, Loader2 } from "lucide-react";
+import { loadArchivedUserCircles, loadUserCircles, type UserCircle } from "@/lib/user-circles";
 import { getVerificationGateSummary, type VerificationGateSummary } from "@/lib/onboarding";
 import { formatCurrency } from "@/lib/diaspora";
 import { canCreateCircle, type CreateCircleLimitResult } from "@/lib/circle-limits";
@@ -10,6 +10,7 @@ import type { CurrencyCode } from "@/lib/supabase-types";
 
 export function CirclesPage() {
   const [circles, setCircles] = useState<UserCircle[]>([]);
+  const [archivedCircles, setArchivedCircles] = useState<UserCircle[]>([]);
   const [financials, setFinancials] = useState<Record<string, CircleMemberFinancialSummary>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -23,15 +24,17 @@ export function CirclesPage() {
   useEffect(() => {
     let isMounted = true;
 
-    Promise.all([loadUserCircles(), getVerificationGateSummary(), canCreateCircle()]).then(async ([circleResult, gateResult, createResult]) => {
+    Promise.all([loadUserCircles(), loadArchivedUserCircles(), getVerificationGateSummary(), canCreateCircle()]).then(async ([circleResult, archivedResult, gateResult, createResult]) => {
       if (!isMounted) return;
-      const financialResults = await Promise.all(circleResult.data.map(async (circle) => {
+      const allCircles = [...circleResult.data, ...archivedResult.data];
+      const financialResults = await Promise.all(allCircles.map(async (circle) => {
         const result = await getCircleMemberFinancialSummary(circle.id);
         return [circle.id, result.data] as const;
       }));
       setCircles(circleResult.data);
+      setArchivedCircles(archivedResult.data);
       setFinancials(Object.fromEntries(financialResults.filter(([, summary]) => Boolean(summary))) as Record<string, CircleMemberFinancialSummary>);
-      setError(circleResult.error ?? "");
+      setError(circleResult.error ?? archivedResult.error ?? "");
       setGateSummary(gateResult);
       setCreateLimit(createResult);
       setIsLoading(false);
@@ -156,6 +159,50 @@ export function CirclesPage() {
           </li>
         ))}
       </ul>
+
+      {!isLoading && !error && archivedCircles.length > 0 && (
+        <section className="mt-8 border-t border-border pt-6">
+          <div className="flex items-center gap-2">
+            <Archive className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <h2 className="font-display text-base font-semibold">Archived history</h2>
+              <p className="text-[11px] text-muted-foreground">Read-only records from previous circles</p>
+            </div>
+          </div>
+          <ul className="mt-3 flex flex-col gap-3">
+            {archivedCircles.map((circle) => (
+              <li key={circle.id}>
+                <Link
+                  to="/circles/$id"
+                  params={{ id: circle.id }}
+                  className="block rounded-3xl border border-border bg-muted/30 p-4 shadow-card"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+                      <Archive className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate font-display text-sm font-semibold">{circle.name}</p>
+                        <span className="rounded-full border border-border px-2 py-0.5 text-[9px] font-semibold uppercase text-muted-foreground">
+                          Read only
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {circle.memberCount} members · {formatCurrency(circle.amount, circle.baseCurrency)}/{circle.frequency}
+                      </p>
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        Archived {circle.archivedAt ? new Date(circle.archivedAt).toLocaleDateString() : "previously"}
+                      </p>
+                    </div>
+                  </div>
+                  <CircleMoneySummary summary={financials[circle.id]} fallbackCurrency={circle.baseCurrency} />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

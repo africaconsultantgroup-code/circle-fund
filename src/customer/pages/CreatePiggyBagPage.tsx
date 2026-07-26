@@ -78,8 +78,9 @@ export function CreatePiggyBagPage() {
     }
 
     setSuccess("Piggy Bag plan created. Savings added to this plan will stay locked until the target date.");
+    const planId = result.data.id;
     setTimeout(() => {
-      void navigate({ to: "/piggy-bag/$id", params: { id: result.data.id } });
+      void navigate({ to: "/piggy-bag/$id", params: { id: planId } });
     }, 700);
   };
 

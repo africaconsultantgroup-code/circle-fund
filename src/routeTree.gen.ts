@@ -11,8 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TrustScoreRouteImport } from './routes/trust-score'
 import { Route as TransactionsRouteImport } from './routes/transactions'
-import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SupabaseHealthRouteImport } from './routes/supabase-health'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as RiskAlertRouteImport } from './routes/risk-alert'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
@@ -29,36 +29,37 @@ import { Route as VerifyPhoneRouteImport } from './routes/verify.phone'
 import { Route as VerifyMomoRouteImport } from './routes/verify.momo'
 import { Route as VerifyGuarantorRouteImport } from './routes/verify.guarantor'
 import { Route as VerifyGhanaCardRouteImport } from './routes/verify.ghana-card'
-import { Route as PayoutIdRouteImport } from './routes/payout.$id'
-import { Route as PiggyBagIdRouteImport } from './routes/piggy-bag.$id'
 import { Route as PiggyBagCreateRouteImport } from './routes/piggy-bag.create'
+import { Route as PiggyBagIdRouteImport } from './routes/piggy-bag.$id'
+import { Route as PayoutIdRouteImport } from './routes/payout.$id'
 import { Route as PaymentIdRouteImport } from './routes/payment.$id'
 import { Route as CirclesIdRouteImport } from './routes/circles.$id'
 import { Route as CircleIdRouteImport } from './routes/circle.$id'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
-import { Route as AppPiggyBagRouteImport } from './routes/_app/piggy-bag'
 import { Route as AppProfileRouteImport } from './routes/_app/profile'
+import { Route as AppPiggyBagRouteImport } from './routes/_app/piggy-bag'
 import { Route as AppPaymentsRouteImport } from './routes/_app/payments'
 import { Route as AppNotificationsRouteImport } from './routes/_app/notifications'
 import { Route as AppHomeRouteImport } from './routes/_app/home'
 import { Route as AppCirclesRouteImport } from './routes/_app/circles'
 import { Route as AdminAdminIndexRouteImport } from './routes/_admin.admin.index'
-import { Route as AdminAdminDashboardRouteImport } from './routes/_admin.admin.dashboard'
-import { Route as AdminAdminActivityRouteImport } from './routes/_admin.admin.activity'
-import { Route as AdminAdminContributionsRouteImport } from './routes/_admin.admin.contributions'
-import { Route as AdminAdminCapacityRouteImport } from './routes/_admin.admin.capacity'
-import { Route as AdminAdminCirclesRouteImport } from './routes/_admin.admin.circles'
-import { Route as AdminAdminPayoutsRouteImport } from './routes/_admin.admin.payouts'
-import { Route as AdminAdminTrustRouteImport } from './routes/_admin.admin.trust'
-import { Route as AdminAdminRiskRouteImport } from './routes/_admin.admin.risk'
-import { Route as AdminAdminSupportRouteImport } from './routes/_admin.admin.support'
-import { Route as AdminAdminReportsRouteImport } from './routes/_admin.admin.reports'
-import { Route as AdminAdminRolesRouteImport } from './routes/_admin.admin.roles'
-import { Route as AdminAdminSettingsRouteImport } from './routes/_admin.admin.settings'
 import { Route as CircleIdMembersRouteImport } from './routes/circle.$id.members'
 import { Route as CircleIdApprovalsRouteImport } from './routes/circle.$id.approvals'
 import { Route as AdminAdminVerificationsRouteImport } from './routes/_admin.admin.verifications'
 import { Route as AdminAdminUsersRouteImport } from './routes/_admin.admin.users'
+import { Route as AdminAdminTrustRouteImport } from './routes/_admin.admin.trust'
+import { Route as AdminAdminSupportRouteImport } from './routes/_admin.admin.support'
+import { Route as AdminAdminSettingsRouteImport } from './routes/_admin.admin.settings'
+import { Route as AdminAdminRolesRouteImport } from './routes/_admin.admin.roles'
+import { Route as AdminAdminRiskRouteImport } from './routes/_admin.admin.risk'
+import { Route as AdminAdminReportsRouteImport } from './routes/_admin.admin.reports'
+import { Route as AdminAdminPayoutsRouteImport } from './routes/_admin.admin.payouts'
+import { Route as AdminAdminDashboardRouteImport } from './routes/_admin.admin.dashboard'
+import { Route as AdminAdminContributionsRouteImport } from './routes/_admin.admin.contributions'
+import { Route as AdminAdminCirclesRouteImport } from './routes/_admin.admin.circles'
+import { Route as AdminAdminCapacityRouteImport } from './routes/_admin.admin.capacity'
+import { Route as AdminAdminActivityRouteImport } from './routes/_admin.admin.activity'
 
 const TrustScoreRoute = TrustScoreRouteImport.update({
   id: '/trust-score',
@@ -70,14 +71,14 @@ const TransactionsRoute = TransactionsRouteImport.update({
   path: '/transactions',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SupabaseHealthRoute = SupabaseHealthRouteImport.update({
   id: '/supabase-health',
   path: '/supabase-health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RiskAlertRoute = RiskAlertRouteImport.update({
@@ -158,9 +159,9 @@ const VerifyGhanaCardRoute = VerifyGhanaCardRouteImport.update({
   path: '/verify/ghana-card',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PayoutIdRoute = PayoutIdRouteImport.update({
-  id: '/payout/$id',
-  path: '/payout/$id',
+const PiggyBagCreateRoute = PiggyBagCreateRouteImport.update({
+  id: '/piggy-bag/create',
+  path: '/piggy-bag/create',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PiggyBagIdRoute = PiggyBagIdRouteImport.update({
@@ -168,9 +169,9 @@ const PiggyBagIdRoute = PiggyBagIdRouteImport.update({
   path: '/piggy-bag/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PiggyBagCreateRoute = PiggyBagCreateRouteImport.update({
-  id: '/piggy-bag/create',
-  path: '/piggy-bag/create',
+const PayoutIdRoute = PayoutIdRouteImport.update({
+  id: '/payout/$id',
+  path: '/payout/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PaymentIdRoute = PaymentIdRouteImport.update({
@@ -188,19 +189,24 @@ const CircleIdRoute = CircleIdRouteImport.update({
   path: '/circle/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminLoginRoute = AdminLoginRouteImport.update({
   id: '/admin/login',
   path: '/admin/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppPiggyBagRoute = AppPiggyBagRouteImport.update({
-  id: '/piggy-bag',
-  path: '/piggy-bag',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppProfileRoute = AppProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPiggyBagRoute = AppPiggyBagRouteImport.update({
+  id: '/piggy-bag',
+  path: '/piggy-bag',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPaymentsRoute = AppPaymentsRouteImport.update({
@@ -228,66 +234,6 @@ const AdminAdminIndexRoute = AdminAdminIndexRouteImport.update({
   path: '/admin/',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminAdminDashboardRoute = AdminAdminDashboardRouteImport.update({
-  id: '/admin/dashboard',
-  path: '/admin/dashboard',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminAdminActivityRoute = AdminAdminActivityRouteImport.update({
-  id: '/admin/activity',
-  path: '/admin/activity',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminAdminContributionsRoute = AdminAdminContributionsRouteImport.update({
-  id: '/admin/contributions',
-  path: '/admin/contributions',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminAdminCapacityRoute = AdminAdminCapacityRouteImport.update({
-  id: '/admin/capacity',
-  path: '/admin/capacity',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminAdminCirclesRoute = AdminAdminCirclesRouteImport.update({
-  id: '/admin/circles',
-  path: '/admin/circles',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminAdminPayoutsRoute = AdminAdminPayoutsRouteImport.update({
-  id: '/admin/payouts',
-  path: '/admin/payouts',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminAdminTrustRoute = AdminAdminTrustRouteImport.update({
-  id: '/admin/trust',
-  path: '/admin/trust',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminAdminRiskRoute = AdminAdminRiskRouteImport.update({
-  id: '/admin/risk',
-  path: '/admin/risk',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminAdminSupportRoute = AdminAdminSupportRouteImport.update({
-  id: '/admin/support',
-  path: '/admin/support',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminAdminReportsRoute = AdminAdminReportsRouteImport.update({
-  id: '/admin/reports',
-  path: '/admin/reports',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminAdminRolesRoute = AdminAdminRolesRouteImport.update({
-  id: '/admin/roles',
-  path: '/admin/roles',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminAdminSettingsRoute = AdminAdminSettingsRouteImport.update({
-  id: '/admin/settings',
-  path: '/admin/settings',
-  getParentRoute: () => AdminRoute,
-} as any)
 const CircleIdMembersRoute = CircleIdMembersRouteImport.update({
   id: '/members',
   path: '/members',
@@ -308,6 +254,66 @@ const AdminAdminUsersRoute = AdminAdminUsersRouteImport.update({
   path: '/admin/users',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAdminTrustRoute = AdminAdminTrustRouteImport.update({
+  id: '/admin/trust',
+  path: '/admin/trust',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAdminSupportRoute = AdminAdminSupportRouteImport.update({
+  id: '/admin/support',
+  path: '/admin/support',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAdminSettingsRoute = AdminAdminSettingsRouteImport.update({
+  id: '/admin/settings',
+  path: '/admin/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAdminRolesRoute = AdminAdminRolesRouteImport.update({
+  id: '/admin/roles',
+  path: '/admin/roles',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAdminRiskRoute = AdminAdminRiskRouteImport.update({
+  id: '/admin/risk',
+  path: '/admin/risk',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAdminReportsRoute = AdminAdminReportsRouteImport.update({
+  id: '/admin/reports',
+  path: '/admin/reports',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAdminPayoutsRoute = AdminAdminPayoutsRouteImport.update({
+  id: '/admin/payouts',
+  path: '/admin/payouts',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAdminDashboardRoute = AdminAdminDashboardRouteImport.update({
+  id: '/admin/dashboard',
+  path: '/admin/dashboard',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAdminContributionsRoute = AdminAdminContributionsRouteImport.update({
+  id: '/admin/contributions',
+  path: '/admin/contributions',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAdminCirclesRoute = AdminAdminCirclesRouteImport.update({
+  id: '/admin/circles',
+  path: '/admin/circles',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAdminCapacityRoute = AdminAdminCapacityRouteImport.update({
+  id: '/admin/capacity',
+  path: '/admin/capacity',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAdminActivityRoute = AdminAdminActivityRouteImport.update({
+  id: '/admin/activity',
+  path: '/admin/activity',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -324,15 +330,16 @@ export interface FileRoutesByFullPath {
   '/home': typeof AppHomeRoute
   '/notifications': typeof AppNotificationsRoute
   '/payments': typeof AppPaymentsRoute
+  '/piggy-bag': typeof AppPiggyBagRoute
   '/profile': typeof AppProfileRoute
   '/admin/login': typeof AdminLoginRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/circle/$id': typeof CircleIdRouteWithChildren
   '/circles/$id': typeof CirclesIdRoute
   '/payment/$id': typeof PaymentIdRoute
-  '/piggy-bag/create': typeof PiggyBagCreateRoute
-  '/piggy-bag/$id': typeof PiggyBagIdRoute
   '/payout/$id': typeof PayoutIdRoute
-  '/piggy-bag': typeof AppPiggyBagRoute
+  '/piggy-bag/$id': typeof PiggyBagIdRoute
+  '/piggy-bag/create': typeof PiggyBagCreateRoute
   '/verify/ghana-card': typeof VerifyGhanaCardRoute
   '/verify/guarantor': typeof VerifyGuarantorRoute
   '/verify/momo': typeof VerifyMomoRoute
@@ -341,20 +348,20 @@ export interface FileRoutesByFullPath {
   '/verify/selfie': typeof VerifySelfieRoute
   '/verify/status': typeof VerifyStatusRoute
   '/verify/': typeof VerifyIndexRoute
-  '/admin/users': typeof AdminAdminUsersRoute
-  '/admin/verifications': typeof AdminAdminVerificationsRoute
   '/admin/activity': typeof AdminAdminActivityRoute
-  '/admin/contributions': typeof AdminAdminContributionsRoute
   '/admin/capacity': typeof AdminAdminCapacityRoute
+  '/admin/circles': typeof AdminAdminCirclesRoute
+  '/admin/contributions': typeof AdminAdminContributionsRoute
+  '/admin/dashboard': typeof AdminAdminDashboardRoute
   '/admin/payouts': typeof AdminAdminPayoutsRoute
-  '/admin/trust': typeof AdminAdminTrustRoute
-  '/admin/risk': typeof AdminAdminRiskRoute
-  '/admin/support': typeof AdminAdminSupportRoute
   '/admin/reports': typeof AdminAdminReportsRoute
+  '/admin/risk': typeof AdminAdminRiskRoute
   '/admin/roles': typeof AdminAdminRolesRoute
   '/admin/settings': typeof AdminAdminSettingsRoute
-  '/admin/dashboard': typeof AdminAdminDashboardRoute
-  '/admin/circles': typeof AdminAdminCirclesRoute
+  '/admin/support': typeof AdminAdminSupportRoute
+  '/admin/trust': typeof AdminAdminTrustRoute
+  '/admin/users': typeof AdminAdminUsersRoute
+  '/admin/verifications': typeof AdminAdminVerificationsRoute
   '/circle/$id/approvals': typeof CircleIdApprovalsRoute
   '/circle/$id/members': typeof CircleIdMembersRoute
   '/admin/': typeof AdminAdminIndexRoute
@@ -374,15 +381,16 @@ export interface FileRoutesByTo {
   '/home': typeof AppHomeRoute
   '/notifications': typeof AppNotificationsRoute
   '/payments': typeof AppPaymentsRoute
+  '/piggy-bag': typeof AppPiggyBagRoute
   '/profile': typeof AppProfileRoute
   '/admin/login': typeof AdminLoginRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/circle/$id': typeof CircleIdRouteWithChildren
   '/circles/$id': typeof CirclesIdRoute
   '/payment/$id': typeof PaymentIdRoute
-  '/piggy-bag/create': typeof PiggyBagCreateRoute
-  '/piggy-bag/$id': typeof PiggyBagIdRoute
   '/payout/$id': typeof PayoutIdRoute
-  '/piggy-bag': typeof AppPiggyBagRoute
+  '/piggy-bag/$id': typeof PiggyBagIdRoute
+  '/piggy-bag/create': typeof PiggyBagCreateRoute
   '/verify/ghana-card': typeof VerifyGhanaCardRoute
   '/verify/guarantor': typeof VerifyGuarantorRoute
   '/verify/momo': typeof VerifyMomoRoute
@@ -391,10 +399,20 @@ export interface FileRoutesByTo {
   '/verify/selfie': typeof VerifySelfieRoute
   '/verify/status': typeof VerifyStatusRoute
   '/verify': typeof VerifyIndexRoute
+  '/admin/activity': typeof AdminAdminActivityRoute
+  '/admin/capacity': typeof AdminAdminCapacityRoute
+  '/admin/circles': typeof AdminAdminCirclesRoute
+  '/admin/contributions': typeof AdminAdminContributionsRoute
+  '/admin/dashboard': typeof AdminAdminDashboardRoute
+  '/admin/payouts': typeof AdminAdminPayoutsRoute
+  '/admin/reports': typeof AdminAdminReportsRoute
+  '/admin/risk': typeof AdminAdminRiskRoute
+  '/admin/roles': typeof AdminAdminRolesRoute
+  '/admin/settings': typeof AdminAdminSettingsRoute
+  '/admin/support': typeof AdminAdminSupportRoute
+  '/admin/trust': typeof AdminAdminTrustRoute
   '/admin/users': typeof AdminAdminUsersRoute
   '/admin/verifications': typeof AdminAdminVerificationsRoute
-  '/admin/dashboard': typeof AdminAdminDashboardRoute
-  '/admin/circles': typeof AdminAdminCirclesRoute
   '/circle/$id/approvals': typeof CircleIdApprovalsRoute
   '/circle/$id/members': typeof CircleIdMembersRoute
   '/admin': typeof AdminAdminIndexRoute
@@ -417,15 +435,16 @@ export interface FileRoutesById {
   '/_app/home': typeof AppHomeRoute
   '/_app/notifications': typeof AppNotificationsRoute
   '/_app/payments': typeof AppPaymentsRoute
+  '/_app/piggy-bag': typeof AppPiggyBagRoute
   '/_app/profile': typeof AppProfileRoute
   '/admin/login': typeof AdminLoginRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/circle/$id': typeof CircleIdRouteWithChildren
   '/circles/$id': typeof CirclesIdRoute
   '/payment/$id': typeof PaymentIdRoute
-  '/piggy-bag/create': typeof PiggyBagCreateRoute
-  '/piggy-bag/$id': typeof PiggyBagIdRoute
   '/payout/$id': typeof PayoutIdRoute
-  '/_app/piggy-bag': typeof AppPiggyBagRoute
+  '/piggy-bag/$id': typeof PiggyBagIdRoute
+  '/piggy-bag/create': typeof PiggyBagCreateRoute
   '/verify/ghana-card': typeof VerifyGhanaCardRoute
   '/verify/guarantor': typeof VerifyGuarantorRoute
   '/verify/momo': typeof VerifyMomoRoute
@@ -434,20 +453,20 @@ export interface FileRoutesById {
   '/verify/selfie': typeof VerifySelfieRoute
   '/verify/status': typeof VerifyStatusRoute
   '/verify/': typeof VerifyIndexRoute
-  '/_admin/admin/users': typeof AdminAdminUsersRoute
-  '/_admin/admin/verifications': typeof AdminAdminVerificationsRoute
   '/_admin/admin/activity': typeof AdminAdminActivityRoute
-  '/_admin/admin/contributions': typeof AdminAdminContributionsRoute
   '/_admin/admin/capacity': typeof AdminAdminCapacityRoute
+  '/_admin/admin/circles': typeof AdminAdminCirclesRoute
+  '/_admin/admin/contributions': typeof AdminAdminContributionsRoute
+  '/_admin/admin/dashboard': typeof AdminAdminDashboardRoute
   '/_admin/admin/payouts': typeof AdminAdminPayoutsRoute
-  '/_admin/admin/trust': typeof AdminAdminTrustRoute
-  '/_admin/admin/risk': typeof AdminAdminRiskRoute
-  '/_admin/admin/support': typeof AdminAdminSupportRoute
   '/_admin/admin/reports': typeof AdminAdminReportsRoute
+  '/_admin/admin/risk': typeof AdminAdminRiskRoute
   '/_admin/admin/roles': typeof AdminAdminRolesRoute
   '/_admin/admin/settings': typeof AdminAdminSettingsRoute
-  '/_admin/admin/dashboard': typeof AdminAdminDashboardRoute
-  '/_admin/admin/circles': typeof AdminAdminCirclesRoute
+  '/_admin/admin/support': typeof AdminAdminSupportRoute
+  '/_admin/admin/trust': typeof AdminAdminTrustRoute
+  '/_admin/admin/users': typeof AdminAdminUsersRoute
+  '/_admin/admin/verifications': typeof AdminAdminVerificationsRoute
   '/circle/$id/approvals': typeof CircleIdApprovalsRoute
   '/circle/$id/members': typeof CircleIdMembersRoute
   '/_admin/admin/': typeof AdminAdminIndexRoute
@@ -469,15 +488,16 @@ export interface FileRouteTypes {
     | '/home'
     | '/notifications'
     | '/payments'
+    | '/piggy-bag'
     | '/profile'
     | '/admin/login'
+    | '/auth/callback'
     | '/circle/$id'
     | '/circles/$id'
     | '/payment/$id'
-    | '/piggy-bag/create'
-    | '/piggy-bag/$id'
     | '/payout/$id'
-    | '/piggy-bag'
+    | '/piggy-bag/$id'
+    | '/piggy-bag/create'
     | '/verify/ghana-card'
     | '/verify/guarantor'
     | '/verify/momo'
@@ -486,20 +506,20 @@ export interface FileRouteTypes {
     | '/verify/selfie'
     | '/verify/status'
     | '/verify/'
-    | '/admin/users'
-    | '/admin/verifications'
     | '/admin/activity'
-    | '/admin/contributions'
     | '/admin/capacity'
+    | '/admin/circles'
+    | '/admin/contributions'
+    | '/admin/dashboard'
     | '/admin/payouts'
-    | '/admin/trust'
-    | '/admin/risk'
-    | '/admin/support'
     | '/admin/reports'
+    | '/admin/risk'
     | '/admin/roles'
     | '/admin/settings'
-    | '/admin/dashboard'
-    | '/admin/circles'
+    | '/admin/support'
+    | '/admin/trust'
+    | '/admin/users'
+    | '/admin/verifications'
     | '/circle/$id/approvals'
     | '/circle/$id/members'
     | '/admin/'
@@ -519,15 +539,16 @@ export interface FileRouteTypes {
     | '/home'
     | '/notifications'
     | '/payments'
+    | '/piggy-bag'
     | '/profile'
     | '/admin/login'
+    | '/auth/callback'
     | '/circle/$id'
     | '/circles/$id'
     | '/payment/$id'
-    | '/piggy-bag/create'
-    | '/piggy-bag/$id'
     | '/payout/$id'
-    | '/piggy-bag'
+    | '/piggy-bag/$id'
+    | '/piggy-bag/create'
     | '/verify/ghana-card'
     | '/verify/guarantor'
     | '/verify/momo'
@@ -536,11 +557,20 @@ export interface FileRouteTypes {
     | '/verify/selfie'
     | '/verify/status'
     | '/verify'
+    | '/admin/activity'
+    | '/admin/capacity'
+    | '/admin/circles'
+    | '/admin/contributions'
+    | '/admin/dashboard'
+    | '/admin/payouts'
+    | '/admin/reports'
+    | '/admin/risk'
+    | '/admin/roles'
+    | '/admin/settings'
+    | '/admin/support'
+    | '/admin/trust'
     | '/admin/users'
     | '/admin/verifications'
-    | '/admin/capacity'
-    | '/admin/dashboard'
-    | '/admin/circles'
     | '/circle/$id/approvals'
     | '/circle/$id/members'
     | '/admin'
@@ -555,21 +585,23 @@ export interface FileRouteTypes {
     | '/register'
     | '/risk-alert'
     | '/settings'
+    | '/supabase-health'
     | '/transactions'
     | '/trust-score'
     | '/_app/circles'
     | '/_app/home'
     | '/_app/notifications'
     | '/_app/payments'
+    | '/_app/piggy-bag'
     | '/_app/profile'
     | '/admin/login'
+    | '/auth/callback'
     | '/circle/$id'
     | '/circles/$id'
     | '/payment/$id'
-    | '/piggy-bag/create'
-    | '/piggy-bag/$id'
     | '/payout/$id'
-    | '/_app/piggy-bag'
+    | '/piggy-bag/$id'
+    | '/piggy-bag/create'
     | '/verify/ghana-card'
     | '/verify/guarantor'
     | '/verify/momo'
@@ -578,20 +610,20 @@ export interface FileRouteTypes {
     | '/verify/selfie'
     | '/verify/status'
     | '/verify/'
-    | '/_admin/admin/users'
-    | '/_admin/admin/verifications'
     | '/_admin/admin/activity'
-    | '/_admin/admin/contributions'
     | '/_admin/admin/capacity'
+    | '/_admin/admin/circles'
+    | '/_admin/admin/contributions'
+    | '/_admin/admin/dashboard'
     | '/_admin/admin/payouts'
-    | '/_admin/admin/trust'
-    | '/_admin/admin/risk'
-    | '/_admin/admin/support'
     | '/_admin/admin/reports'
+    | '/_admin/admin/risk'
     | '/_admin/admin/roles'
     | '/_admin/admin/settings'
-    | '/_admin/admin/dashboard'
-    | '/_admin/admin/circles'
+    | '/_admin/admin/support'
+    | '/_admin/admin/trust'
+    | '/_admin/admin/users'
+    | '/_admin/admin/verifications'
     | '/circle/$id/approvals'
     | '/circle/$id/members'
     | '/_admin/admin/'
@@ -611,12 +643,13 @@ export interface RootRouteChildren {
   TransactionsRoute: typeof TransactionsRoute
   TrustScoreRoute: typeof TrustScoreRoute
   AdminLoginRoute: typeof AdminLoginRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
   CircleIdRoute: typeof CircleIdRouteWithChildren
   CirclesIdRoute: typeof CirclesIdRoute
   PaymentIdRoute: typeof PaymentIdRoute
-  PiggyBagCreateRoute: typeof PiggyBagCreateRoute
-  PiggyBagIdRoute: typeof PiggyBagIdRoute
   PayoutIdRoute: typeof PayoutIdRoute
+  PiggyBagIdRoute: typeof PiggyBagIdRoute
+  PiggyBagCreateRoute: typeof PiggyBagCreateRoute
   VerifyGhanaCardRoute: typeof VerifyGhanaCardRoute
   VerifyGuarantorRoute: typeof VerifyGuarantorRoute
   VerifyMomoRoute: typeof VerifyMomoRoute
@@ -643,18 +676,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TransactionsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/supabase-health': {
       id: '/supabase-health'
       path: '/supabase-health'
       fullPath: '/supabase-health'
       preLoaderRoute: typeof SupabaseHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/risk-alert': {
@@ -769,11 +802,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VerifyGhanaCardRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/payout/$id': {
-      id: '/payout/$id'
-      path: '/payout/$id'
-      fullPath: '/payout/$id'
-      preLoaderRoute: typeof PayoutIdRouteImport
+    '/piggy-bag/create': {
+      id: '/piggy-bag/create'
+      path: '/piggy-bag/create'
+      fullPath: '/piggy-bag/create'
+      preLoaderRoute: typeof PiggyBagCreateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/piggy-bag/$id': {
@@ -783,11 +816,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PiggyBagIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/piggy-bag/create': {
-      id: '/piggy-bag/create'
-      path: '/piggy-bag/create'
-      fullPath: '/piggy-bag/create'
-      preLoaderRoute: typeof PiggyBagCreateRouteImport
+    '/payout/$id': {
+      id: '/payout/$id'
+      path: '/payout/$id'
+      fullPath: '/payout/$id'
+      preLoaderRoute: typeof PayoutIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/payment/$id': {
@@ -797,6 +830,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PaymentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/circles/$id': {
+      id: '/circles/$id'
+      path: '/circles/$id'
+      fullPath: '/circles/$id'
+      preLoaderRoute: typeof CirclesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/circle/$id': {
       id: '/circle/$id'
       path: '/circle/$id'
@@ -804,11 +844,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CircleIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/circles/$id': {
-      id: '/circles/$id'
-      path: '/circles/$id'
-      fullPath: '/circles/$id'
-      preLoaderRoute: typeof CirclesIdRouteImport
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/login': {
@@ -867,20 +907,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/_admin/admin/circles': {
-      id: '/_admin/admin/circles'
-      path: '/admin/circles'
-      fullPath: '/admin/circles'
-      preLoaderRoute: typeof AdminAdminCirclesRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/_admin/admin/dashboard': {
-      id: '/_admin/admin/dashboard'
-      path: '/admin/dashboard'
-      fullPath: '/admin/dashboard'
-      preLoaderRoute: typeof AdminAdminDashboardRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/circle/$id/members': {
       id: '/circle/$id/members'
       path: '/members'
@@ -902,32 +928,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdminVerificationsRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/_admin/admin/activity': {
-      id: '/_admin/admin/activity'
-      path: '/admin/activity'
-      fullPath: '/admin/activity'
-      preLoaderRoute: typeof AdminAdminActivityRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/_admin/admin/contributions': {
-      id: '/_admin/admin/contributions'
-      path: '/admin/contributions'
-      fullPath: '/admin/contributions'
-      preLoaderRoute: typeof AdminAdminContributionsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/_admin/admin/capacity': {
-      id: '/_admin/admin/capacity'
-      path: '/admin/capacity'
-      fullPath: '/admin/capacity'
-      preLoaderRoute: typeof AdminAdminCapacityRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/_admin/admin/payouts': {
-      id: '/_admin/admin/payouts'
-      path: '/admin/payouts'
-      fullPath: '/admin/payouts'
-      preLoaderRoute: typeof AdminAdminPayoutsRouteImport
+    '/_admin/admin/users': {
+      id: '/_admin/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminAdminUsersRouteImport
       parentRoute: typeof AdminRoute
     }
     '/_admin/admin/trust': {
@@ -937,32 +942,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdminTrustRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/_admin/admin/risk': {
-      id: '/_admin/admin/risk'
-      path: '/admin/risk'
-      fullPath: '/admin/risk'
-      preLoaderRoute: typeof AdminAdminRiskRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/_admin/admin/support': {
       id: '/_admin/admin/support'
       path: '/admin/support'
       fullPath: '/admin/support'
       preLoaderRoute: typeof AdminAdminSupportRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/_admin/admin/reports': {
-      id: '/_admin/admin/reports'
-      path: '/admin/reports'
-      fullPath: '/admin/reports'
-      preLoaderRoute: typeof AdminAdminReportsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/_admin/admin/roles': {
-      id: '/_admin/admin/roles'
-      path: '/admin/roles'
-      fullPath: '/admin/roles'
-      preLoaderRoute: typeof AdminAdminRolesRouteImport
       parentRoute: typeof AdminRoute
     }
     '/_admin/admin/settings': {
@@ -972,49 +956,105 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdminSettingsRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/_admin/admin/users': {
-      id: '/_admin/admin/users'
-      path: '/admin/users'
-      fullPath: '/admin/users'
-      preLoaderRoute: typeof AdminAdminUsersRouteImport
+    '/_admin/admin/roles': {
+      id: '/_admin/admin/roles'
+      path: '/admin/roles'
+      fullPath: '/admin/roles'
+      preLoaderRoute: typeof AdminAdminRolesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/_admin/admin/risk': {
+      id: '/_admin/admin/risk'
+      path: '/admin/risk'
+      fullPath: '/admin/risk'
+      preLoaderRoute: typeof AdminAdminRiskRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/_admin/admin/reports': {
+      id: '/_admin/admin/reports'
+      path: '/admin/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AdminAdminReportsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/_admin/admin/payouts': {
+      id: '/_admin/admin/payouts'
+      path: '/admin/payouts'
+      fullPath: '/admin/payouts'
+      preLoaderRoute: typeof AdminAdminPayoutsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/_admin/admin/dashboard': {
+      id: '/_admin/admin/dashboard'
+      path: '/admin/dashboard'
+      fullPath: '/admin/dashboard'
+      preLoaderRoute: typeof AdminAdminDashboardRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/_admin/admin/contributions': {
+      id: '/_admin/admin/contributions'
+      path: '/admin/contributions'
+      fullPath: '/admin/contributions'
+      preLoaderRoute: typeof AdminAdminContributionsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/_admin/admin/circles': {
+      id: '/_admin/admin/circles'
+      path: '/admin/circles'
+      fullPath: '/admin/circles'
+      preLoaderRoute: typeof AdminAdminCirclesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/_admin/admin/capacity': {
+      id: '/_admin/admin/capacity'
+      path: '/admin/capacity'
+      fullPath: '/admin/capacity'
+      preLoaderRoute: typeof AdminAdminCapacityRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/_admin/admin/activity': {
+      id: '/_admin/admin/activity'
+      path: '/admin/activity'
+      fullPath: '/admin/activity'
+      preLoaderRoute: typeof AdminAdminActivityRouteImport
       parentRoute: typeof AdminRoute
     }
   }
 }
 
 interface AdminRouteChildren {
-  AdminAdminCirclesRoute: typeof AdminAdminCirclesRoute
-  AdminAdminDashboardRoute: typeof AdminAdminDashboardRoute
-  AdminAdminUsersRoute: typeof AdminAdminUsersRoute
-  AdminAdminVerificationsRoute: typeof AdminAdminVerificationsRoute
   AdminAdminActivityRoute: typeof AdminAdminActivityRoute
-  AdminAdminContributionsRoute: typeof AdminAdminContributionsRoute
   AdminAdminCapacityRoute: typeof AdminAdminCapacityRoute
+  AdminAdminCirclesRoute: typeof AdminAdminCirclesRoute
+  AdminAdminContributionsRoute: typeof AdminAdminContributionsRoute
+  AdminAdminDashboardRoute: typeof AdminAdminDashboardRoute
   AdminAdminPayoutsRoute: typeof AdminAdminPayoutsRoute
-  AdminAdminTrustRoute: typeof AdminAdminTrustRoute
-  AdminAdminRiskRoute: typeof AdminAdminRiskRoute
-  AdminAdminSupportRoute: typeof AdminAdminSupportRoute
   AdminAdminReportsRoute: typeof AdminAdminReportsRoute
+  AdminAdminRiskRoute: typeof AdminAdminRiskRoute
   AdminAdminRolesRoute: typeof AdminAdminRolesRoute
   AdminAdminSettingsRoute: typeof AdminAdminSettingsRoute
+  AdminAdminSupportRoute: typeof AdminAdminSupportRoute
+  AdminAdminTrustRoute: typeof AdminAdminTrustRoute
+  AdminAdminUsersRoute: typeof AdminAdminUsersRoute
+  AdminAdminVerificationsRoute: typeof AdminAdminVerificationsRoute
   AdminAdminIndexRoute: typeof AdminAdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
-  AdminAdminCirclesRoute: AdminAdminCirclesRoute,
-  AdminAdminDashboardRoute: AdminAdminDashboardRoute,
-  AdminAdminUsersRoute: AdminAdminUsersRoute,
-  AdminAdminVerificationsRoute: AdminAdminVerificationsRoute,
   AdminAdminActivityRoute: AdminAdminActivityRoute,
-  AdminAdminContributionsRoute: AdminAdminContributionsRoute,
   AdminAdminCapacityRoute: AdminAdminCapacityRoute,
+  AdminAdminCirclesRoute: AdminAdminCirclesRoute,
+  AdminAdminContributionsRoute: AdminAdminContributionsRoute,
+  AdminAdminDashboardRoute: AdminAdminDashboardRoute,
   AdminAdminPayoutsRoute: AdminAdminPayoutsRoute,
-  AdminAdminTrustRoute: AdminAdminTrustRoute,
-  AdminAdminRiskRoute: AdminAdminRiskRoute,
-  AdminAdminSupportRoute: AdminAdminSupportRoute,
   AdminAdminReportsRoute: AdminAdminReportsRoute,
+  AdminAdminRiskRoute: AdminAdminRiskRoute,
   AdminAdminRolesRoute: AdminAdminRolesRoute,
   AdminAdminSettingsRoute: AdminAdminSettingsRoute,
+  AdminAdminSupportRoute: AdminAdminSupportRoute,
+  AdminAdminTrustRoute: AdminAdminTrustRoute,
+  AdminAdminUsersRoute: AdminAdminUsersRoute,
+  AdminAdminVerificationsRoute: AdminAdminVerificationsRoute,
   AdminAdminIndexRoute: AdminAdminIndexRoute,
 }
 
@@ -1068,12 +1108,13 @@ const rootRouteChildren: RootRouteChildren = {
   TransactionsRoute: TransactionsRoute,
   TrustScoreRoute: TrustScoreRoute,
   AdminLoginRoute: AdminLoginRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
   CircleIdRoute: CircleIdRouteWithChildren,
   CirclesIdRoute: CirclesIdRoute,
   PaymentIdRoute: PaymentIdRoute,
-  PiggyBagCreateRoute: PiggyBagCreateRoute,
-  PiggyBagIdRoute: PiggyBagIdRoute,
   PayoutIdRoute: PayoutIdRoute,
+  PiggyBagIdRoute: PiggyBagIdRoute,
+  PiggyBagCreateRoute: PiggyBagCreateRoute,
   VerifyGhanaCardRoute: VerifyGhanaCardRoute,
   VerifyGuarantorRoute: VerifyGuarantorRoute,
   VerifyMomoRoute: VerifyMomoRoute,

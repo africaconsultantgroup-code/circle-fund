@@ -1,12 +1,25 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { PaymentPreparationModal } from "@/components/payment-preparation-modal";
 import { PageHeader } from "@/components/page-header";
 import { SavingsPlanner } from "@/components/savings-planner";
-import { Activity, Calendar, Check, HeartPulse, Loader2, LockKeyhole, RefreshCw, Settings, Share2, ShieldAlert, ShieldCheck, Shuffle, TrendingUp, Users, WalletCards, X } from "lucide-react";
+import { Activity, Archive, Calendar, Check, HeartPulse, Loader2, LockKeyhole, RefreshCw, Settings, Share2, ShieldAlert, ShieldCheck, Shuffle, Trash2, TrendingUp, Users, WalletCards, X } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { getCircle, type Circle as MockCircleType } from "@/lib/mock-data";
 import {
   generateCircleContributionSchedule,
+  archiveCircle,
+  deleteCircle,
+  getCircleLifecycleEligibility,
   generateCirclePayoutRotation,
   getCircleById,
   getCircleMemberFinancialSummary,
@@ -58,6 +71,7 @@ function CircleDetails() {
 }
 
 export function CircleDetailsContent({ circleId, mockCircle }: { circleId: string; mockCircle: MockCircleType | null }) {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("overview");
   const [user, setUser] = useState<AuthUser | null>(null);
   const [circle, setCircle] = useState<Circle | null>(null);
@@ -76,9 +90,13 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [updatingMembershipId, setUpdatingMembershipId] = useState<string | null>(null);
+  const [lifecycleEligibility, setLifecycleEligibility] = useState<Awaited<ReturnType<typeof getCircleLifecycleEligibility>>["data"]>(null);
+  const [lifecycleAction, setLifecycleAction] = useState<"delete" | "archive" | null>(null);
+  const [isManagingLifecycle, setIsManagingLifecycle] = useState(false);
 
   const currentMember = useMemo(() => members.find((member) => member.user_id === user?.id), [members, user?.id]);
   const isAdmin = Boolean(circle?.owner_id === user?.id || (currentMember?.status === "approved" && ["creator", "admin"].includes(currentMember.role)));
+  const isArchived = circle?.status === "archived";
   const approvedMembers = members.filter((member) => member.status === "approved");
   const pendingMembers = members.filter((member) => member.status === "pending");
   const rejectedMembers = members.filter((member) => member.status === "rejected" || member.status === "removed");
@@ -89,7 +107,7 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
   const rotationLocked = payoutRotation.some((item) => Boolean(item.locked_at));
   const rotationLockedAt = payoutRotation.find((item) => item.locked_at)?.locked_at ?? null;
   const hasEnoughMembersForRotation = approvedMembers.length >= 2;
-  const canGenerateRotation = isAdmin && hasEnoughMembersForRotation && !rotationLocked;
+  const canGenerateRotation = isAdmin && !isArchived && hasEnoughMembersForRotation && !rotationLocked;
   const canRegenerateRotation = canGenerateRotation && !hasCircleStarted(circle?.start_date);
   const rotationByMember = useMemo(() => new Map(payoutRotation.map((turn) => [turn.member_id, turn])), [payoutRotation]);
   const contributionSummary = useMemo(() => {
@@ -179,6 +197,13 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
     setPayoutRotation((rotationResult.data ?? []) as PayoutRotationItem[]);
     setPaymentSummary(paymentSummaryResult.data);
     setMemberFinancialSummary(memberFinancialResult.data);
+    const membership = membershipResult.data;
+    const canManageLifecycle = circleResult.data.owner_id === currentUser.id
+      || (membership?.status === "approved" && ["creator", "admin"].includes(membership.role));
+    if (canManageLifecycle) {
+      const lifecycleResult = await getCircleLifecycleEligibility(circleId);
+      if (!lifecycleResult.error) setLifecycleEligibility(lifecycleResult.data);
+    }
     console.log("payout_rotation_fetch_debug", {
       circle_id: circleId,
       user_id: currentUser.id,
@@ -189,6 +214,29 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
       payout_schedule_rows: rotationResult.data ?? [],
     });
     setIsLoading(false);
+  }
+
+  async function handleLifecycleAction() {
+    if (!lifecycleAction) return;
+    setIsManagingLifecycle(true);
+    setError("");
+
+    const result = lifecycleAction === "delete"
+      ? await deleteCircle(circleId)
+      : await archiveCircle(circleId);
+
+    setIsManagingLifecycle(false);
+    if (result.error) {
+      setError(result.error.message);
+      setLifecycleAction(null);
+      if (lifecycleAction === "delete") {
+        const refreshed = await getCircleLifecycleEligibility(circleId);
+        if (!refreshed.error) setLifecycleEligibility(refreshed.data);
+      }
+      return;
+    }
+
+    await navigate({ to: "/circles" });
   }
 
   async function handleMemberAction(member: CircleMemberDetails, action: "approve" | "reject" | "remove") {
@@ -468,7 +516,7 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
 
           {tab === "members" && (
             <section className="flex flex-col gap-4 p-5">
-              {isAdmin && (
+              {isAdmin && !isArchived && (
                 <PendingRequests
                   members={pendingMembers}
                   updatingMembershipId={updatingMembershipId}
@@ -476,7 +524,7 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
                 />
               )}
               {membershipStatus === "approved" || isAdmin ? (
-                <MemberGroup title="Approved members" members={approvedMembers} isAdmin={isAdmin} rotationByMember={rotationByMember} onAction={handleMemberAction} />
+                <MemberGroup title="Approved members" members={approvedMembers} isAdmin={isAdmin && !isArchived} rotationByMember={rotationByMember} onAction={handleMemberAction} />
               ) : (
                 <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
                   {membershipStatus === "pending" ? "Waiting for admin approval." : "Approved members are visible after approval."}
@@ -500,7 +548,7 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
                 <Metric label="Pending Payments" value={formatCurrency(Number(memberFinancialSummary?.pending_payments ?? 0), currency)} />
               </div>
 
-              {isAdmin && (
+              {isAdmin && !isArchived && (
                 <button
                   onClick={handleGenerateSchedule}
                   disabled={isGeneratingSchedule}
@@ -530,7 +578,7 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
                         <LedgerField label="Paid date" value={formatDate(contribution.paid_at)} />
                         <LedgerField label="Payment ref" value={contribution.payment_reference ?? "None"} wide />
                       </div>
-                      {user?.id === contribution.user_id && ["unpaid", "overdue", "pending", "failed"].includes(contribution.status) && (
+                      {!isArchived && user?.id === contribution.user_id && ["unpaid", "overdue", "pending", "failed"].includes(contribution.status) && (
                         <div className="mt-3 grid gap-2">
                           <button
                             onClick={() => handlePayContribution(contribution)}
@@ -564,8 +612,38 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
           )}
 
           {tab === "settings" && (
-            <section className="p-5">
+            <section className="flex flex-col gap-4 p-5">
               <CircleRules circle={circle} amount={amount} currency={currency} maxMembers={maxMembers} approvedCount={approvedMembers.length} rotationLocked={rotationLocked} />
+              {isAdmin && circle.status !== "archived" && lifecycleEligibility && (
+                <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+                  <h2 className="font-display text-base font-semibold">Circle management</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {lifecycleEligibility.can_delete
+                      ? "This unused circle can be permanently deleted."
+                      : "This circle has activity, so its history must be preserved by archiving it."}
+                  </p>
+                  {lifecycleEligibility.can_delete ? (
+                    <button
+                      onClick={() => setLifecycleAction("delete")}
+                      className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-destructive px-4 py-3 text-sm font-semibold text-destructive-foreground"
+                    >
+                      <Trash2 className="h-4 w-4" /> Delete Circle
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setLifecycleAction("archive")}
+                      className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground"
+                    >
+                      <Archive className="h-4 w-4" /> Archive Circle
+                    </button>
+                  )}
+                </div>
+              )}
+              {isAdmin && circle.status === "archived" && (
+                <div className="rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+                  This circle is archived. Its contribution, payout, and membership history remains read-only.
+                </div>
+              )}
             </section>
           )}
         </>
@@ -576,6 +654,32 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
         title="Contribution payment started"
         onClose={() => setPaymentTransaction(null)}
       />
+      <AlertDialog open={lifecycleAction !== null} onOpenChange={(open) => !open && !isManagingLifecycle && setLifecycleAction(null)}>
+        <AlertDialogContent className="max-w-sm rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{lifecycleAction === "delete" ? "Delete Circle?" : "Archive Circle?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {lifecycleAction === "delete"
+                ? "The circle will be permanently removed. This action cannot be undone."
+                : "The circle will stop accepting joins and contributions and disappear from active circles. This action cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isManagingLifecycle}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isManagingLifecycle}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleLifecycleAction();
+              }}
+              className={lifecycleAction === "delete" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+            >
+              {isManagingLifecycle && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {lifecycleAction === "delete" ? "Delete Circle" : "Archive Circle"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
