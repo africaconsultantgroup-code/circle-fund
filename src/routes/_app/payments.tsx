@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Children, type ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, CheckCircle2, Clock, Loader2, ShieldAlert, Wallet, XCircle } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, CalendarClock, CheckCircle2, Clock, Loader2, ShieldAlert, Wallet, XCircle } from "lucide-react";
 import { PaymentPreparationModal } from "@/components/payment-preparation-modal";
 import { getCurrentUser } from "@/lib/auth";
 import {
@@ -306,6 +306,10 @@ function PaymentsPage() {
     <div className="flex flex-col px-5 pt-12">
       <h1 className="font-display text-2xl font-bold tracking-tight">Sika Wallet</h1>
       <p className="text-xs text-muted-foreground">Wallet balances, deposits, contribution payments, and receipts.</p>
+      <Link to="/automation" className="mt-4 flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-card">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-primary"><CalendarClock className="h-5 w-5" /></span>
+        <span className="flex-1"><span className="block text-sm font-semibold">Automation & scheduled payments</span><span className="block text-[11px] text-muted-foreground">Manage AutoPay, AutoSave, and upcoming deductions.</span></span>
+      </Link>
 
       <div className="mt-5 grid grid-cols-2 gap-3">
         <SummaryCard label="Available balance" value={formatCurrency(Number(walletSummary?.available_balance ?? 0), walletCurrency)} tone="gold" />

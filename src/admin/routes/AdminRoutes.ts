@@ -1,6 +1,7 @@
 import {
   Activity,
   AlertTriangle,
+  CalendarClock,
   Circle,
   FileBarChart,
   HandCoins,
@@ -28,6 +29,8 @@ export const adminRoutes = [
   { to: "/admin/capacity", label: "Capacity Review", icon: ShieldQuestion, roles: ["super_admin", "compliance"] },
   { to: "/admin/circles", label: "Circles", icon: Circle, roles: ["super_admin", "operations"] },
   { to: "/admin/contributions", label: "Contributions", icon: HandCoins, roles: ["super_admin", "operations", "finance"] },
+  { to: "/admin/automations", label: "Automation", icon: CalendarClock, roles: ["super_admin", "operations", "finance"] },
+  { to: "/admin/protected-funds", label: "Protected Funds", icon: ShieldCheck, roles: ["super_admin", "operations", "finance", "compliance"] },
   { to: "/admin/payouts", label: "Payouts", icon: WalletCards, roles: ["super_admin", "finance"] },
   { to: "/admin/trust", label: "Trust", icon: Shield, roles: ["super_admin"] },
   { to: "/admin/risk", label: "Risk", icon: AlertTriangle, roles: ["super_admin", "compliance"] },

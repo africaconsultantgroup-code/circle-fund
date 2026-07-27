@@ -1,5 +1,11 @@
 import { getCurrentUser } from "@/lib/auth";
-import { countCircleMembers, countPendingCircleMembers, listArchivedCirclesForUser, listCirclesForUser, type Circle } from "@/lib/db";
+import {
+  countCircleMembers,
+  countPendingCircleMembers,
+  listArchivedCirclesForUser,
+  listCirclesForUser,
+  type Circle,
+} from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { circles as mockCircles } from "@/lib/mock-data";
 import type { CurrencyCode } from "@/lib/supabase-types";
@@ -25,6 +31,7 @@ export type UserCircle = {
   isCreator: boolean;
   status: Circle["status"];
   archivedAt: string | null;
+  circleType: "rotational" | "goal";
 };
 
 type CircleMembershipRow = {
@@ -55,6 +62,7 @@ export function mockUserCircles(): UserCircle[] {
     isCreator: false,
     status: "active",
     archivedAt: null,
+    circleType: "rotational",
   }));
 }
 
@@ -66,7 +74,10 @@ export async function loadUserCircles(): Promise<{ data: UserCircle[]; error: st
   return loadConfiguredUserCircles(listCirclesForUser);
 }
 
-export async function loadArchivedUserCircles(): Promise<{ data: UserCircle[]; error: string | null }> {
+export async function loadArchivedUserCircles(): Promise<{
+  data: UserCircle[];
+  error: string | null;
+}> {
   if (!isSupabaseConfigured) {
     return { data: [], error: null };
   }
@@ -119,7 +130,10 @@ async function loadConfiguredUserCircles(
 export function toUserCircle(circle: Circle): UserCircle {
   const amount = Number(circle.contribution_amount ?? 0);
   const goal = Number(circle.goal_amount ?? amount);
-  const maxMembers = Math.min(Math.max(circle.max_members ?? (amount > 0 ? Math.round(goal / amount) : 1), 1), 15);
+  const maxMembers = Math.min(
+    Math.max(circle.max_members ?? (amount > 0 ? Math.round(goal / amount) : 1), 1),
+    15,
+  );
 
   return {
     id: circle.id,
@@ -135,13 +149,16 @@ export function toUserCircle(circle: Circle): UserCircle {
     currentCycle: 0,
     totalCycles: maxMembers,
     nextRecipient: "Pending",
-    nextPayoutDate: circle.start_date ? new Date(circle.start_date).toLocaleDateString() : "Not set",
+    nextPayoutDate: circle.start_date
+      ? new Date(circle.start_date).toLocaleDateString()
+      : "Not set",
     inviteToken: circle.invite_code ?? circle.invite_token ?? null,
     membershipRole: "member",
     membershipStatus: "pending",
     isCreator: false,
     status: circle.status,
     archivedAt: circle.archived_at,
+    circleType: circle.circle_type,
   };
 }
 

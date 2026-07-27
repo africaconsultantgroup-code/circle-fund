@@ -19,6 +19,8 @@ import {
   Wallet,
 } from "lucide-react";
 import { PaymentPreparationModal } from "@/components/payment-preparation-modal";
+import { AutomationDashboardSummary } from "@/components/automation-dashboard-summary";
+import { ProtectedFundsCard } from "@/components/protected-funds-card";
 import { SavingsPlanner } from "@/components/savings-planner";
 import { getCurrentUser, getCurrentUserProfile, type UserProfile } from "@/lib/auth";
 import {
@@ -341,6 +343,10 @@ export function HomePage() {
           <SummaryTile icon={<CalendarDays className="h-4 w-4" />} label="Upcoming" value={String(dashboard.upcomingContributions.length)} />
           <SummaryTile icon={<ArrowUpRight className="h-4 w-4" />} label="Contributed" value={formatCurrency(dashboard.totalContributed, primaryCurrency)} />
           <SummaryTile icon={<ArrowDownLeft className="h-4 w-4" />} label="Received" value={formatCurrency(dashboard.totalReceived, primaryCurrency)} />
+        </div>
+        <AutomationDashboardSummary />
+        <div className="mt-5">
+          <ProtectedFundsCard scope="customer" />
         </div>
       </div>
 
