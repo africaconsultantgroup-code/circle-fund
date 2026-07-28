@@ -49,11 +49,13 @@ import {
   getCircleMembership,
   getCirclePaymentSummary,
   initiateHubtelContributionPayment,
+  isAppTestAccount,
   listCirclePayoutRotation,
   listCircleContributions,
   listCircleMembers,
   lockCirclePayoutRotation,
   manageCircleMember,
+  finishTestCircle,
   payFromWallet,
   type Circle,
   type CircleContributionStatus,
@@ -126,8 +128,11 @@ export function CircleDetailsContent({
   const [updatingMembershipId, setUpdatingMembershipId] = useState<string | null>(null);
   const [lifecycleEligibility, setLifecycleEligibility] =
     useState<Awaited<ReturnType<typeof getCircleLifecycleEligibility>>["data"]>(null);
-  const [lifecycleAction, setLifecycleAction] = useState<"delete" | "archive" | null>(null);
+  const [lifecycleAction, setLifecycleAction] = useState<
+    "delete" | "archive" | "finish_test" | null
+  >(null);
   const [isManagingLifecycle, setIsManagingLifecycle] = useState(false);
+  const [isTestAccount, setIsTestAccount] = useState(false);
 
   const currentMember = useMemo(
     () => members.find((member) => member.user_id === user?.id),
@@ -235,6 +240,9 @@ export function CircleDetailsContent({
       return;
     }
 
+    const testAccountResult = await isAppTestAccount(currentUser.id);
+    setIsTestAccount(Boolean(testAccountResult.data));
+
     const [
       circleResult,
       membershipResult,
@@ -315,7 +323,11 @@ export function CircleDetailsContent({
     setError("");
 
     const result =
-      lifecycleAction === "delete" ? await deleteCircle(circleId) : await archiveCircle(circleId);
+      lifecycleAction === "finish_test"
+        ? await finishTestCircle(circleId)
+        : lifecycleAction === "delete"
+          ? await deleteCircle(circleId)
+          : await archiveCircle(circleId);
 
     setIsManagingLifecycle(false);
     if (result.error) {
@@ -1026,11 +1038,20 @@ export function CircleDetailsContent({
                 <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
                   <h2 className="font-display text-base font-semibold">Circle management</h2>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {lifecycleEligibility.can_delete
-                      ? "This unused circle can be permanently deleted."
-                      : "This circle has activity, so its history must be preserved by archiving it."}
+                    {isTestAccount
+                      ? "Finish this test Circle. Unused Circles are deleted; Circles with activity are archived to preserve financial history."
+                      : lifecycleEligibility.can_delete
+                        ? "This unused circle can be permanently deleted."
+                        : "This circle has activity, so its history must be preserved by archiving it."}
                   </p>
-                  {lifecycleEligibility.can_delete ? (
+                  {isTestAccount ? (
+                    <button
+                      onClick={() => setLifecycleAction("finish_test")}
+                      className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground"
+                    >
+                      <Archive className="h-4 w-4" /> Finish Test Circle
+                    </button>
+                  ) : lifecycleEligibility.can_delete ? (
                     <button
                       onClick={() => setLifecycleAction("delete")}
                       className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-destructive px-4 py-3 text-sm font-semibold text-destructive-foreground"
@@ -1070,12 +1091,18 @@ export function CircleDetailsContent({
         <AlertDialogContent className="max-w-sm rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {lifecycleAction === "delete" ? "Delete Circle?" : "Archive Circle?"}
+              {lifecycleAction === "finish_test"
+                ? "Finish Test Circle?"
+                : lifecycleAction === "delete"
+                  ? "Delete Circle?"
+                  : "Archive Circle?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {lifecycleAction === "delete"
-                ? "The circle will be permanently removed. This action cannot be undone."
-                : "The circle will stop accepting joins and contributions and disappear from active circles. This action cannot be undone."}
+              {lifecycleAction === "finish_test"
+                ? "An unused test Circle will be deleted. If it has financial or member activity, it will be archived instead so its history remains protected."
+                : lifecycleAction === "delete"
+                  ? "The circle will be permanently removed. This action cannot be undone."
+                  : "The circle will stop accepting joins and contributions and disappear from active circles. This action cannot be undone."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1093,7 +1120,11 @@ export function CircleDetailsContent({
               }
             >
               {isManagingLifecycle && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {lifecycleAction === "delete" ? "Delete Circle" : "Archive Circle"}
+              {lifecycleAction === "finish_test"
+                ? "Finish Test Circle"
+                : lifecycleAction === "delete"
+                  ? "Delete Circle"
+                  : "Archive Circle"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

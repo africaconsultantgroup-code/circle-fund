@@ -1704,6 +1704,14 @@ export interface Database {
         Args: Record<PropertyKey, never>;
         Returns: Json;
       };
+      is_app_test_account: {
+        Args: { check_user_id: string };
+        Returns: boolean;
+      };
+      finish_test_circle: {
+        Args: { check_circle_id: string };
+        Returns: "deleted" | "archived";
+      };
       current_user_is_admin: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;

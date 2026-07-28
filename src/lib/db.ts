@@ -289,6 +289,14 @@ export async function deleteCircle(circleId: string) {
   return supabase.rpc("delete_circle", { check_circle_id: circleId });
 }
 
+export async function isAppTestAccount(userId: string) {
+  return supabase.rpc("is_app_test_account", { check_user_id: userId });
+}
+
+export async function finishTestCircle(circleId: string) {
+  return supabase.rpc("finish_test_circle", { check_circle_id: circleId });
+}
+
 export async function archiveCircle(circleId: string) {
   return supabase.rpc("archive_circle", { check_circle_id: circleId });
 }
