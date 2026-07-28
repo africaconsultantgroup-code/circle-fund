@@ -61,6 +61,14 @@ export function CreateCirclePage() {
   const [isCheckingEligibility, setIsCheckingEligibility] = useState(true);
   const eligible = Boolean(eligibility?.isEligible && createLimit?.canCreate);
   const blocked = isCheckingEligibility || !eligible;
+  const goalContributionPlan = calculateGoalContribution({
+    targetAmount,
+    members,
+    frequency,
+    startDate,
+    endDate: maturityDate,
+  });
+  const effectiveContributionAmount = circleType === "goal" ? goalContributionPlan.amount : amount;
 
   useEffect(() => {
     let isMounted = true;
@@ -87,7 +95,7 @@ export function CreateCirclePage() {
     const allowedFrequencies = ["weekly", "biweekly", "monthly"];
 
     if (!name.trim()) nextErrors.name = "Enter a circle name.";
-    if (!Number.isFinite(amount) || amount <= 0)
+    if (!Number.isFinite(effectiveContributionAmount) || effectiveContributionAmount <= 0)
       nextErrors.amount = "Enter a contribution amount greater than 0.";
     if (!allowedFrequencies.includes(frequency))
       nextErrors.frequency = "Choose weekly, biweekly, or monthly.";
@@ -156,7 +164,7 @@ export function CreateCirclePage() {
               goalName: name.trim(),
               description: description.trim(),
               targetAmount,
-              contributionAmount: amount,
+              contributionAmount: effectiveContributionAmount,
               frequency,
               payoutFrequency,
               startDate,
@@ -181,9 +189,9 @@ export function CreateCirclePage() {
                 description: description.trim()
                   ? `${description.trim()} Category: ${category}`
                   : `Category: ${category}`,
-                contribution_amount: amount,
+                contribution_amount: effectiveContributionAmount,
                 base_currency: baseCurrency,
-                goal_amount: amount * members,
+                goal_amount: effectiveContributionAmount * members,
                 frequency,
                 max_members: members,
                 invite_token: inviteToken,
@@ -427,18 +435,34 @@ export function CreateCirclePage() {
           />
           <div>
             <label className="text-xs font-medium text-muted-foreground">
-              Amount ({baseCurrency})
+              {circleType === "goal"
+                ? `Automatically calculated per member (${baseCurrency})`
+                : `Amount (${baseCurrency})`}
             </label>
             <div className="mt-1.5 flex items-center gap-2 rounded-2xl border border-input bg-muted/40 px-4 py-3.5">
               <span className="text-sm font-semibold text-muted-foreground">{baseCurrency}</span>
               <input
                 type="number"
                 min={1}
-                value={amount}
+                value={effectiveContributionAmount}
                 onChange={(e) => setAmount(Number(e.target.value))}
+                readOnly={circleType === "goal"}
                 className="flex-1 bg-transparent text-sm outline-none"
               />
             </div>
+            {circleType === "goal" && goalContributionPlan.occurrences > 0 && (
+              <div className="mt-2 rounded-xl bg-secondary px-3 py-2 text-[11px] text-primary">
+                <p className="font-semibold">
+                  {formatCurrency(effectiveContributionAmount, baseCurrency)} per member,{" "}
+                  {frequencyLabel(frequency)}
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  {formatCurrency(targetAmount, baseCurrency)} target ÷ {members} members ÷{" "}
+                  {goalContributionPlan.occurrences} contribution dates. The amount is rounded up to
+                  avoid a shortfall.
+                </p>
+              </div>
+            )}
             {errors.amount && (
               <p className="mt-1 text-[11px] font-medium text-destructive">{errors.amount}</p>
             )}
@@ -710,4 +734,83 @@ function CircleTypeOption({
       <p className="mt-1 text-[11px] text-muted-foreground">{description}</p>
     </button>
   );
+}
+
+function calculateGoalContribution({
+  targetAmount,
+  members,
+  frequency,
+  startDate,
+  endDate,
+}: {
+  targetAmount: number;
+  members: number;
+  frequency: "weekly" | "biweekly" | "monthly";
+  startDate: string;
+  endDate: string;
+}) {
+  const occurrences = countContributionDates(startDate, endDate, frequency);
+  if (
+    !Number.isFinite(targetAmount) ||
+    targetAmount <= 0 ||
+    !Number.isInteger(members) ||
+    members < 2 ||
+    occurrences < 1
+  ) {
+    return { amount: 0, occurrences: 0 };
+  }
+
+  return {
+    amount: Math.ceil((targetAmount * 100) / (members * occurrences)) / 100,
+    occurrences,
+  };
+}
+
+function countContributionDates(
+  startDate: string,
+  endDate: string,
+  frequency: "weekly" | "biweekly" | "monthly",
+) {
+  const start = parseDateOnly(startDate);
+  const end = parseDateOnly(endDate);
+  if (!start || !end || end.getTime() <= start.getTime()) return 0;
+
+  let occurrence = start;
+  let count = 0;
+  while (occurrence.getTime() <= end.getTime() && count < 1000) {
+    count += 1;
+    occurrence =
+      frequency === "weekly"
+        ? addDays(occurrence, 7)
+        : frequency === "biweekly"
+          ? addDays(occurrence, 14)
+          : addMonthClamped(occurrence);
+  }
+  return count;
+}
+
+function parseDateOnly(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function addDays(value: Date, days: number) {
+  const result = new Date(value);
+  result.setUTCDate(result.getUTCDate() + days);
+  return result;
+}
+
+function addMonthClamped(value: Date) {
+  const year = value.getUTCFullYear();
+  const month = value.getUTCMonth();
+  const day = value.getUTCDate();
+  const lastDay = new Date(Date.UTC(year, month + 2, 0)).getUTCDate();
+  return new Date(Date.UTC(year, month + 1, Math.min(day, lastDay)));
+}
+
+function frequencyLabel(value: "weekly" | "biweekly" | "monthly") {
+  if (value === "biweekly") return "every 14 days";
+  return value;
 }
