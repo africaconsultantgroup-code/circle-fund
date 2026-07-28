@@ -111,17 +111,6 @@ function LoginPage() {
         </button>
       </form>
 
-      <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
-        <span className="h-px flex-1 bg-border" /> or continue with{" "}
-        <span className="h-px flex-1 bg-border" />
-      </div>
-
-      <div>
-        <button className="w-full rounded-2xl border border-border bg-background py-3 text-sm font-medium">
-          Apple
-        </button>
-      </div>
-
       <p className="mt-auto pt-8 text-center text-sm text-muted-foreground">
         New to SikaCircle?{" "}
         <Link to="/register" className="font-semibold text-primary">
