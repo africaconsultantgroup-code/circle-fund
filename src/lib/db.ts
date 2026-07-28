@@ -375,8 +375,11 @@ export type GoalSusuCreateInput = {
   targetAmount: number;
   contributionAmount: number;
   frequency: "weekly" | "biweekly" | "monthly";
+  payoutFrequency: "one_time" | "weekly" | "every_14_days" | "twice_monthly" | "monthly";
   startDate: string;
-  maturityDate: string;
+  endDate: string;
+  twiceMonthlyDayOne: number | null;
+  twiceMonthlyDayTwo: number | null;
   maximumMembers: number;
   currency: string;
   inviteValue: string;
@@ -389,14 +392,15 @@ export type GoalSusuCreateInput = {
 };
 
 export async function createGoalSusu(input: GoalSusuCreateInput) {
-  return supabase.rpc("create_goal_susu", {
+  return supabase.rpc("create_goal_susu_with_cycles", {
     goal_name: input.goalName,
     goal_description: input.description,
     target_amount: input.targetAmount,
     contribution_amount: input.contributionAmount,
     contribution_frequency: input.frequency,
-    first_contribution_date: input.startDate,
-    maturity_date: input.maturityDate,
+    payout_frequency: input.payoutFrequency,
+    overall_start_date: input.startDate,
+    overall_end_date: input.endDate,
     maximum_members: input.maximumMembers,
     currency: input.currency,
     invite_value: input.inviteValue,
@@ -406,6 +410,8 @@ export async function createGoalSusu(input: GoalSusuCreateInput) {
     destination_reference: input.destinationReference,
     mobile_money_network: input.mobileMoneyNetwork,
     relationship_or_purpose: input.relationshipOrPurpose,
+    twice_monthly_day_one: input.twiceMonthlyDayOne,
+    twice_monthly_day_two: input.twiceMonthlyDayTwo,
   });
 }
 
@@ -419,6 +425,10 @@ export async function acceptGoalSusuTerms(circleId: string) {
 
 export async function getGoalSusuProgress(circleId: string) {
   return supabase.rpc("goal_susu_progress", { check_circle_id: circleId });
+}
+
+export async function getGoalSusuCycles(circleId: string) {
+  return supabase.rpc("get_goal_susu_cycles", { check_circle_id: circleId });
 }
 
 function describeCircleCreateError(message: string) {

@@ -35,8 +35,13 @@ export function CreateCirclePage() {
   const [amount, setAmount] = useState(150);
   const [baseCurrency, setBaseCurrency] = useState<CurrencyCode>("GHS");
   const [frequency, setFrequency] = useState<"weekly" | "biweekly" | "monthly">("monthly");
+  const [payoutFrequency, setPayoutFrequency] = useState<
+    "one_time" | "weekly" | "every_14_days" | "twice_monthly" | "monthly"
+  >("one_time");
   const [startDate, setStartDate] = useState("2026-06-15");
   const [maturityDate, setMaturityDate] = useState("2026-08-30");
+  const [twiceMonthlyDayOne, setTwiceMonthlyDayOne] = useState(1);
+  const [twiceMonthlyDayTwo, setTwiceMonthlyDayTwo] = useState(15);
   const [targetAmount, setTargetAmount] = useState(3000);
   const [beneficiaryType, setBeneficiaryType] = useState<"sikacircle_user" | "external">(
     "external",
@@ -93,7 +98,14 @@ export function CreateCirclePage() {
       if (!Number.isFinite(targetAmount) || targetAmount <= 0)
         nextErrors.targetAmount = "Enter a target greater than 0.";
       if (!maturityDate || maturityDate <= startDate)
-        nextErrors.maturityDate = "Choose a maturity date after the start date.";
+        nextErrors.maturityDate = "Choose an overall end date after the start date.";
+      if (
+        payoutFrequency === "twice_monthly" &&
+        (twiceMonthlyDayOne < 1 ||
+          twiceMonthlyDayTwo > 28 ||
+          twiceMonthlyDayOne >= twiceMonthlyDayTwo)
+      )
+        nextErrors.payoutDays = "Choose two different calendar days between 1 and 28.";
       if (!beneficiaryName.trim())
         nextErrors.beneficiaryName = "Enter the agreed beneficiary name.";
       if (beneficiaryPhone.replace(/\D/g, "").length < 10)
@@ -146,8 +158,11 @@ export function CreateCirclePage() {
               targetAmount,
               contributionAmount: amount,
               frequency,
+              payoutFrequency,
               startDate,
-              maturityDate,
+              endDate: maturityDate,
+              twiceMonthlyDayOne: payoutFrequency === "twice_monthly" ? twiceMonthlyDayOne : null,
+              twiceMonthlyDayTwo: payoutFrequency === "twice_monthly" ? twiceMonthlyDayTwo : null,
               maximumMembers: members,
               currency: baseCurrency,
               inviteValue: inviteToken,
@@ -292,13 +307,60 @@ export function CreateCirclePage() {
         {circleType === "goal" && (
           <Section icon={<Target className="h-4 w-4" />} title="Goal and beneficiary">
             <NumberInput
-              label={`Target amount (${baseCurrency})`}
+              label={`Overall planning target (${baseCurrency})`}
               value={targetAmount}
               onChange={setTargetAmount}
               error={errors.targetAmount}
             />
+            <p className="text-[11px] text-muted-foreground">
+              For recurring payouts, the final overall target is calculated from the independent
+              payout cycles.
+            </p>
+            <Select
+              label="Payout frequency"
+              options={["one_time", "weekly", "every_14_days", "twice_monthly", "monthly"]}
+              value={payoutFrequency}
+              onChange={(value) =>
+                setPayoutFrequency(
+                  value as "one_time" | "weekly" | "every_14_days" | "twice_monthly" | "monthly",
+                )
+              }
+              optionLabel={(value) =>
+                ({
+                  one_time: "One time",
+                  weekly: "Weekly",
+                  every_14_days: "Every 14 days",
+                  twice_monthly: "Twice monthly",
+                  monthly: "Monthly",
+                })[value] ?? value
+              }
+            />
+            {payoutFrequency === "twice_monthly" && (
+              <div>
+                <div className="grid grid-cols-2 gap-2">
+                  <NumberInput
+                    label="First payout day"
+                    value={twiceMonthlyDayOne}
+                    onChange={setTwiceMonthlyDayOne}
+                  />
+                  <NumberInput
+                    label="Second payout day"
+                    value={twiceMonthlyDayTwo}
+                    onChange={setTwiceMonthlyDayTwo}
+                  />
+                </div>
+                {errors.payoutDays && (
+                  <p className="mt-1 text-[11px] font-medium text-destructive">
+                    {errors.payoutDays}
+                  </p>
+                )}
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  These are fixed calendar dates. This is different from a payout every 14 days.
+                </p>
+              </div>
+            )}
             <Input
-              label="Target / maturity date"
+              label="Overall end date"
               type="date"
               value={maturityDate}
               onChange={setMaturityDate}
@@ -575,11 +637,13 @@ function Select({
   options,
   value,
   onChange,
+  optionLabel,
 }: {
   label: string;
   options: string[];
   value: string;
   onChange: (value: string) => void;
+  optionLabel?: (value: string) => string;
 }) {
   return (
     <div>
@@ -590,7 +654,9 @@ function Select({
         className="mt-1.5 w-full appearance-none rounded-2xl border border-input bg-muted/40 px-4 py-3.5 text-sm outline-none"
       >
         {options.map((o) => (
-          <option key={o}>{o}</option>
+          <option key={o} value={o}>
+            {optionLabel?.(o) ?? o}
+          </option>
         ))}
       </select>
     </div>

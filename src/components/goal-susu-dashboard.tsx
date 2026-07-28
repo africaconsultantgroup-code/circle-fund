@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { Target, ShieldCheck, UserRound } from "lucide-react";
-import { getGoalSusuProgress } from "@/lib/db";
+import { getGoalSusuCycles, getGoalSusuProgress } from "@/lib/db";
 import { formatCurrency } from "@/lib/diaspora";
 import type { CurrencyCode } from "@/lib/supabase-types";
 
 type GoalProgress = Awaited<ReturnType<typeof getGoalSusuProgress>>["data"] extends
   | (infer T)[]
   | null
+  ? T
+  : never;
+type GoalCycle = Awaited<ReturnType<typeof getGoalSusuCycles>>["data"] extends (infer T)[] | null
   ? T
   : never;
 
@@ -18,9 +21,15 @@ export function GoalSusuDashboard({
   currency: CurrencyCode;
 }) {
   const [goal, setGoal] = useState<GoalProgress | null>(null);
+  const [cycles, setCycles] = useState<GoalCycle[]>([]);
 
   useEffect(() => {
-    void getGoalSusuProgress(circleId).then(({ data }) => setGoal(data?.[0] ?? null));
+    void Promise.all([getGoalSusuProgress(circleId), getGoalSusuCycles(circleId)]).then(
+      ([progressResult, cycleResult]) => {
+        setGoal(progressResult.data?.[0] ?? null);
+        setCycles(cycleResult.data ?? []);
+      },
+    );
   }, [circleId]);
 
   if (!goal) return null;
@@ -81,6 +90,44 @@ export function GoalSusuDashboard({
           </p>
         </div>
       </div>
+      {cycles.length > 0 && (
+        <div className="mt-4">
+          <h3 className="text-xs font-semibold uppercase text-muted-foreground">Payout cycles</h3>
+          <ul className="mt-2 flex flex-col gap-2">
+            {cycles.map((cycle) => (
+              <li key={cycle.cycle_id} className="rounded-2xl border border-border p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-semibold">Cycle {cycle.cycle_number}</p>
+                  <span className="rounded-full bg-secondary px-2 py-0.5 text-[9px] font-semibold uppercase text-primary">
+                    {cycle.status.replaceAll("_", " ")}
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Payout {new Date(cycle.payout_date).toLocaleDateString()}
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <Metric
+                    label="Expected"
+                    value={formatCurrency(Number(cycle.expected_amount), currency)}
+                  />
+                  <Metric
+                    label="Confirmed"
+                    value={formatCurrency(Number(cycle.confirmed_amount), currency)}
+                  />
+                  <Metric
+                    label="Protected"
+                    value={formatCurrency(Number(cycle.protected_amount), currency)}
+                  />
+                  <Metric
+                    label="Outstanding"
+                    value={formatCurrency(Number(cycle.outstanding_amount), currency)}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }

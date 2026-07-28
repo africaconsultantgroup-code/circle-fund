@@ -1122,14 +1122,56 @@ export interface Database {
           goal_description: string | null;
           target_amount: number;
           contribution_amount: number;
-          frequency: string;
+          contribution_frequency: string;
+          payout_frequency: string;
           start_date: string;
-          maturity_date: string;
+          end_date: string;
           max_members: number;
           beneficiary_name: string;
           beneficiary_type: string;
           masked_destination: string;
           verification_status: string;
+          twice_monthly_day_one: number | null;
+          twice_monthly_day_two: number | null;
+        }>;
+      };
+      create_goal_susu_with_cycles: {
+        Args: {
+          goal_name: string;
+          goal_description: string;
+          target_amount: number;
+          contribution_amount: number;
+          contribution_frequency: string;
+          payout_frequency: string;
+          overall_start_date: string;
+          overall_end_date: string;
+          maximum_members: number;
+          currency: string;
+          invite_value: string;
+          beneficiary_type: string;
+          beneficiary_user_id: string | null;
+          beneficiary_name: string;
+          destination_reference: string;
+          mobile_money_network: string;
+          relationship_or_purpose?: string | null;
+          twice_monthly_day_one?: number | null;
+          twice_monthly_day_two?: number | null;
+        };
+        Returns: Database["public"]["Tables"]["circles"]["Row"];
+      };
+      get_goal_susu_cycles: {
+        Args: { check_circle_id: string };
+        Returns: Array<{
+          cycle_id: string;
+          cycle_number: number;
+          cycle_start_date: string;
+          cycle_end_date: string;
+          payout_date: string;
+          expected_amount: number;
+          confirmed_amount: number;
+          protected_amount: number;
+          outstanding_amount: number;
+          status: string;
         }>;
       };
       accept_goal_susu_terms: {

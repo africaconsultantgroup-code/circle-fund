@@ -272,7 +272,15 @@ export function JoinCirclePage() {
                       preview.circle.base_currency ?? "GHS",
                     )}
                   </p>
-                  <p>Maturity: {formatDate(preview.goal.maturity_date)}</p>
+                  <p>Contributions: {formatSchedule(preview.goal.contribution_frequency)}</p>
+                  <p>Payouts: {formatSchedule(preview.goal.payout_frequency)}</p>
+                  {preview.goal.payout_frequency === "twice_monthly" && (
+                    <p>
+                      Payout dates: day {preview.goal.twice_monthly_day_one} and day{" "}
+                      {preview.goal.twice_monthly_day_two} each month
+                    </p>
+                  )}
+                  <p>Overall end date: {formatDate(preview.goal.end_date)}</p>
                   <p className="mt-2 font-semibold">Beneficiary: {preview.goal.beneficiary_name}</p>
                   <p>{preview.goal.masked_destination}</p>
                   <p className="mt-2">
@@ -369,4 +377,12 @@ function formatDate(value: string | null) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "not set";
   return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatSchedule(value: string) {
+  return value
+    .replace("every_14_days", "Every 14 days")
+    .replace("twice_monthly", "Twice monthly")
+    .replace("one_time", "One time")
+    .replace(/_/g, " ");
 }
