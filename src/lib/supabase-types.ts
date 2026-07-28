@@ -1669,6 +1669,41 @@ export interface Database {
         Args: { check_schedule_id: string; reason?: string | null };
         Returns: Database["public"]["Tables"]["payout_schedule"]["Row"];
       };
+      submit_governance_request: {
+        Args: {
+          check_circle_id: string;
+          check_request_type: string;
+          check_reason_code: string;
+          check_details?: string | null;
+          check_subject_membership_id?: string | null;
+          check_evidence_summary?: string | null;
+        };
+        Returns: Json;
+      };
+      open_governance_dispute: {
+        Args: {
+          check_dispute_type: string;
+          check_title: string;
+          check_description: string;
+          check_circle_id?: string | null;
+          check_against_user_id?: string | null;
+          check_related_request_id?: string | null;
+          check_related_transaction_id?: string | null;
+        };
+        Returns: Json;
+      };
+      decide_governance_request: {
+        Args: {
+          check_request_id: string;
+          check_decision: "approved" | "rejected";
+          check_decision_reason: string;
+        };
+        Returns: Json;
+      };
+      get_governance_dashboard: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
       current_user_is_admin: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;

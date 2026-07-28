@@ -67,6 +67,7 @@ import { getCurrentUser, type AuthUser } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { requireAuth } from "@/lib/phone-guard";
 import { formatCurrency } from "@/lib/diaspora";
+import { openGovernanceDispute, submitGovernanceRequest } from "@/lib/governance";
 import type { AutomationFrequency, CurrencyCode } from "@/lib/supabase-types";
 
 export const Route = createFileRoute("/circle/$id")({
@@ -337,6 +338,30 @@ export function CircleDetailsContent({
     setMessage("");
     setError("");
     setUpdatingMembershipId(member.membership_id);
+    if (action === "remove") {
+      const reason = window.prompt(
+        "Why should this member be removed? This will be reviewed by SikaCircle Operations.",
+      );
+      if (!reason?.trim()) {
+        setUpdatingMembershipId(null);
+        return;
+      }
+      const result = await submitGovernanceRequest({
+        circleId,
+        requestType: "member_removal",
+        reasonCode: "circle_rule_violation",
+        details: reason.trim(),
+        subjectMembershipId: member.membership_id,
+      });
+      setUpdatingMembershipId(null);
+      if (result.error) {
+        setError(result.error.message);
+        return;
+      }
+      setMessage("Member removal request submitted for SikaCircle Operations review.");
+      return;
+    }
+
     const { error: actionError } = await manageCircleMember(member.membership_id, action);
     setUpdatingMembershipId(null);
     if (actionError) {
@@ -467,6 +492,29 @@ export function CircleDetailsContent({
       Number(data ?? 0) > 0 ? "Payout rotation locked." : "Payout rotation was already locked.",
     );
     await loadCircle();
+  }
+
+  async function handleOpenDispute() {
+    const title = window.prompt("Give this dispute a short title.");
+    if (!title?.trim()) return;
+    const description = window.prompt(
+      "Describe what happened, including relevant payment references or dates.",
+    );
+    if (!description?.trim()) return;
+
+    setError("");
+    setMessage("");
+    const result = await openGovernanceDispute({
+      disputeType: "contribution",
+      title: title.trim(),
+      description: description.trim(),
+      circleId,
+    });
+    if (result.error) {
+      setError(result.error.message);
+      return;
+    }
+    setMessage("Your dispute was opened and sent to SikaCircle Operations.");
   }
 
   function renderPayoutRotationSection() {
@@ -960,6 +1008,20 @@ export function CircleDetailsContent({
                 approvedCount={approvedMembers.length}
                 rotationLocked={rotationLocked}
               />
+              <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+                <h2 className="font-display text-base font-semibold">Governance support</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Open a documented case for a payment, contribution, beneficiary, creator, removal,
+                  or payout concern. Protected funds remain unchanged while it is reviewed.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void handleOpenDispute()}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border px-4 py-3 text-sm font-semibold"
+                >
+                  <ShieldAlert className="h-4 w-4" /> Open a dispute
+                </button>
+              </div>
               {isAdmin && circle.status !== "archived" && lifecycleEligibility && (
                 <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
                   <h2 className="font-display text-base font-semibold">Circle management</h2>
@@ -1222,7 +1284,7 @@ function MemberGroup({
                       onClick={() => onAction(member, "remove")}
                       className="col-span-3 flex items-center justify-center gap-1 rounded-xl bg-destructive/10 py-2 text-[11px] font-semibold text-destructive"
                     >
-                      <X className="h-3.5 w-3.5" /> Remove member
+                      <X className="h-3.5 w-3.5" /> Request removal
                     </button>
                   )}
                 </div>
