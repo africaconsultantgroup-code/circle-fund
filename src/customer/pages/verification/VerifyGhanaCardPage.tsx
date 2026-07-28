@@ -1,8 +1,9 @@
 import { useNavigate } from "@tanstack/react-router";
 import { PageHeader } from "@/components/page-header";
 import { IdCard, ShieldAlert, Loader2 } from "lucide-react";
-import { useState } from "react";
-import { submitGhanaCardVerification } from "@/lib/db";
+import { useEffect, useState } from "react";
+import { isAppTestAccount, submitGhanaCardVerification } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
 
 export function VerifyGhanaCardPage() {
   const navigate = useNavigate();
@@ -10,6 +11,19 @@ export function VerifyGhanaCardPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [isTestAccount, setIsTestAccount] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void getCurrentUser().then(async (user) => {
+      if (!user) return;
+      const result = await isAppTestAccount(user.id);
+      if (active) setIsTestAccount(Boolean(result.data));
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleSubmit = async () => {
     setError("");
@@ -34,7 +48,9 @@ export function VerifyGhanaCardPage() {
       return;
     }
 
-    setMessage(resultMessage(data, "Ghana Card submitted for review. Taking you to face verification."));
+    setMessage(
+      resultMessage(data, "Ghana Card submitted for review. Taking you to face verification."),
+    );
     setTimeout(() => navigate({ to: "/verify/selfie" }), 600);
   };
 
@@ -48,7 +64,9 @@ export function VerifyGhanaCardPage() {
         </div>
         <div>
           <h2 className="font-display text-xl font-bold">Verify your Ghana Card</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Your card number is sent only to a secure Edge Function and stored as a hash.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Your card number is sent only to a secure Edge Function and stored as a hash.
+          </p>
         </div>
 
         <div>
@@ -59,7 +77,23 @@ export function VerifyGhanaCardPage() {
             placeholder="GHA-XXXXXXXXX-X"
             className="mt-1.5 w-full rounded-2xl border border-input bg-muted/40 px-4 py-3.5 font-mono text-sm tracking-wider outline-none"
           />
+          {isTestAccount && (
+            <button
+              type="button"
+              onClick={() => setGhanaCardNumber("GHA-000000000-0")}
+              className="mt-2 text-xs font-semibold text-primary"
+            >
+              Use test Ghana Card
+            </button>
+          )}
         </div>
+
+        {isTestAccount && (
+          <div className="rounded-2xl border border-gold/40 bg-gold/10 p-4 text-[11px] text-[color:var(--gold-foreground)]">
+            Test verification is available for this account. It does not represent production KYC
+            and cannot authorize real money movement.
+          </div>
+        )}
 
         <div className="rounded-2xl bg-secondary p-4">
           <p className="text-xs font-semibold text-primary">Secure processing</p>
@@ -70,7 +104,11 @@ export function VerifyGhanaCardPage() {
           </ul>
         </div>
 
-        {message && <p className="rounded-2xl bg-secondary p-4 text-[11px] font-medium text-primary">{message}</p>}
+        {message && (
+          <p className="rounded-2xl bg-secondary p-4 text-[11px] font-medium text-primary">
+            {message}
+          </p>
+        )}
         {error && (
           <div className="flex items-center gap-2 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-destructive">
             <ShieldAlert className="h-4 w-4" />
@@ -78,10 +116,23 @@ export function VerifyGhanaCardPage() {
           </div>
         )}
 
-        <button disabled={isSaving} onClick={handleSubmit} className="mt-auto rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card disabled:opacity-50">
-          {isSaving ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Submitting</span> : "Submit to secure backend"}
+        <button
+          disabled={isSaving}
+          onClick={handleSubmit}
+          className="mt-auto rounded-2xl bg-gradient-primary py-4 font-display text-base font-semibold text-primary-foreground shadow-card disabled:opacity-50"
+        >
+          {isSaving ? (
+            <span className="flex items-center justify-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" /> Submitting
+            </span>
+          ) : (
+            "Submit to secure backend"
+          )}
         </button>
-        <button onClick={() => navigate({ to: "/verify/status" })} className="rounded-2xl border border-border py-4 font-display text-base font-semibold text-muted-foreground">
+        <button
+          onClick={() => navigate({ to: "/verify/status" })}
+          className="rounded-2xl border border-border py-4 font-display text-base font-semibold text-muted-foreground"
+        >
           View status
         </button>
       </div>
@@ -92,9 +143,20 @@ export function VerifyGhanaCardPage() {
 function resultMessage(data: unknown, fallback: string) {
   if (!data || typeof data !== "object") return fallback;
   const response = data as { message?: string; status?: string; providerReference?: string };
-  return [response.message ?? fallback, response.status ? `Status: ${response.status}` : "", response.providerReference ? `Reference: ${response.providerReference}` : ""].filter(Boolean).join(" ");
+  return [
+    response.message ?? fallback,
+    response.status ? `Status: ${response.status}` : "",
+    response.providerReference ? `Reference: ${response.providerReference}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function isFunctionError(data: unknown): data is { ok: false; error: string } {
-  return Boolean(data && typeof data === "object" && (data as { ok?: unknown }).ok === false && typeof (data as { error?: unknown }).error === "string");
+  return Boolean(
+    data &&
+    typeof data === "object" &&
+    (data as { ok?: unknown }).ok === false &&
+    typeof (data as { error?: unknown }).error === "string",
+  );
 }
