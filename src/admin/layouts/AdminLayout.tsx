@@ -90,7 +90,7 @@ export function AdminLayout({ children }: { children?: ReactNode }) {
           </div>
         </div>
         <nav className="mt-8 flex flex-col gap-2">
-          {adminRoutes.filter((route) => !route.hidden && staffCanAccessAdminRoute(staffRole, route.to)).map(({ to, label, icon: Icon }) => {
+          {adminRoutes.filter((route) => !("hidden" in route && route.hidden) && staffCanAccessAdminRoute(staffRole, route.to)).map(({ to, label, icon: Icon }) => {
             const active = location.pathname === to || (to !== "/admin" && location.pathname.startsWith(to));
             return (
               <Link

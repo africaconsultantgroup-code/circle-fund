@@ -10,4 +10,5 @@ export { RoleManagement } from "@/admin/pages/RoleManagement";
 export { PaymentMonitoringPage } from "@/admin/pages/PaymentMonitoringPage";
 export { CapacityReviewPage } from "@/admin/pages/CapacityReviewPage";
 export { PayoutOperationsPage } from "@/admin/pages/PayoutOperationsPage";
+export { GovernanceRiskPage } from "@/admin/pages/GovernanceRiskPage";
 export { adminRoutes } from "@/admin/routes/AdminRoutes";

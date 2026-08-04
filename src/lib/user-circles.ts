@@ -1,5 +1,11 @@
 import { getCurrentUser } from "@/lib/auth";
-import { countCircleMembers, countPendingCircleMembers, listCirclesForUser, type Circle } from "@/lib/db";
+import {
+  countCircleMembers,
+  countPendingCircleMembers,
+  listArchivedCirclesForUser,
+  listCirclesForUser,
+  type Circle,
+} from "@/lib/db";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { circles as mockCircles } from "@/lib/mock-data";
 import type { CurrencyCode } from "@/lib/supabase-types";
@@ -23,6 +29,9 @@ export type UserCircle = {
   membershipRole: string;
   membershipStatus: string;
   isCreator: boolean;
+  status: Circle["status"];
+  archivedAt: string | null;
+  circleType: "rotational" | "goal";
 };
 
 type CircleMembershipRow = {
@@ -51,6 +60,9 @@ export function mockUserCircles(): UserCircle[] {
     membershipRole: "member",
     membershipStatus: "approved",
     isCreator: false,
+    status: "active",
+    archivedAt: null,
+    circleType: "rotational",
   }));
 }
 
@@ -59,12 +71,29 @@ export async function loadUserCircles(): Promise<{ data: UserCircle[]; error: st
     return { data: mockUserCircles(), error: null };
   }
 
+  return loadConfiguredUserCircles(listCirclesForUser);
+}
+
+export async function loadArchivedUserCircles(): Promise<{
+  data: UserCircle[];
+  error: string | null;
+}> {
+  if (!isSupabaseConfigured) {
+    return { data: [], error: null };
+  }
+
+  return loadConfiguredUserCircles(listArchivedCirclesForUser);
+}
+
+async function loadConfiguredUserCircles(
+  listCircles: typeof listCirclesForUser,
+): Promise<{ data: UserCircle[]; error: string | null }> {
   const user = await getCurrentUser();
   if (!user) {
     return { data: [], error: "Please sign in to view your circles." };
   }
 
-  const { data, error } = await listCirclesForUser(user.id);
+  const { data, error } = await listCircles(user.id);
   if (error) {
     return { data: [], error: error.message };
   }
@@ -101,7 +130,10 @@ export async function loadUserCircles(): Promise<{ data: UserCircle[]; error: st
 export function toUserCircle(circle: Circle): UserCircle {
   const amount = Number(circle.contribution_amount ?? 0);
   const goal = Number(circle.goal_amount ?? amount);
-  const maxMembers = Math.min(Math.max(circle.max_members ?? (amount > 0 ? Math.round(goal / amount) : 1), 1), 15);
+  const maxMembers = Math.min(
+    Math.max(circle.max_members ?? (amount > 0 ? Math.round(goal / amount) : 1), 1),
+    15,
+  );
 
   return {
     id: circle.id,
@@ -117,11 +149,16 @@ export function toUserCircle(circle: Circle): UserCircle {
     currentCycle: 0,
     totalCycles: maxMembers,
     nextRecipient: "Pending",
-    nextPayoutDate: circle.start_date ? new Date(circle.start_date).toLocaleDateString() : "Not set",
+    nextPayoutDate: circle.start_date
+      ? new Date(circle.start_date).toLocaleDateString()
+      : "Not set",
     inviteToken: circle.invite_code ?? circle.invite_token ?? null,
     membershipRole: "member",
     membershipStatus: "pending",
     isCreator: false,
+    status: circle.status,
+    archivedAt: circle.archived_at,
+    circleType: circle.circle_type,
   };
 }
 

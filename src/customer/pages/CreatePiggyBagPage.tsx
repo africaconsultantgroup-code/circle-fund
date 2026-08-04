@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Calendar, CheckCircle2, Loader2, LockKeyhole, PiggyBank, Repeat, ShieldAlert } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { formatGHS } from "@/lib/mock-data";
+import { enablePaymentAutomation } from "@/lib/payment-automation";
 import { calculatePiggyPlan, createPiggyPlan, deriveEndDate, formatDate, toDateInputValue, type PiggyDurationUnit, type PiggyFrequency } from "@/lib/piggy-bag";
 
 const today = toDateInputValue(new Date());
@@ -19,6 +20,8 @@ export function CreatePiggyBagPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [autoSave, setAutoSave] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState("");
 
   const calculation = useMemo(
     () => calculatePiggyPlan({ targetAmount, frequency, startDate, endDate, currentSaved: 0 }),
@@ -60,6 +63,11 @@ export function CreatePiggyBagPage() {
       return;
     }
 
+    if (autoSave && !phoneNumber.trim()) {
+      setError("Enter the Mobile Money number to authorize AutoSave.");
+      return;
+    }
+
     setIsSaving(true);
     const result = await createPiggyPlan({
       name,
@@ -70,16 +78,35 @@ export function CreatePiggyBagPage() {
       startDate,
       endDate,
     });
-    setIsSaving(false);
-
     if (result.error || !result.data) {
+      setIsSaving(false);
       setError(result.error ?? "We could not create this Piggy Bag plan. Please try again.");
       return;
     }
 
-    setSuccess("Piggy Bag plan created. Savings added to this plan will stay locked until the target date.");
+    const planId = result.data.id;
+    if (autoSave) {
+      const automationResult = await enablePaymentAutomation({
+        automationType: "piggy_autosave",
+        piggyId: planId,
+        amount: calculation.expectedContributionPerPeriod,
+        frequency,
+        paymentMethod: "mobile_money",
+        phoneNumber,
+        startDate,
+      });
+      if (automationResult.error) {
+        setIsSaving(false);
+        setError(`Piggy Bag created, but AutoSave could not be enabled: ${automationResult.error.message}`);
+        return;
+      }
+    }
+    setIsSaving(false);
+    setSuccess(autoSave
+      ? "Piggy Bag created and AutoSave scheduled. Provider authorization is still required before automatic deductions."
+      : "Piggy Bag plan created. Savings added to this plan will stay locked until the target date.");
     setTimeout(() => {
-      void navigate({ to: "/piggy-bag/$id", params: { id: result.data.id } });
+      void navigate({ to: "/piggy-bag/$id", params: { id: planId } });
     }, 700);
   };
 
@@ -145,6 +172,26 @@ export function CreatePiggyBagPage() {
             <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Locked until</p>
             <p className="mt-1 font-display text-sm font-semibold">{formatDate(endDate)}</p>
           </div>
+        </Section>
+
+        <Section icon={<Repeat className="h-4 w-4" />} title="AutoSave">
+          <label className="flex items-center justify-between gap-3 rounded-2xl bg-muted/40 p-3">
+            <span>
+              <span className="block text-sm font-semibold">Enable AutoSave</span>
+              <span className="block text-[11px] text-muted-foreground">Optional. Manual deposits remain available.</span>
+            </span>
+            <input type="checkbox" checked={autoSave} onChange={(event) => setAutoSave(event.target.checked)} className="h-5 w-5 accent-primary" />
+          </label>
+          {autoSave && (
+            <>
+              <Input label="Mobile Money number" type="tel" value={phoneNumber} onChange={setPhoneNumber} placeholder="+233..." />
+              <div className="rounded-2xl border border-gold/30 bg-gold/10 p-3 text-[11px] text-muted-foreground">
+                You authorize {formatGHS(calculation.expectedContributionPerPeriod)} {frequency}, starting {formatDate(startDate)}.
+                You can pause or cancel AutoSave without deleting this Piggy Bag. Failed payments may be retried twice.
+                Recurring provider authorization is not connected yet, so payments will require your approval until it is verified.
+              </div>
+            </>
+          )}
         </Section>
 
         <section className="rounded-2xl border border-border bg-card p-4 shadow-card">

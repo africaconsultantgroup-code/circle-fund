@@ -1,23 +1,63 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { PaymentPreparationModal } from "@/components/payment-preparation-modal";
+import { PaymentAutomationCard } from "@/components/payment-automation-card";
+import { ProtectedFundsCard } from "@/components/protected-funds-card";
+import { PayoutStatusCard } from "@/components/payout-status-card";
+import { GoalSusuDashboard } from "@/components/goal-susu-dashboard";
+import { CircleChat } from "@/components/circle-chat";
 import { PageHeader } from "@/components/page-header";
 import { SavingsPlanner } from "@/components/savings-planner";
-import { Activity, Calendar, Check, HeartPulse, Loader2, LockKeyhole, RefreshCw, Settings, Share2, ShieldAlert, ShieldCheck, Shuffle, TrendingUp, Users, WalletCards, X } from "lucide-react";
+import {
+  Activity,
+  Archive,
+  Calendar,
+  Check,
+  HeartPulse,
+  Loader2,
+  LockKeyhole,
+  MessageCircle,
+  RefreshCw,
+  Settings,
+  Share2,
+  ShieldAlert,
+  ShieldCheck,
+  Shuffle,
+  Trash2,
+  TrendingUp,
+  Users,
+  WalletCards,
+  X,
+} from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { getCircle, type Circle as MockCircleType } from "@/lib/mock-data";
 import {
   generateCircleContributionSchedule,
+  archiveCircle,
+  deleteCircle,
+  getCircleLifecycleEligibility,
   generateCirclePayoutRotation,
   getCircleById,
   getCircleMemberFinancialSummary,
   getCircleMembership,
   getCirclePaymentSummary,
   initiateHubtelContributionPayment,
+  isAppTestAccount,
   listCirclePayoutRotation,
   listCircleContributions,
   listCircleMembers,
   lockCirclePayoutRotation,
   manageCircleMember,
+  finishTestCircle,
   payFromWallet,
   type Circle,
   type CircleContributionStatus,
@@ -31,7 +71,8 @@ import { getCurrentUser, type AuthUser } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { requireAuth } from "@/lib/phone-guard";
 import { formatCurrency } from "@/lib/diaspora";
-import type { CurrencyCode } from "@/lib/supabase-types";
+import { openGovernanceDispute, submitGovernanceRequest } from "@/lib/governance";
+import type { AutomationFrequency, CurrencyCode } from "@/lib/supabase-types";
 
 export const Route = createFileRoute("/circle/$id")({
   beforeLoad: requireAuth,
@@ -50,21 +91,33 @@ export const Route = createFileRoute("/circle/$id")({
   ),
 });
 
-type Tab = "overview" | "members" | "contributions" | "rotation" | "settings";
+type Tab = "overview" | "members" | "contributions" | "chat" | "rotation" | "settings";
 
 function CircleDetails() {
-  const { circleId, mockCircle } = Route.useLoaderData() as { circleId: string; mockCircle: MockCircleType | null };
+  const { circleId, mockCircle } = Route.useLoaderData() as {
+    circleId: string;
+    mockCircle: MockCircleType | null;
+  };
   return <CircleDetailsContent circleId={circleId} mockCircle={mockCircle} />;
 }
 
-export function CircleDetailsContent({ circleId, mockCircle }: { circleId: string; mockCircle: MockCircleType | null }) {
+export function CircleDetailsContent({
+  circleId,
+  mockCircle,
+}: {
+  circleId: string;
+  mockCircle: MockCircleType | null;
+}) {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("overview");
+  const [chatContributionId, setChatContributionId] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [circle, setCircle] = useState<Circle | null>(null);
   const [members, setMembers] = useState<CircleMemberDetails[]>([]);
   const [contributions, setContributions] = useState<CircleContributionStatus[]>([]);
   const [paymentSummary, setPaymentSummary] = useState<CirclePaymentSummary | null>(null);
-  const [memberFinancialSummary, setMemberFinancialSummary] = useState<CircleMemberFinancialSummary | null>(null);
+  const [memberFinancialSummary, setMemberFinancialSummary] =
+    useState<CircleMemberFinancialSummary | null>(null);
   const [payoutRotation, setPayoutRotation] = useState<PayoutRotationItem[]>([]);
   const [membershipStatus, setMembershipStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -76,33 +129,73 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [updatingMembershipId, setUpdatingMembershipId] = useState<string | null>(null);
+  const [lifecycleEligibility, setLifecycleEligibility] =
+    useState<Awaited<ReturnType<typeof getCircleLifecycleEligibility>>["data"]>(null);
+  const [lifecycleAction, setLifecycleAction] = useState<
+    "delete" | "archive" | "finish_test" | null
+  >(null);
+  const [isManagingLifecycle, setIsManagingLifecycle] = useState(false);
+  const [isTestAccount, setIsTestAccount] = useState(false);
 
-  const currentMember = useMemo(() => members.find((member) => member.user_id === user?.id), [members, user?.id]);
-  const isAdmin = Boolean(circle?.owner_id === user?.id || (currentMember?.status === "approved" && ["creator", "admin"].includes(currentMember.role)));
+  const currentMember = useMemo(
+    () => members.find((member) => member.user_id === user?.id),
+    [members, user?.id],
+  );
+  const isAdmin = Boolean(
+    circle?.owner_id === user?.id ||
+    (currentMember?.status === "approved" && ["creator", "admin"].includes(currentMember.role)),
+  );
+  const isArchived = circle?.status === "archived";
+  const isGoalSusu = circle?.circle_type === "goal";
   const approvedMembers = members.filter((member) => member.status === "approved");
   const pendingMembers = members.filter((member) => member.status === "pending");
-  const rejectedMembers = members.filter((member) => member.status === "rejected" || member.status === "removed");
+  const rejectedMembers = members.filter(
+    (member) => member.status === "rejected" || member.status === "removed",
+  );
   const currency = (circle?.base_currency ?? mockCircle?.baseCurrency ?? "GHS") as CurrencyCode;
   const amount = Number(circle?.contribution_amount ?? mockCircle?.amount ?? 0);
+  const automationFrequency = (
+    ["weekly", "biweekly", "monthly"].includes(circle?.frequency ?? "")
+      ? circle?.frequency
+      : "monthly"
+  ) as AutomationFrequency;
+  const nextOwnContribution = contributions.find(
+    (contribution) =>
+      contribution.user_id === user?.id &&
+      ["unpaid", "pending", "failed", "overdue"].includes(contribution.status),
+  );
   const maxMembers = Math.min(circle?.max_members ?? 15, 15);
-  const myPayoutTurn = useMemo(() => payoutRotation.find((item) => item.is_current_user), [payoutRotation]);
+  const myPayoutTurn = useMemo(
+    () => payoutRotation.find((item) => item.is_current_user),
+    [payoutRotation],
+  );
   const rotationLocked = payoutRotation.some((item) => Boolean(item.locked_at));
   const rotationLockedAt = payoutRotation.find((item) => item.locked_at)?.locked_at ?? null;
   const hasEnoughMembersForRotation = approvedMembers.length >= 2;
-  const canGenerateRotation = isAdmin && hasEnoughMembersForRotation && !rotationLocked;
+  const canGenerateRotation =
+    isAdmin && !isArchived && hasEnoughMembersForRotation && !rotationLocked;
   const canRegenerateRotation = canGenerateRotation && !hasCircleStarted(circle?.start_date);
-  const rotationByMember = useMemo(() => new Map(payoutRotation.map((turn) => [turn.member_id, turn])), [payoutRotation]);
+  const rotationByMember = useMemo(
+    () => new Map(payoutRotation.map((turn) => [turn.member_id, turn])),
+    [payoutRotation],
+  );
   const contributionSummary = useMemo(() => {
     if (paymentSummary) {
       return {
         totalExpected: Number(paymentSummary.total_expected ?? 0),
         totalPaid: Number(paymentSummary.total_paid ?? 0),
-        outstanding: Number(paymentSummary.pending_amount ?? 0) + Number(paymentSummary.overdue_amount ?? 0) + Number(paymentSummary.failed_amount ?? 0),
+        outstanding:
+          Number(paymentSummary.pending_amount ?? 0) +
+          Number(paymentSummary.overdue_amount ?? 0) +
+          Number(paymentSummary.failed_amount ?? 0),
         overdue: Number(paymentSummary.overdue_amount ?? 0),
       };
     }
 
-    const totalExpected = contributions.reduce((sum, contribution) => sum + Number(contribution.expected_amount ?? 0), 0);
+    const totalExpected = contributions.reduce(
+      (sum, contribution) => sum + Number(contribution.expected_amount ?? 0),
+      0,
+    );
     const totalPaid = contributions
       .filter((contribution) => contribution.status === "paid")
       .reduce((sum, contribution) => sum + Number(contribution.expected_amount ?? 0), 0);
@@ -117,9 +210,18 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
       overdue,
     };
   }, [contributions, paymentSummary]);
-  const cycleHealth = useMemo(() => buildCircleHealth(contributions, approvedMembers.length, amount, paymentSummary), [contributions, approvedMembers.length, amount, paymentSummary]);
-  const trustSummary = useMemo(() => buildTrustSummary(contributions, circle?.status, user?.id), [contributions, circle?.status, user?.id]);
-  const activityLog = useMemo(() => buildActivityLog(currentMember, contributions, payoutRotation), [currentMember, contributions, payoutRotation]);
+  const cycleHealth = useMemo(
+    () => buildCircleHealth(contributions, approvedMembers.length, amount, paymentSummary),
+    [contributions, approvedMembers.length, amount, paymentSummary],
+  );
+  const trustSummary = useMemo(
+    () => buildTrustSummary(contributions, circle?.status, user?.id),
+    [contributions, circle?.status, user?.id],
+  );
+  const activityLog = useMemo(
+    () => buildActivityLog(currentMember, contributions, payoutRotation),
+    [currentMember, contributions, payoutRotation],
+  );
 
   useEffect(() => {
     void loadCircle();
@@ -141,7 +243,18 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
       return;
     }
 
-    const [circleResult, membershipResult, membersResult, contributionResult, rotationResult, paymentSummaryResult, memberFinancialResult] = await Promise.all([
+    const testAccountResult = await isAppTestAccount(currentUser.id);
+    setIsTestAccount(Boolean(testAccountResult.data));
+
+    const [
+      circleResult,
+      membershipResult,
+      membersResult,
+      contributionResult,
+      rotationResult,
+      paymentSummaryResult,
+      memberFinancialResult,
+    ] = await Promise.all([
       getCircleById(circleId),
       getCircleMembership(circleId, currentUser.id),
       listCircleMembers(circleId),
@@ -158,17 +271,21 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
     }
 
     setCircle(circleResult.data);
-    const resolvedMembershipStatus = membershipResult.data?.status ?? (circleResult.data.owner_id === currentUser.id ? "approved" : null);
+    const resolvedMembershipStatus =
+      membershipResult.data?.status ??
+      (circleResult.data.owner_id === currentUser.id ? "approved" : null);
     if (resolvedMembershipStatus !== "approved") {
       setCircle(circleResult.data);
       setMembershipStatus(resolvedMembershipStatus);
-      setError(resolvedMembershipStatus === "pending"
-        ? "Your join request is pending approval. Circle details are available after approval."
-        : resolvedMembershipStatus === "pending_capacity_review"
-          ? "Pending SikaCircle review. Circle details are available after your capacity review and member approval."
-        : resolvedMembershipStatus === "rejected" || resolvedMembershipStatus === "removed"
-          ? "You do not have access to this circle."
-          : "Only approved members can view circle details.");
+      setError(
+        resolvedMembershipStatus === "pending"
+          ? "Your join request is pending approval. Circle details are available after approval."
+          : resolvedMembershipStatus === "pending_capacity_review"
+            ? "Pending SikaCircle review. Circle details are available after your capacity review and member approval."
+            : resolvedMembershipStatus === "rejected" || resolvedMembershipStatus === "removed"
+              ? "You do not have access to this circle."
+              : "Only approved members can view circle details.",
+      );
       setIsLoading(false);
       return;
     }
@@ -179,11 +296,23 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
     setPayoutRotation((rotationResult.data ?? []) as PayoutRotationItem[]);
     setPaymentSummary(paymentSummaryResult.data);
     setMemberFinancialSummary(memberFinancialResult.data);
+    const membership = membershipResult.data;
+    const canManageLifecycle =
+      circleResult.data.owner_id === currentUser.id ||
+      (membership?.status === "approved" && ["creator", "admin"].includes(membership.role));
+    if (canManageLifecycle) {
+      const lifecycleResult = await getCircleLifecycleEligibility(circleId);
+      if (!lifecycleResult.error) setLifecycleEligibility(lifecycleResult.data);
+    }
     console.log("payout_rotation_fetch_debug", {
       circle_id: circleId,
       user_id: currentUser.id,
-      member_role: membershipResult.data?.role ?? (circleResult.data.owner_id === currentUser.id ? "owner" : null),
-      member_status: membershipResult.data?.status ?? (circleResult.data.owner_id === currentUser.id ? "approved" : null),
+      member_role:
+        membershipResult.data?.role ??
+        (circleResult.data.owner_id === currentUser.id ? "owner" : null),
+      member_status:
+        membershipResult.data?.status ??
+        (circleResult.data.owner_id === currentUser.id ? "approved" : null),
       payout_schedule_rows_found: rotationResult.data?.length ?? 0,
       payout_schedule_query_error: rotationResult.error?.message ?? null,
       payout_schedule_rows: rotationResult.data ?? [],
@@ -191,10 +320,63 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
     setIsLoading(false);
   }
 
-  async function handleMemberAction(member: CircleMemberDetails, action: "approve" | "reject" | "remove") {
+  async function handleLifecycleAction() {
+    if (!lifecycleAction) return;
+    setIsManagingLifecycle(true);
+    setError("");
+
+    const result =
+      lifecycleAction === "finish_test"
+        ? await finishTestCircle(circleId)
+        : lifecycleAction === "delete"
+          ? await deleteCircle(circleId)
+          : await archiveCircle(circleId);
+
+    setIsManagingLifecycle(false);
+    if (result.error) {
+      setError(result.error.message);
+      setLifecycleAction(null);
+      if (lifecycleAction === "delete") {
+        const refreshed = await getCircleLifecycleEligibility(circleId);
+        if (!refreshed.error) setLifecycleEligibility(refreshed.data);
+      }
+      return;
+    }
+
+    await navigate({ to: "/circles" });
+  }
+
+  async function handleMemberAction(
+    member: CircleMemberDetails,
+    action: "approve" | "reject" | "remove",
+  ) {
     setMessage("");
     setError("");
     setUpdatingMembershipId(member.membership_id);
+    if (action === "remove") {
+      const reason = window.prompt(
+        "Why should this member be removed? This will be reviewed by SikaCircle Operations.",
+      );
+      if (!reason?.trim()) {
+        setUpdatingMembershipId(null);
+        return;
+      }
+      const result = await submitGovernanceRequest({
+        circleId,
+        requestType: "member_removal",
+        reasonCode: "circle_rule_violation",
+        details: reason.trim(),
+        subjectMembershipId: member.membership_id,
+      });
+      setUpdatingMembershipId(null);
+      if (result.error) {
+        setError(result.error.message);
+        return;
+      }
+      setMessage("Member removal request submitted for SikaCircle Operations review.");
+      return;
+    }
+
     const { error: actionError } = await manageCircleMember(member.membership_id, action);
     setUpdatingMembershipId(null);
     if (actionError) {
@@ -202,7 +384,13 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
       return;
     }
 
-    setMessage(action === "approve" ? "Member approved." : action === "reject" ? "Member rejected." : "Member removed.");
+    setMessage(
+      action === "approve"
+        ? "Member approved."
+        : action === "reject"
+          ? "Member rejected."
+          : "Member removed.",
+    );
     await loadCircle();
   }
 
@@ -218,7 +406,11 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
       return;
     }
 
-    setMessage(Number(data ?? 0) > 0 ? "Contribution schedule generated." : "Contribution schedule is already up to date.");
+    setMessage(
+      Number(data ?? 0) > 0
+        ? "Contribution schedule generated."
+        : "Contribution schedule is already up to date.",
+    );
     await loadCircle();
   }
 
@@ -227,7 +419,9 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
     setError("");
     setPaymentNotice("");
     setInitiatingPaymentId(contribution.contribution_id);
-    const { data, error: paymentError } = await initiateHubtelContributionPayment(contribution.contribution_id);
+    const { data, error: paymentError } = await initiateHubtelContributionPayment(
+      contribution.contribution_id,
+    );
     setInitiatingPaymentId(null);
 
     if (paymentError) {
@@ -236,7 +430,9 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
     }
 
     setPaymentTransaction(data ?? null);
-    setPaymentNotice(`Contribution payment started. Reference: ${data?.provider_reference ?? "pending"}. The ledger updates after Hubtel confirms success.`);
+    setPaymentNotice(
+      `Contribution payment started. Reference: ${data?.provider_reference ?? "pending"}. The ledger updates after Hubtel confirms success.`,
+    );
     await loadCircle();
   }
 
@@ -269,7 +465,12 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
     setMessage("");
     setError("");
 
-    if (regenerate && !window.confirm("Regenerating will replace the current payout order before the circle starts. Continue?")) {
+    if (
+      regenerate &&
+      !window.confirm(
+        "Regenerating will replace the current payout order before the circle starts. Continue?",
+      )
+    ) {
       return;
     }
 
@@ -282,7 +483,11 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
       return;
     }
 
-    setMessage(Number(data ?? 0) > 0 ? "Payout rotation generated." : "Payout rotation is already generated.");
+    setMessage(
+      Number(data ?? 0) > 0
+        ? "Payout rotation generated."
+        : "Payout rotation is already generated.",
+    );
     await loadCircle();
   }
 
@@ -298,8 +503,33 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
       return;
     }
 
-    setMessage(Number(data ?? 0) > 0 ? "Payout rotation locked." : "Payout rotation was already locked.");
+    setMessage(
+      Number(data ?? 0) > 0 ? "Payout rotation locked." : "Payout rotation was already locked.",
+    );
     await loadCircle();
+  }
+
+  async function handleOpenDispute() {
+    const title = window.prompt("Give this dispute a short title.");
+    if (!title?.trim()) return;
+    const description = window.prompt(
+      "Describe what happened, including relevant payment references or dates.",
+    );
+    if (!description?.trim()) return;
+
+    setError("");
+    setMessage("");
+    const result = await openGovernanceDispute({
+      disputeType: "contribution",
+      title: title.trim(),
+      description: description.trim(),
+      circleId,
+    });
+    if (result.error) {
+      setError(result.error.message);
+      return;
+    }
+    setMessage("Your dispute was opened and sent to SikaCircle Operations.");
   }
 
   function renderPayoutRotationSection() {
@@ -307,14 +537,19 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
       <section className="flex flex-col gap-4">
         <div>
           <h2 className="font-display text-lg font-semibold">Payout Rotation</h2>
-          <p className="mt-1 text-xs text-muted-foreground">Fair automatic order for who receives each susu payout.</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Fair automatic order for who receives each susu payout.
+          </p>
         </div>
 
         {myPayoutTurn && (
           <div className="grid grid-cols-3 gap-2">
             <Metric label="My position" value={`#${myPayoutTurn.rotation_position}`} />
             <Metric label="Expected date" value={formatDate(myPayoutTurn.payout_due_date)} />
-            <Metric label="Expected amount" value={formatCurrency(Number(myPayoutTurn.payout_amount ?? 0), currency)} />
+            <Metric
+              label="Expected amount"
+              value={formatCurrency(Number(myPayoutTurn.payout_amount ?? 0), currency)}
+            />
           </div>
         )}
 
@@ -327,7 +562,11 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
               disabled={isUpdatingRotation || !canGenerateRotation || payoutRotation.length > 0}
               className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
             >
-              {isUpdatingRotation ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shuffle className="h-4 w-4" />}
+              {isUpdatingRotation ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Shuffle className="h-4 w-4" />
+              )}
               Generate Payout Order
             </button>
             {payoutRotation.length > 0 && (
@@ -341,7 +580,9 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
                 </button>
                 <button
                   onClick={handleLockRotation}
-                  disabled={isUpdatingRotation || rotationLocked || hasCircleStarted(circle?.start_date)}
+                  disabled={
+                    isUpdatingRotation || rotationLocked || hasCircleStarted(circle?.start_date)
+                  }
                   className="flex items-center justify-center gap-2 rounded-xl bg-success/10 px-3 py-2 text-[11px] font-semibold text-success disabled:opacity-60"
                 >
                   <LockKeyhole className="h-3.5 w-3.5" /> Lock Payout Order
@@ -349,12 +590,21 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
               </div>
             )}
             {payoutRotation.length > 0 && !rotationLocked && (
-              <p className="text-[11px] text-muted-foreground">Regenerating replaces this fair random order and is only available before the circle starts.</p>
+              <p className="text-[11px] text-muted-foreground">
+                Regenerating replaces this fair random order and is only available before the circle
+                starts.
+              </p>
             )}
             {payoutRotation.length === 0 && !hasEnoughMembersForRotation && (
-              <p className="text-[11px] text-muted-foreground">Approve at least 2 members to generate the payout order.</p>
+              <p className="text-[11px] text-muted-foreground">
+                Approve at least 2 members to generate the payout order.
+              </p>
             )}
-            {rotationLocked && <p className="text-[11px] text-muted-foreground">This payout order is locked and will not change automatically.</p>}
+            {rotationLocked && (
+              <p className="text-[11px] text-muted-foreground">
+                This payout order is locked and will not change automatically.
+              </p>
+            )}
           </div>
         )}
 
@@ -365,20 +615,31 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
         ) : membershipStatus === "approved" || isAdmin ? (
           <ul className="flex flex-col gap-3">
             {payoutRotation.map((turn) => (
-              <li key={turn.schedule_id} className="rounded-2xl border border-border bg-card p-4 shadow-card">
+              <li
+                key={turn.schedule_id}
+                className="rounded-2xl border border-border bg-card p-4 shadow-card"
+              >
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold">#{turn.rotation_position} {displayMemberName(turn.full_name)} {turn.is_current_user ? "- You" : ""}</p>
+                      <p className="text-sm font-semibold">
+                        #{turn.rotation_position} {displayMemberName(turn.full_name)}{" "}
+                        {turn.is_current_user ? "- You" : ""}
+                      </p>
                       <VerificationBadge status={turn.verification_status} />
                     </div>
                     <p className="mt-1 text-[11px] text-muted-foreground">
-                      {formatCurrency(Number(turn.payout_amount ?? 0), currency)} - {formatDate(turn.payout_due_date)}
+                      {formatCurrency(Number(turn.payout_amount ?? 0), currency)} -{" "}
+                      {formatDate(turn.payout_due_date)}
                     </p>
                   </div>
                   <StatusPill status={turn.status} />
                 </div>
-                {turn.is_current_user && <p className="mt-2 text-[11px] font-semibold text-primary">You - Expected payout: {formatDate(turn.payout_due_date)}</p>}
+                {turn.is_current_user && (
+                  <p className="mt-2 text-[11px] font-semibold text-primary">
+                    You - Expected payout: {formatDate(turn.payout_due_date)}
+                  </p>
+                )}
               </li>
             ))}
           </ul>
@@ -397,7 +658,11 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
         title={circle?.name ?? "Circle"}
         subtitle={`${approvedMembers.length}/${maxMembers} approved members${isAdmin && pendingMembers.length ? ` · ${pendingMembers.length} pending` : ""}`}
         back="/circles"
-        right={<button className="flex h-9 w-9 items-center justify-center rounded-full bg-muted"><Share2 className="h-4 w-4" /></button>}
+        right={
+          <button className="flex h-9 w-9 items-center justify-center rounded-full bg-muted">
+            <Share2 className="h-4 w-4" />
+          </button>
+        }
       />
 
       {isLoading ? (
@@ -405,21 +670,36 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
           <Loader2 className="h-4 w-4 animate-spin" /> Loading circle
         </div>
       ) : error ? (
-        <div className="m-5 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>
+        <div className="m-5 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          {error}
+        </div>
       ) : circle ? (
         <>
           <section className="bg-gradient-card px-5 pt-5 pb-7 text-primary-foreground">
             <div className="flex items-center justify-between">
-              <span className="rounded-full bg-white/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide">{circle.status}</span>
-              <span className="text-[10px] uppercase tracking-wide text-primary-foreground/70">Invite - {circle.invite_code ?? circle.invite_token}</span>
+              <span className="rounded-full bg-white/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide">
+                {circle.status}
+              </span>
+              <span className="text-[10px] uppercase tracking-wide text-primary-foreground/70">
+                Invite - {circle.invite_code ?? circle.invite_token}
+              </span>
             </div>
-            <p className="mt-4 text-xs uppercase tracking-wide text-primary-foreground/60">Contribution</p>
-            <p className="mt-1 font-display text-3xl font-bold">{formatCurrency(amount, currency)}</p>
-            <p className="text-xs text-primary-foreground/70">{circle.frequency ?? "monthly"} - starts {formatDate(circle.start_date)}</p>
+            <p className="mt-4 text-xs uppercase tracking-wide text-primary-foreground/60">
+              Contribution
+            </p>
+            <p className="mt-1 font-display text-3xl font-bold">
+              {formatCurrency(amount, currency)}
+            </p>
+            <p className="text-xs text-primary-foreground/70">
+              {circle.frequency ?? "monthly"} - starts {formatDate(circle.start_date)}
+            </p>
           </section>
 
           {membershipStatus === "pending" && (
-            <Notice tone="gold" text="Waiting for admin approval. You will see the approved member list after your request is approved." />
+            <Notice
+              tone="gold"
+              text="Waiting for admin approval. You will see the approved member list after your request is approved."
+            />
           )}
           {membershipStatus === "rejected" && (
             <Notice tone="danger" text="Your request was not approved." />
@@ -430,45 +710,142 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
           {message && <Notice tone="success" text={message} />}
           {paymentNotice && <Notice tone="success" text={paymentNotice} />}
 
-          <div className="grid grid-cols-5 gap-2 px-5 pt-4">
-            <TabButton active={tab === "overview"} icon={<WalletCards className="h-4 w-4" />} label="Overview" onClick={() => setTab("overview")} />
-            <TabButton active={tab === "members"} icon={<Users className="h-4 w-4" />} label="Members" onClick={() => setTab("members")} />
-            <TabButton active={tab === "contributions"} icon={<Calendar className="h-4 w-4" />} label="Contrib." onClick={() => setTab("contributions")} />
-            <TabButton active={tab === "rotation"} icon={<Shuffle className="h-4 w-4" />} label="Payouts" onClick={() => setTab("rotation")} />
-            <TabButton active={tab === "settings"} icon={<Settings className="h-4 w-4" />} label="Settings" onClick={() => setTab("settings")} />
+          <div className="grid grid-cols-6 gap-2 px-5 pt-4">
+            <TabButton
+              active={tab === "overview"}
+              icon={<WalletCards className="h-4 w-4" />}
+              label="Overview"
+              onClick={() => setTab("overview")}
+            />
+            <TabButton
+              active={tab === "members"}
+              icon={<Users className="h-4 w-4" />}
+              label="Members"
+              onClick={() => setTab("members")}
+            />
+            <TabButton
+              active={tab === "contributions"}
+              icon={<Calendar className="h-4 w-4" />}
+              label="Contrib."
+              onClick={() => setTab("contributions")}
+            />
+            <TabButton
+              active={tab === "chat"}
+              icon={<MessageCircle className="h-4 w-4" />}
+              label="Chat"
+              onClick={() => {
+                setChatContributionId(null);
+                setTab("chat");
+              }}
+            />
+            {!isGoalSusu && (
+              <TabButton
+                active={tab === "rotation"}
+                icon={<Shuffle className="h-4 w-4" />}
+                label="Payouts"
+                onClick={() => setTab("rotation")}
+              />
+            )}
+            <TabButton
+              active={tab === "settings"}
+              icon={<Settings className="h-4 w-4" />}
+              label="Settings"
+              onClick={() => setTab("settings")}
+            />
           </div>
 
           {tab === "overview" && (
             <section className="flex flex-col gap-5 px-5 pt-5">
+              {isGoalSusu && <GoalSusuDashboard circleId={circle.id} currency={currency} />}
               <div className="grid grid-cols-2 gap-3">
                 <Metric label="Approved" value={`${approvedMembers.length}/${maxMembers}`} />
                 <Metric label="Pending" value={String(pendingMembers.length)} />
                 <Metric label="Frequency" value={circle.frequency ?? "Monthly"} />
                 <Metric label="Start date" value={formatDate(circle.start_date)} />
                 <Metric label="End date" value={formatDate(circle.end_date)} />
-                <Metric label="My role" value={currentMember?.role ?? (isAdmin ? "creator" : "member")} />
-                <Metric label="Expected" value={formatCurrency(contributionSummary.totalExpected, currency)} />
-                <Metric label="Outstanding" value={formatCurrency(contributionSummary.outstanding, currency)} />
-                <Metric label="Total Paid" value={formatCurrency(Number(memberFinancialSummary?.confirmed_payments ?? 0), currency)} />
-                <Metric label="Pending Payments" value={formatCurrency(Number(memberFinancialSummary?.pending_payments ?? 0), currency)} />
-                <Metric label="Total Received" value={formatCurrency(Number(memberFinancialSummary?.total_received ?? 0), currency)} />
-                <Metric label="Expected Payout" value={formatCurrency(Number(memberFinancialSummary?.expected_payout ?? myPayoutTurn?.payout_amount ?? 0), currency)} />
-                <Metric label="Your turn" value={myPayoutTurn ? `#${myPayoutTurn.rotation_position}` : "Not set"} />
-                <Metric label="Payout date" value={myPayoutTurn ? formatDate(myPayoutTurn.payout_due_date) : "Not set"} />
-                <Metric label="Payout amount" value={myPayoutTurn ? formatCurrency(Number(myPayoutTurn.payout_amount ?? 0), currency) : "Not set"} />
+                <Metric
+                  label="My role"
+                  value={currentMember?.role ?? (isAdmin ? "creator" : "member")}
+                />
+                <Metric
+                  label="Expected"
+                  value={formatCurrency(contributionSummary.totalExpected, currency)}
+                />
+                <Metric
+                  label="Outstanding"
+                  value={formatCurrency(contributionSummary.outstanding, currency)}
+                />
+                <Metric
+                  label="Total Paid"
+                  value={formatCurrency(
+                    Number(memberFinancialSummary?.confirmed_payments ?? 0),
+                    currency,
+                  )}
+                />
+                <Metric
+                  label="Pending Payments"
+                  value={formatCurrency(
+                    Number(memberFinancialSummary?.pending_payments ?? 0),
+                    currency,
+                  )}
+                />
+                <Metric
+                  label="Total Received"
+                  value={formatCurrency(
+                    Number(memberFinancialSummary?.total_received ?? 0),
+                    currency,
+                  )}
+                />
+                {!isGoalSusu && (
+                  <Metric
+                    label="Expected Payout"
+                    value={formatCurrency(
+                      Number(
+                        memberFinancialSummary?.expected_payout ?? myPayoutTurn?.payout_amount ?? 0,
+                      ),
+                      currency,
+                    )}
+                  />
+                )}
+                {!isGoalSusu && (
+                  <Metric
+                    label="Your turn"
+                    value={myPayoutTurn ? `#${myPayoutTurn.rotation_position}` : "Not set"}
+                  />
+                )}
+                {!isGoalSusu && (
+                  <Metric
+                    label="Payout date"
+                    value={myPayoutTurn ? formatDate(myPayoutTurn.payout_due_date) : "Not set"}
+                  />
+                )}
+                {!isGoalSusu && (
+                  <Metric
+                    label="Payout amount"
+                    value={
+                      myPayoutTurn
+                        ? formatCurrency(Number(myPayoutTurn.payout_amount ?? 0), currency)
+                        : "Not set"
+                    }
+                  />
+                )}
               </div>
               <CircleHealthMeter health={cycleHealth} />
               <PayoutFundingStatus health={cycleHealth} currency={currency} />
               <TrustScoreFoundation summary={trustSummary} />
               <CustomerActivityLog items={activityLog} />
-              <SavingsPlanner defaultTargetAmount={amount} defaultDueDate={toDateInputValue(circle.start_date)} currency={currency} />
-              {renderPayoutRotationSection()}
+              <SavingsPlanner
+                defaultTargetAmount={amount}
+                defaultDueDate={toDateInputValue(circle.start_date)}
+                currency={currency}
+              />
+              {!isGoalSusu && renderPayoutRotationSection()}
             </section>
           )}
 
           {tab === "members" && (
             <section className="flex flex-col gap-4 p-5">
-              {isAdmin && (
+              {isAdmin && !isArchived && (
                 <PendingRequests
                   members={pendingMembers}
                   updatingMembershipId={updatingMembershipId}
@@ -476,10 +853,18 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
                 />
               )}
               {membershipStatus === "approved" || isAdmin ? (
-                <MemberGroup title="Approved members" members={approvedMembers} isAdmin={isAdmin} rotationByMember={rotationByMember} onAction={handleMemberAction} />
+                <MemberGroup
+                  title="Approved members"
+                  members={approvedMembers}
+                  isAdmin={isAdmin && !isArchived}
+                  rotationByMember={rotationByMember}
+                  onAction={handleMemberAction}
+                />
               ) : (
                 <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
-                  {membershipStatus === "pending" ? "Waiting for admin approval." : "Approved members are visible after approval."}
+                  {membershipStatus === "pending"
+                    ? "Waiting for admin approval."
+                    : "Approved members are visible after approval."}
                 </div>
               )}
             </section>
@@ -487,20 +872,68 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
 
           {tab === "contributions" && (
             <section className="flex flex-col gap-4 p-5">
+              {!isArchived && currentMember?.status === "approved" && circle && (
+                <PaymentAutomationCard
+                  automationType="circle_autopay"
+                  targetId={circle.id}
+                  targetName={circle.name}
+                  amount={amount}
+                  frequency={automationFrequency}
+                  nextCollectionDate={
+                    nextOwnContribution?.due_date ??
+                    circle.start_date ??
+                    new Date().toISOString().slice(0, 10)
+                  }
+                  currency={currency}
+                />
+              )}
+              {currentMember?.status === "approved" && circle && (
+                <>
+                  <ProtectedFundsCard scope="circle" circleId={circle.id} />
+                  <PayoutStatusCard circleId={circle.id} />
+                </>
+              )}
               <div>
                 <h2 className="font-display text-lg font-semibold">Circle contribution ledger</h2>
-                <p className="mt-1 text-xs text-muted-foreground">Transparent contribution records for this circle. Sensitive member details stay private.</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Transparent contribution records for this circle. Sensitive member details stay
+                  private.
+                </p>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Metric label="Total expected" value={formatCurrency(contributionSummary.totalExpected, currency)} />
-                <Metric label="Total paid" value={formatCurrency(contributionSummary.totalPaid, currency)} />
-                <Metric label="Outstanding" value={formatCurrency(contributionSummary.outstanding, currency)} />
-                <Metric label="Overdue" value={formatCurrency(contributionSummary.overdue, currency)} />
-                <Metric label="My paid" value={formatCurrency(Number(memberFinancialSummary?.susu_contributions_paid ?? 0), currency)} />
-                <Metric label="Pending Payments" value={formatCurrency(Number(memberFinancialSummary?.pending_payments ?? 0), currency)} />
+                <Metric
+                  label="Total expected"
+                  value={formatCurrency(contributionSummary.totalExpected, currency)}
+                />
+                <Metric
+                  label="Total paid"
+                  value={formatCurrency(contributionSummary.totalPaid, currency)}
+                />
+                <Metric
+                  label="Outstanding"
+                  value={formatCurrency(contributionSummary.outstanding, currency)}
+                />
+                <Metric
+                  label="Overdue"
+                  value={formatCurrency(contributionSummary.overdue, currency)}
+                />
+                <Metric
+                  label="My paid"
+                  value={formatCurrency(
+                    Number(memberFinancialSummary?.susu_contributions_paid ?? 0),
+                    currency,
+                  )}
+                />
+                <Metric
+                  label="Pending Payments"
+                  value={formatCurrency(
+                    Number(memberFinancialSummary?.pending_payments ?? 0),
+                    currency,
+                  )}
+                />
               </div>
 
-              {isAdmin && (
+              {isAdmin && !isArchived && (
                 <button
                   onClick={handleGenerateSchedule}
                   disabled={isGeneratingSchedule}
@@ -518,38 +951,77 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
               ) : (
                 <ul className="flex flex-col gap-3">
                   {contributions.map((contribution) => (
-                    <li key={contribution.contribution_id} className="rounded-2xl border border-border bg-card p-4 shadow-card">
+                    <li
+                      key={contribution.contribution_id}
+                      className="rounded-2xl border border-border bg-card p-4 shadow-card"
+                    >
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold">{displayMemberName(contribution.full_name)}</p>
+                        <p className="text-sm font-semibold">
+                          {displayMemberName(contribution.full_name)}
+                        </p>
                         <StatusPill status={contribution.status} />
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2">
-                        <LedgerField label="Cycle" value={formatContributionCycle(contribution.due_date)} />
-                        <LedgerField label="Amount" value={formatCurrency(Number(contribution.expected_amount ?? amount), currency)} />
+                        <LedgerField
+                          label="Cycle"
+                          value={formatContributionCycle(contribution.due_date)}
+                        />
+                        <LedgerField
+                          label="Amount"
+                          value={formatCurrency(
+                            Number(contribution.expected_amount ?? amount),
+                            currency,
+                          )}
+                        />
                         <LedgerField label="Due date" value={formatDate(contribution.due_date)} />
                         <LedgerField label="Paid date" value={formatDate(contribution.paid_at)} />
-                        <LedgerField label="Payment ref" value={contribution.payment_reference ?? "None"} wide />
+                        <LedgerField
+                          label="Payment ref"
+                          value={contribution.payment_reference ?? "None"}
+                          wide
+                        />
                       </div>
-                      {user?.id === contribution.user_id && ["unpaid", "overdue", "pending", "failed"].includes(contribution.status) && (
-                        <div className="mt-3 grid gap-2">
-                          <button
-                            onClick={() => handlePayContribution(contribution)}
-                            disabled={initiatingPaymentId === contribution.contribution_id}
-                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2 text-[11px] font-semibold text-primary-foreground disabled:opacity-60"
-                          >
-                            {initiatingPaymentId === contribution.contribution_id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                            Pay with Mobile Money
-                          </button>
-                          <button
-                            onClick={() => handlePayContributionFromWallet(contribution)}
-                            disabled={initiatingPaymentId === `wallet-${contribution.contribution_id}`}
-                            className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-2 text-[11px] font-semibold text-foreground disabled:opacity-60"
-                          >
-                            {initiatingPaymentId === `wallet-${contribution.contribution_id}` && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                            Pay from SikaCircle Wallet
-                          </button>
-                        </div>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChatContributionId(contribution.contribution_id);
+                          setTab("chat");
+                        }}
+                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border py-2 text-[11px] font-semibold text-primary"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        Discuss contribution
+                      </button>
+                      {!isArchived &&
+                        user?.id === contribution.user_id &&
+                        ["unpaid", "overdue", "pending", "failed"].includes(
+                          contribution.status,
+                        ) && (
+                          <div className="mt-3 grid gap-2">
+                            <button
+                              onClick={() => handlePayContribution(contribution)}
+                              disabled={initiatingPaymentId === contribution.contribution_id}
+                              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2 text-[11px] font-semibold text-primary-foreground disabled:opacity-60"
+                            >
+                              {initiatingPaymentId === contribution.contribution_id && (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              )}
+                              Pay with Mobile Money
+                            </button>
+                            <button
+                              onClick={() => handlePayContributionFromWallet(contribution)}
+                              disabled={
+                                initiatingPaymentId === `wallet-${contribution.contribution_id}`
+                              }
+                              className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-2 text-[11px] font-semibold text-foreground disabled:opacity-60"
+                            >
+                              {initiatingPaymentId === `wallet-${contribution.contribution_id}` && (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              )}
+                              Pay from SikaCircle Wallet
+                            </button>
+                          </div>
+                        )}
                     </li>
                   ))}
                 </ul>
@@ -557,15 +1029,95 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
             </section>
           )}
 
+          {tab === "chat" &&
+            circle &&
+            user &&
+            (currentMember?.status === "approved" || isAdmin) && (
+              <section className="p-5">
+                <CircleChat
+                  circleId={circle.id}
+                  circleName={circle.name}
+                  circleType={isGoalSusu ? "goal" : "rotational"}
+                  currentUserId={user.id}
+                  memberNames={Object.fromEntries(
+                    members.map((member) => [member.user_id, displayMemberName(member.full_name)]),
+                  )}
+                  isAdmin={isAdmin}
+                  isArchived={isArchived}
+                  contributionId={chatContributionId}
+                  onCloseContributionThread={() => setChatContributionId(null)}
+                />
+              </section>
+            )}
+
           {tab === "rotation" && (
-            <section className="flex flex-col gap-4 p-5">
-              {renderPayoutRotationSection()}
-            </section>
+            <section className="flex flex-col gap-4 p-5">{renderPayoutRotationSection()}</section>
           )}
 
           {tab === "settings" && (
-            <section className="p-5">
-              <CircleRules circle={circle} amount={amount} currency={currency} maxMembers={maxMembers} approvedCount={approvedMembers.length} rotationLocked={rotationLocked} />
+            <section className="flex flex-col gap-4 p-5">
+              <CircleRules
+                circle={circle}
+                amount={amount}
+                currency={currency}
+                maxMembers={maxMembers}
+                approvedCount={approvedMembers.length}
+                rotationLocked={rotationLocked}
+              />
+              <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+                <h2 className="font-display text-base font-semibold">Governance support</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Open a documented case for a payment, contribution, beneficiary, creator, removal,
+                  or payout concern. Protected funds remain unchanged while it is reviewed.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void handleOpenDispute()}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border px-4 py-3 text-sm font-semibold"
+                >
+                  <ShieldAlert className="h-4 w-4" /> Open a dispute
+                </button>
+              </div>
+              {isAdmin && circle.status !== "archived" && lifecycleEligibility && (
+                <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+                  <h2 className="font-display text-base font-semibold">Circle management</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {isTestAccount
+                      ? "Finish this test Circle. Unused Circles are deleted; Circles with activity are archived to preserve financial history."
+                      : lifecycleEligibility.can_delete
+                        ? "This unused circle can be permanently deleted."
+                        : "This circle has activity, so its history must be preserved by archiving it."}
+                  </p>
+                  {isTestAccount ? (
+                    <button
+                      onClick={() => setLifecycleAction("finish_test")}
+                      className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground"
+                    >
+                      <Archive className="h-4 w-4" /> Finish Test Circle
+                    </button>
+                  ) : lifecycleEligibility.can_delete ? (
+                    <button
+                      onClick={() => setLifecycleAction("delete")}
+                      className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-destructive px-4 py-3 text-sm font-semibold text-destructive-foreground"
+                    >
+                      <Trash2 className="h-4 w-4" /> Delete Circle
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setLifecycleAction("archive")}
+                      className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground"
+                    >
+                      <Archive className="h-4 w-4" /> Archive Circle
+                    </button>
+                  )}
+                </div>
+              )}
+              {isAdmin && circle.status === "archived" && (
+                <div className="rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+                  This circle is archived. Its contribution, payout, and membership history remains
+                  read-only.
+                </div>
+              )}
             </section>
           )}
         </>
@@ -576,6 +1128,51 @@ export function CircleDetailsContent({ circleId, mockCircle }: { circleId: strin
         title="Contribution payment started"
         onClose={() => setPaymentTransaction(null)}
       />
+      <AlertDialog
+        open={lifecycleAction !== null}
+        onOpenChange={(open) => !open && !isManagingLifecycle && setLifecycleAction(null)}
+      >
+        <AlertDialogContent className="max-w-sm rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {lifecycleAction === "finish_test"
+                ? "Finish Test Circle?"
+                : lifecycleAction === "delete"
+                  ? "Delete Circle?"
+                  : "Archive Circle?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {lifecycleAction === "finish_test"
+                ? "An unused test Circle will be deleted. If it has financial or member activity, it will be archived instead so its history remains protected."
+                : lifecycleAction === "delete"
+                  ? "The circle will be permanently removed. This action cannot be undone."
+                  : "The circle will stop accepting joins and contributions and disappear from active circles. This action cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isManagingLifecycle}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isManagingLifecycle}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleLifecycleAction();
+              }}
+              className={
+                lifecycleAction === "delete"
+                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  : ""
+              }
+            >
+              {isManagingLifecycle && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {lifecycleAction === "finish_test"
+                ? "Finish Test Circle"
+                : lifecycleAction === "delete"
+                  ? "Delete Circle"
+                  : "Archive Circle"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -594,36 +1191,59 @@ function PendingRequests({
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-base font-semibold">Pending Requests</h2>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">Review applicants before adding them to active members.</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Review applicants before adding them to active members.
+          </p>
         </div>
-        <span className="rounded-full bg-gold/20 px-2.5 py-1 text-xs font-bold text-[color:var(--gold-foreground)]">{members.length}</span>
+        <span className="rounded-full bg-gold/20 px-2.5 py-1 text-xs font-bold text-[color:var(--gold-foreground)]">
+          {members.length}
+        </span>
       </div>
 
       {members.length === 0 ? (
-        <p className="mt-4 rounded-xl bg-card px-3 py-4 text-sm text-muted-foreground">No pending join requests.</p>
+        <p className="mt-4 rounded-xl bg-card px-3 py-4 text-sm text-muted-foreground">
+          No pending join requests.
+        </p>
       ) : (
         <ul className="mt-4 flex flex-col gap-3">
           {members.map((member) => {
             const isUpdating = updatingMembershipId === member.membership_id;
             return (
-              <li key={member.membership_id} className="rounded-xl border border-border bg-card p-3">
+              <li
+                key={member.membership_id}
+                className="rounded-xl border border-border bg-card p-3"
+              >
                 <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
                   <RequestField label="Full Name" value={displayMemberName(member.full_name)} />
-                  <RequestField label="Phone Number" value={member.phone?.trim() || "Not provided"} />
+                  <RequestField
+                    label="Phone Number"
+                    value={member.phone?.trim() || "Not provided"}
+                  />
                   <RequestField label="Request Date" value={formatDate(member.joined_at)} wide />
                 </dl>
-                {member.requires_capacity_review && member.capacity_review_status !== "approved" && (
-                  <p className="mt-3 rounded-lg bg-gold/10 px-3 py-2 text-[10px] font-medium text-[color:var(--gold-foreground)]">
-                    SikaCircle capacity review is {member.capacity_review_status}; approval is available after that review.
-                  </p>
-                )}
+                {member.requires_capacity_review &&
+                  member.capacity_review_status !== "approved" && (
+                    <p className="mt-3 rounded-lg bg-gold/10 px-3 py-2 text-[10px] font-medium text-[color:var(--gold-foreground)]">
+                      SikaCircle capacity review is {member.capacity_review_status}; approval is
+                      available after that review.
+                    </p>
+                  )}
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <button
                     onClick={() => onAction(member, "approve")}
-                    disabled={isUpdating || (member.requires_capacity_review && member.capacity_review_status !== "approved")}
+                    disabled={
+                      isUpdating ||
+                      (member.requires_capacity_review &&
+                        member.capacity_review_status !== "approved")
+                    }
                     className="flex items-center justify-center gap-1.5 rounded-xl bg-success/10 py-2.5 text-[11px] font-semibold text-success disabled:opacity-50"
                   >
-                    {isUpdating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />} Approve
+                    {isUpdating ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Check className="h-3.5 w-3.5" />
+                    )}{" "}
+                    Approve
                   </button>
                   <button
                     onClick={() => onAction(member, "reject")}
@@ -642,10 +1262,20 @@ function PendingRequests({
   );
 }
 
-function RequestField({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
+function RequestField({
+  label,
+  value,
+  wide = false,
+}: {
+  label: string;
+  value: string;
+  wide?: boolean;
+}) {
   return (
     <div className={wide ? "col-span-2" : ""}>
-      <dt className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dt className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </dt>
       <dd className="mt-0.5 text-xs font-medium">{value}</dd>
     </div>
   );
@@ -668,11 +1298,16 @@ function MemberGroup({
     <div>
       <h2 className="font-display text-base font-semibold">{title}</h2>
       {members.length === 0 ? (
-        <div className="mt-3 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">Members will appear here after approval.</div>
+        <div className="mt-3 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
+          Members will appear here after approval.
+        </div>
       ) : (
         <ul className="mt-3 flex flex-col gap-3">
           {members.map((member) => (
-            <li key={member.membership_id} className="rounded-2xl border border-border bg-card p-4 shadow-card">
+            <li
+              key={member.membership_id}
+              className="rounded-2xl border border-border bg-card p-4 shadow-card"
+            >
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
@@ -680,13 +1315,19 @@ function MemberGroup({
                     <StatusPill status={member.status} />
                     <VerificationBadge status={member.verification_status} />
                   </div>
-                  <p className="mt-1 text-[11px] text-muted-foreground">Joined {formatDate(member.joined_at)} - {member.role}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Joined {formatDate(member.joined_at)} - {member.role}
+                  </p>
                   <p className="text-[11px] text-muted-foreground">
-                    Rotation position: {rotationByMember.get(member.membership_id)?.rotation_position ? `#${rotationByMember.get(member.membership_id)?.rotation_position}` : "Not set"}
+                    Rotation position:{" "}
+                    {rotationByMember.get(member.membership_id)?.rotation_position
+                      ? `#${rotationByMember.get(member.membership_id)?.rotation_position}`
+                      : "Not set"}
                   </p>
                   {member.requires_capacity_review && (
                     <p className="mt-2 rounded-xl bg-gold/10 px-3 py-2 text-[11px] font-medium text-[color:var(--gold-foreground)]">
-                      Capacity review {member.capacity_review_status}. SikaCircle must approve this extra-circle request before member approval.
+                      Capacity review {member.capacity_review_status}. SikaCircle must approve this
+                      extra-circle request before member approval.
                     </p>
                   )}
                 </div>
@@ -697,19 +1338,28 @@ function MemberGroup({
                     <>
                       <button
                         onClick={() => onAction(member, "approve")}
-                        disabled={member.requires_capacity_review && member.capacity_review_status !== "approved"}
+                        disabled={
+                          member.requires_capacity_review &&
+                          member.capacity_review_status !== "approved"
+                        }
                         className="flex items-center justify-center gap-1 rounded-xl bg-success/10 py-2 text-[11px] font-semibold text-success disabled:bg-muted disabled:text-muted-foreground"
                       >
                         <Check className="h-3.5 w-3.5" /> Approve
                       </button>
-                      <button onClick={() => onAction(member, "reject")} className="flex items-center justify-center gap-1 rounded-xl bg-destructive/10 py-2 text-[11px] font-semibold text-destructive">
+                      <button
+                        onClick={() => onAction(member, "reject")}
+                        className="flex items-center justify-center gap-1 rounded-xl bg-destructive/10 py-2 text-[11px] font-semibold text-destructive"
+                      >
                         <X className="h-3.5 w-3.5" /> Reject
                       </button>
                     </>
                   )}
                   {member.status === "approved" && (
-                    <button onClick={() => onAction(member, "remove")} className="col-span-3 flex items-center justify-center gap-1 rounded-xl bg-destructive/10 py-2 text-[11px] font-semibold text-destructive">
-                      <X className="h-3.5 w-3.5" /> Remove member
+                    <button
+                      onClick={() => onAction(member, "remove")}
+                      className="col-span-3 flex items-center justify-center gap-1 rounded-xl bg-destructive/10 py-2 text-[11px] font-semibold text-destructive"
+                    >
+                      <X className="h-3.5 w-3.5" /> Request removal
                     </button>
                   )}
                 </div>
@@ -725,7 +1375,11 @@ function MemberGroup({
 function MockCircleDetails({ circle }: { circle: MockCircleType }) {
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
-      <PageHeader title={circle.name} subtitle={`${circle.members.length}/15 members`} back="/circles" />
+      <PageHeader
+        title={circle.name}
+        subtitle={`${circle.members.length}/15 members`}
+        back="/circles"
+      />
       <div className="p-5">
         <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
           Live member management is available when Supabase is configured.
@@ -735,9 +1389,22 @@ function MockCircleDetails({ circle }: { circle: MockCircleType }) {
   );
 }
 
-function TabButton({ active, icon, label, onClick }: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
+function TabButton({
+  active,
+  icon,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
   return (
-    <button onClick={onClick} className={`flex flex-col items-center gap-1 rounded-xl border px-2 py-2 text-[10px] font-semibold ${active ? "border-primary bg-secondary text-primary" : "border-border bg-card text-muted-foreground"}`}>
+    <button
+      onClick={onClick}
+      className={`flex flex-col items-center gap-1 rounded-xl border px-2 py-2 text-[10px] font-semibold ${active ? "border-primary bg-secondary text-primary" : "border-border bg-card text-muted-foreground"}`}
+    >
       {icon}
       {label}
     </button>
@@ -753,7 +1420,15 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function LedgerField({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
+function LedgerField({
+  label,
+  value,
+  wide = false,
+}: {
+  label: string;
+  value: string;
+  wide?: boolean;
+}) {
   return (
     <div className={`rounded-xl bg-muted/40 px-3 py-2 ${wide ? "col-span-2" : ""}`}>
       <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
@@ -781,7 +1456,10 @@ function CircleHealthMeter({ health }: { health: CircleHealth }) {
         <h2 className="font-display text-base font-semibold">Circle health meter</h2>
       </div>
       <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
-        <div className="h-full rounded-full bg-gradient-gold" style={{ width: `${health.payoutReadiness}%` }} />
+        <div
+          className="h-full rounded-full bg-gradient-gold"
+          style={{ width: `${health.payoutReadiness}%` }}
+        />
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2">
         <RuleMetric label="Members paid" value={String(health.membersPaid)} />
@@ -793,7 +1471,13 @@ function CircleHealthMeter({ health }: { health: CircleHealth }) {
   );
 }
 
-function PayoutFundingStatus({ health, currency }: { health: CircleHealth; currency: CurrencyCode }) {
+function PayoutFundingStatus({
+  health,
+  currency,
+}: {
+  health: CircleHealth;
+  currency: CurrencyCode;
+}) {
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-card">
       <div className="flex items-center justify-between gap-3">
@@ -806,14 +1490,23 @@ function PayoutFundingStatus({ health, currency }: { health: CircleHealth; curre
       <div className="mt-4 grid grid-cols-2 gap-2">
         <RuleMetric label="Required" value={formatCurrency(health.requiredAmount, currency)} />
         <RuleMetric label="Collected" value={formatCurrency(health.collectedAmount, currency)} />
-        <RuleMetric label="Outstanding" value={formatCurrency(health.outstandingAmount, currency)} />
+        <RuleMetric
+          label="Outstanding"
+          value={formatCurrency(health.outstandingAmount, currency)}
+        />
         <RuleMetric label="Status" value={health.isReady ? "Ready" : "Not ready"} />
       </div>
     </section>
   );
 }
 
-function RotationLockCard({ generated, lockedAt }: { generated: boolean; lockedAt: string | null }) {
+function RotationLockCard({
+  generated,
+  lockedAt,
+}: {
+  generated: boolean;
+  lockedAt: string | null;
+}) {
   return (
     <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
       <div className="flex items-center gap-2 text-primary">
@@ -875,7 +1568,9 @@ function CustomerActivityLog({ items }: { items: ActivityItem[] }) {
           {items.map((item) => (
             <li key={item.id} className="rounded-xl bg-muted/40 px-3 py-2">
               <p className="text-xs font-semibold">{item.title}</p>
-              <p className="text-[11px] text-muted-foreground">{item.detail} - {formatDate(item.date)}</p>
+              <p className="text-[11px] text-muted-foreground">
+                {item.detail} - {formatDate(item.date)}
+              </p>
             </li>
           ))}
         </ul>
@@ -913,8 +1608,12 @@ function CircleRules({
         <RuleMetric label="Sequence" value={rotationLocked ? "Locked" : "Unlocked"} />
       </div>
       <div className="mt-4 rounded-xl bg-muted/40 px-3 py-2">
-        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Late payment rule</p>
-        <p className="mt-0.5 text-xs font-semibold text-muted-foreground">Late payment rules will be enforced by SikaCircle policy in a later phase.</p>
+        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          Late payment rule
+        </p>
+        <p className="mt-0.5 text-xs font-semibold text-muted-foreground">
+          Late payment rules will be enforced by SikaCircle policy in a later phase.
+        </p>
       </div>
     </div>
   );
@@ -932,7 +1631,9 @@ function RuleMetric({ label, value }: { label: string; value: string }) {
 function VerificationBadge({ status }: { status: string | null | undefined }) {
   const verified = status === "verified";
   return (
-    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${verified ? "bg-success/10 text-success" : "bg-gold/15 text-[color:var(--gold-foreground)]"}`}>
+    <span
+      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${verified ? "bg-success/10 text-success" : "bg-gold/15 text-[color:var(--gold-foreground)]"}`}
+    >
       {verified ? "verified" : "review"}
     </span>
   );
@@ -944,7 +1645,11 @@ function displayMemberName(value: string | null | undefined) {
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return "Member";
 
   const digitsOnly = trimmed.replace(/\D/g, "");
-  if (digitsOnly.length >= 7 && digitsOnly.length <= 15 && digitsOnly === trimmed.replace(/[\s()+.-]/g, "")) {
+  if (
+    digitsOnly.length >= 7 &&
+    digitsOnly.length <= 15 &&
+    digitsOnly === trimmed.replace(/[\s()+.-]/g, "")
+  ) {
     return "Member";
   }
 
@@ -952,11 +1657,12 @@ function displayMemberName(value: string | null | undefined) {
 }
 
 function Notice({ text, tone }: { text: string; tone: "gold" | "danger" | "success" }) {
-  const classes = tone === "danger"
-    ? "border-destructive/30 bg-destructive/5 text-destructive"
-    : tone === "success"
-      ? "border-success/30 bg-success/10 text-success"
-      : "border-gold/40 bg-gold/10 text-[color:var(--gold-foreground)]";
+  const classes =
+    tone === "danger"
+      ? "border-destructive/30 bg-destructive/5 text-destructive"
+      : tone === "success"
+        ? "border-success/30 bg-success/10 text-success"
+        : "border-gold/40 bg-gold/10 text-[color:var(--gold-foreground)]";
 
   return (
     <div className={`mx-5 mt-4 flex items-center gap-2 rounded-2xl border px-4 py-3 ${classes}`}>
@@ -968,9 +1674,16 @@ function Notice({ text, tone }: { text: string; tone: "gold" | "danger" | "succe
 
 function StatusPill({ status }: { status: string }) {
   const good = status === "approved" || status === "paid" || status === "processed";
-  const danger = status === "rejected" || status === "removed" || status === "late" || status === "overdue" || status === "failed";
+  const danger =
+    status === "rejected" ||
+    status === "removed" ||
+    status === "late" ||
+    status === "overdue" ||
+    status === "failed";
   return (
-    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${good ? "bg-success/10 text-success" : danger ? "bg-destructive/10 text-destructive" : "bg-gold/15 text-[color:var(--gold-foreground)]"}`}>
+    <span
+      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${good ? "bg-success/10 text-success" : danger ? "bg-destructive/10 text-destructive" : "bg-gold/15 text-[color:var(--gold-foreground)]"}`}
+    >
       {status}
     </span>
   );
@@ -1014,7 +1727,9 @@ function buildCircleHealth(
     const requiredAmount = Number(paymentSummary.total_expected ?? 0);
     const collectedAmount = Number(paymentSummary.total_paid ?? 0);
     const outstandingAmount = Math.max(
-      Number(paymentSummary.pending_amount ?? 0) + Number(paymentSummary.overdue_amount ?? 0) + Number(paymentSummary.failed_amount ?? 0),
+      Number(paymentSummary.pending_amount ?? 0) +
+        Number(paymentSummary.overdue_amount ?? 0) +
+        Number(paymentSummary.failed_amount ?? 0),
       0,
     );
 
@@ -1051,9 +1766,13 @@ function buildCircleHealth(
   const requiredAmount = Math.max(approvedMemberCount * contributionAmount, 0);
   const collectedAmount = contributions
     .filter((contribution) => contribution.status === "paid" || contribution.status === "processed")
-    .reduce((sum, contribution) => sum + Number(contribution.expected_amount ?? contributionAmount ?? 0), 0);
+    .reduce(
+      (sum, contribution) => sum + Number(contribution.expected_amount ?? contributionAmount ?? 0),
+      0,
+    );
   const outstandingAmount = Math.max(requiredAmount - collectedAmount, 0);
-  const payoutReadiness = requiredAmount > 0 ? Math.min(Math.round((collectedAmount / requiredAmount) * 100), 100) : 0;
+  const payoutReadiness =
+    requiredAmount > 0 ? Math.min(Math.round((collectedAmount / requiredAmount) * 100), 100) : 0;
 
   return {
     membersPaid: paidUsers.size,
@@ -1067,10 +1786,20 @@ function buildCircleHealth(
   };
 }
 
-function buildTrustSummary(contributions: CircleContributionStatus[], circleStatus: string | null | undefined, userId: string | null | undefined): TrustSummary {
-  const userContributions = userId ? contributions.filter((contribution) => contribution.user_id === userId) : [];
-  const latePayments = userContributions.filter((contribution) => contribution.status === "overdue" || contribution.status === "late").length;
-  const missedPayments = userContributions.filter((contribution) => contribution.status === "failed").length;
+function buildTrustSummary(
+  contributions: CircleContributionStatus[],
+  circleStatus: string | null | undefined,
+  userId: string | null | undefined,
+): TrustSummary {
+  const userContributions = userId
+    ? contributions.filter((contribution) => contribution.user_id === userId)
+    : [];
+  const latePayments = userContributions.filter(
+    (contribution) => contribution.status === "overdue" || contribution.status === "late",
+  ).length;
+  const missedPayments = userContributions.filter(
+    (contribution) => contribution.status === "failed",
+  ).length;
   const score = Math.max(0, 100 - latePayments * 5 - missedPayments * 10);
 
   return {

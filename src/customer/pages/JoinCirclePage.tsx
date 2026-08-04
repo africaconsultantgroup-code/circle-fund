@@ -1,8 +1,24 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
-import { CheckCircle2, KeyRound, Link2, ScanLine, ShieldAlert, ShieldCheck, Loader2 } from "lucide-react";
-import { countCircleMembers, getCircleByInviteToken, joinCircle, normalizeInviteToken, type Circle } from "@/lib/db";
+import {
+  CheckCircle2,
+  KeyRound,
+  Link2,
+  ScanLine,
+  ShieldAlert,
+  ShieldCheck,
+  Loader2,
+} from "lucide-react";
+import {
+  acceptGoalSusuTerms,
+  countCircleMembers,
+  getCircleByInviteToken,
+  getGoalSusuJoinPreview,
+  joinCircle,
+  normalizeInviteToken,
+  type Circle,
+} from "@/lib/db";
 import { getCircleEligibility, type CircleEligibility } from "@/lib/onboarding";
 import { canJoinCircle, type JoinCircleLimitResult } from "@/lib/circle-limits";
 import { formatCurrency } from "@/lib/diaspora";
@@ -10,13 +26,19 @@ import { formatCurrency } from "@/lib/diaspora";
 type CirclePreview = {
   circle: Circle;
   memberCount: number;
+  goal: Awaited<ReturnType<typeof getGoalSusuJoinPreview>>["data"] extends (infer T)[] | null
+    ? T | null
+    : never;
 };
 
 export function JoinCirclePage() {
   const navigate = useNavigate();
   const [eligibility, setEligibility] = useState<CircleEligibility | null>(null);
   const [isCheckingEligibility, setIsCheckingEligibility] = useState(true);
-  const [inviteValue, setInviteValue] = useState("");
+  const [inviteValue, setInviteValue] = useState(() => {
+    const code = new URLSearchParams(window.location.search).get("code") ?? "";
+    return code ? normalizeInviteToken(code) : "";
+  });
   const [preview, setPreview] = useState<CirclePreview | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
@@ -28,8 +50,6 @@ export function JoinCirclePage() {
   useEffect(() => {
     let isMounted = true;
     const code = new URLSearchParams(window.location.search).get("code") ?? "";
-    if (code) setInviteValue(normalizeInviteToken(code));
-
     getCircleEligibility().then((result) => {
       if (!isMounted) return;
       setEligibility(result);
@@ -48,7 +68,7 @@ export function JoinCirclePage() {
     void canJoinCircle(preview.circle.id, eligibility.userId).then(setJoinLimit);
   }, [eligibility?.userId, preview?.circle.id]);
 
-  const loadPreview = async (rawCode = inviteValue) => {
+  async function loadPreview(rawCode = inviteValue) {
     setJoinError("");
     setPreview(null);
 
@@ -73,7 +93,8 @@ export function JoinCirclePage() {
       return null;
     }
 
-    const nextPreview = { circle, memberCount: count ?? 0 };
+    const goalResult = circle.circle_type === "goal" ? await getGoalSusuJoinPreview(code) : null;
+    const nextPreview = { circle, memberCount: count ?? 0, goal: goalResult?.data?.[0] ?? null };
     setPreview(nextPreview);
     const currentUserId = eligibility?.userId ?? null;
     if (currentUserId) {
@@ -81,19 +102,19 @@ export function JoinCirclePage() {
       setJoinLimit(limitResult);
     }
     return nextPreview;
-  };
+  }
 
   const handleJoin = async () => {
     setJoinError("");
 
-    const currentEligibility = eligibility ?? await getCircleEligibility();
+    const currentEligibility = eligibility ?? (await getCircleEligibility());
     if (!currentEligibility.isEligible || !currentEligibility.userId) {
       setEligibility(currentEligibility);
       setJoinError(currentEligibility.message || "Please sign in before joining a circle.");
       return;
     }
 
-    const currentPreview = preview ?? await loadPreview();
+    const currentPreview = preview ?? (await loadPreview());
     if (!currentPreview) return;
 
     const maxMembers = Math.min(currentPreview.circle.max_members ?? 15, 15);
@@ -102,7 +123,11 @@ export function JoinCirclePage() {
       return;
     }
 
-    const limitResult = await canJoinCircle(currentPreview.circle.id, currentEligibility.userId, true);
+    const limitResult = await canJoinCircle(
+      currentPreview.circle.id,
+      currentEligibility.userId,
+      true,
+    );
     setJoinLimit(limitResult);
     if (!limitResult.canJoin) {
       setJoinError(limitResult.message);
@@ -116,13 +141,26 @@ export function JoinCirclePage() {
         setJoinError(error?.message ?? "We could not join this circle. Please try again.");
         return;
       }
+      if (currentPreview.circle.circle_type === "goal") {
+        const acceptance = await acceptGoalSusuTerms(currentPreview.circle.id);
+        if (acceptance.error) {
+          setJoinError(
+            `Your join request was saved, but the Goal Susu agreement was not accepted: ${acceptance.error.message}`,
+          );
+          return;
+        }
+      }
 
-      setSuccess(data.requires_capacity_review
-        ? "You are already in 3 active susu groups. SikaCircle must review your capacity before approving another group."
-        : "Join request sent. Opening circle details.");
+      setSuccess(
+        data.requires_capacity_review
+          ? "You are already in 3 active susu groups. SikaCircle must review your capacity before approving another group."
+          : "Join request sent. Opening circle details.",
+      );
       setTimeout(() => navigate({ to: "/circles/$id", params: { id: data.circle_id } }), 700);
     } catch (error) {
-      setJoinError(error instanceof Error ? error.message : "We could not join this circle. Please try again.");
+      setJoinError(
+        error instanceof Error ? error.message : "We could not join this circle. Please try again.",
+      );
     } finally {
       setIsJoining(false);
     }
@@ -147,10 +185,15 @@ export function JoinCirclePage() {
                 <p className="font-display text-sm font-semibold">Sign in before joining</p>
                 <ul className="mt-2 flex flex-col gap-1">
                   {(eligibility?.issues ?? []).map((issue) => (
-                    <li key={issue.key} className="text-[11px] opacity-85">{issue.message}</li>
+                    <li key={issue.key} className="text-[11px] opacity-85">
+                      {issue.message}
+                    </li>
                   ))}
                 </ul>
-                <Link to={eligibility?.issues[0]?.to ?? "/verify"} className="mt-3 inline-flex rounded-xl bg-destructive px-3 py-2 text-[11px] font-semibold text-destructive-foreground">
+                <Link
+                  to={eligibility?.issues[0]?.to ?? "/verify"}
+                  className="mt-3 inline-flex rounded-xl bg-destructive px-3 py-2 text-[11px] font-semibold text-destructive-foreground"
+                >
                   {eligibility?.issues[0]?.actionLabel ?? "Sign in"}
                 </Link>
               </div>
@@ -161,14 +204,19 @@ export function JoinCirclePage() {
         {eligible && (
           <div className="flex items-center gap-2 rounded-2xl bg-success/10 px-4 py-2.5 text-success">
             <ShieldCheck className="h-4 w-4" />
-            <p className="text-[11px] font-medium">You can join circles for testing. Verification may be required before contributions start.</p>
+            <p className="text-[11px] font-medium">
+              You can join circles for testing. Verification may be required before contributions
+              start.
+            </p>
           </div>
         )}
 
         <div className="rounded-3xl bg-gradient-card p-6 text-primary-foreground shadow-elevated">
           <KeyRound className="h-8 w-8 text-gold" />
           <h2 className="mt-3 font-display text-xl font-bold">Enter invite code</h2>
-          <p className="mt-1 text-sm text-primary-foreground/70">Open an invite link or paste the code shared by the circle creator.</p>
+          <p className="mt-1 text-sm text-primary-foreground/70">
+            Open an invite link or paste the code shared by the circle creator.
+          </p>
 
           <input
             value={inviteValue}
@@ -186,14 +234,20 @@ export function JoinCirclePage() {
               <span className="flex items-center justify-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" /> Loading preview
               </span>
-            ) : "Preview circle"}
+            ) : (
+              "Preview circle"
+            )}
           </button>
 
           {preview && (
             <div className="mt-4 rounded-2xl bg-white/15 p-4">
               <p className="font-display text-base font-semibold">{preview.circle.name}</p>
               <p className="mt-1 text-xs text-primary-foreground/75">
-                {formatCurrency(Number(preview.circle.contribution_amount ?? 0), preview.circle.base_currency ?? "GHS")} / {preview.circle.frequency ?? "monthly"}
+                {formatCurrency(
+                  Number(preview.circle.contribution_amount ?? 0),
+                  preview.circle.base_currency ?? "GHS",
+                )}{" "}
+                / {preview.circle.frequency ?? "monthly"}
               </p>
               <p className="mt-2 text-[11px] text-primary-foreground/70">
                 {preview.memberCount}/{Math.min(preview.circle.max_members ?? 15, 15)} members
@@ -201,6 +255,40 @@ export function JoinCirclePage() {
               <p className="mt-1 text-[11px] text-primary-foreground/70">
                 Starts {formatDate(preview.circle.start_date)}
               </p>
+              {preview.goal && (
+                <div className="mt-3 rounded-xl border border-white/15 p-3 text-[11px] text-primary-foreground/80">
+                  <p className="font-semibold uppercase text-gold">Goal Susu agreement</p>
+                  <p className="mt-2">
+                    Target:{" "}
+                    {formatCurrency(
+                      Number(preview.goal.target_amount),
+                      preview.circle.base_currency ?? "GHS",
+                    )}
+                  </p>
+                  <p>
+                    Your contribution:{" "}
+                    {formatCurrency(
+                      Number(preview.goal.contribution_amount),
+                      preview.circle.base_currency ?? "GHS",
+                    )}
+                  </p>
+                  <p>Contributions: {formatSchedule(preview.goal.contribution_frequency)}</p>
+                  <p>Payouts: {formatSchedule(preview.goal.payout_frequency)}</p>
+                  {preview.goal.payout_frequency === "twice_monthly" && (
+                    <p>
+                      Payout dates: day {preview.goal.twice_monthly_day_one} and day{" "}
+                      {preview.goal.twice_monthly_day_two} each month
+                    </p>
+                  )}
+                  <p>Overall end date: {formatDate(preview.goal.end_date)}</p>
+                  <p className="mt-2 font-semibold">Beneficiary: {preview.goal.beneficiary_name}</p>
+                  <p>{preview.goal.masked_destination}</p>
+                  <p className="mt-2">
+                    By accepting, you confirm that you understand where the final protected pot is
+                    intended to go.
+                  </p>
+                </div>
+              )}
               {joinLimit?.requiresCapacityReview && (
                 <p className="mt-3 rounded-xl bg-gold/20 px-3 py-2 text-[11px] font-semibold text-gold-foreground">
                   Pending SikaCircle review will be required for this join request.
@@ -218,9 +306,19 @@ export function JoinCirclePage() {
               <span className="flex items-center justify-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" /> Joining
               </span>
-            ) : eligible ? "Join Circle" : "Sign in to join"}
+            ) : eligible ? (
+              preview?.goal ? (
+                "Accept Goal Susu"
+              ) : (
+                "Join Circle"
+              )
+            ) : (
+              "Sign in to join"
+            )}
           </button>
-          <p className="mt-3 text-[10px] text-primary-foreground/60">Only join circles from people you trust.</p>
+          <p className="mt-3 text-[10px] text-primary-foreground/60">
+            Only join circles from people you trust.
+          </p>
         </div>
 
         {joinError && (
@@ -240,7 +338,10 @@ export function JoinCirclePage() {
           <span className="h-px flex-1 bg-border" /> or <span className="h-px flex-1 bg-border" />
         </div>
 
-        <button disabled={!eligible} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left disabled:opacity-50">
+        <button
+          disabled={!eligible}
+          className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left disabled:opacity-50"
+        >
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-primary">
             <Link2 className="h-5 w-5" />
           </span>
@@ -250,7 +351,10 @@ export function JoinCirclePage() {
           </div>
         </button>
 
-        <button disabled={!eligible} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left disabled:opacity-50">
+        <button
+          disabled={!eligible}
+          className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left disabled:opacity-50"
+        >
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-primary">
             <ScanLine className="h-5 w-5" />
           </span>
@@ -273,4 +377,12 @@ function formatDate(value: string | null) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "not set";
   return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatSchedule(value: string) {
+  return value
+    .replace("every_14_days", "Every 14 days")
+    .replace("twice_monthly", "Twice monthly")
+    .replace("one_time", "One time")
+    .replace(/_/g, " ");
 }

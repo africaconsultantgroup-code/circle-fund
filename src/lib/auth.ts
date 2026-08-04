@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
+import type { AccountStatus, CurrencyCode, LegacyVerificationStatus, UserRole } from './supabase-types';
 
 export interface AuthUser {
   id: string;
@@ -56,7 +57,7 @@ export async function signInWithPassword(email: string, password: string): Promi
   }
 
   return {
-    data: { user: data.user ? { id: data.user.id, email: data.user.email, phone: data.user.phone } : null },
+    data: { user: data.user ? { id: data.user.id, email: data.user.email ?? null, phone: data.user.phone ?? null } : null },
     error: null,
   };
 }
@@ -91,7 +92,7 @@ export async function signUpWithEmail(email: string, password: string, metadata?
 
   return {
     data: {
-      user: data.user ? { id: data.user.id, email: data.user.email, phone: data.user.phone } : null,
+      user: data.user ? { id: data.user.id, email: data.user.email ?? null, phone: data.user.phone ?? null } : null,
       hasSession: Boolean(data.session),
     },
     error: null,
@@ -154,7 +155,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   }
 
   const { data } = await supabase.auth.getUser();
-  return data.user ? { id: data.user.id, email: data.user.email, phone: data.user.phone } : null;
+  return data.user ? { id: data.user.id, email: data.user.email ?? null, phone: data.user.phone ?? null } : null;
 }
 
 export async function getCurrentUserProfile(): Promise<UserProfile | null> {
@@ -200,14 +201,14 @@ export async function upsertUserProfile(profile: {
   email?: string | null;
   phone?: string | null;
   country?: string | null;
-  preferred_currency?: string | null;
+  preferred_currency?: CurrencyCode;
   expected_monthly_contribution?: number | null;
   avatar_url?: string | null;
-  ghana_card_verification_status?: string;
+  ghana_card_verification_status?: LegacyVerificationStatus;
   selfie_image_url?: string | null;
   profile_completed?: boolean;
-  account_status?: string;
-  role?: string;
+  account_status?: AccountStatus;
+  role?: UserRole;
 }) {
   if (!isSupabaseConfigured) {
     return { data: null, error: { message: 'Supabase is not configured.' } };
@@ -224,10 +225,11 @@ export async function upsertUserProfile(profile: {
   }
 
   if (existing.data) {
+    const { user_id: _userId, ...updates } = profile;
     return supabase
       .from('profiles')
       .update({
-        ...profile,
+        ...updates,
         updated_at: new Date().toISOString(),
       })
       .eq('user_id', profile.user_id)
@@ -240,10 +242,11 @@ export async function upsertUserProfile(profile: {
     return inserted;
   }
 
+  const { user_id: _userId, ...updates } = profile;
   return supabase
     .from('profiles')
     .update({
-      ...profile,
+      ...updates,
       updated_at: new Date().toISOString(),
     })
     .eq('user_id', profile.user_id)

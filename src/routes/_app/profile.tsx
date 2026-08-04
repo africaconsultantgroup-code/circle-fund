@@ -100,7 +100,7 @@ function ProfilePage() {
                 </div>
               </div>
               <div className="mt-4 flex items-center justify-between">
-                <TrustBadge tier="Good" score={100} />
+                <TrustBadge tier="high" score={100} />
                 <Link to="/verify/status" className="text-[11px] font-semibold text-primary">
                   Verification status
                 </Link>

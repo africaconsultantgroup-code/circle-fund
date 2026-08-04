@@ -24,11 +24,12 @@ export async function requireVerifiedPhone() {
   }
 }
 
-export async function requireAuth(returnTo?: string) {
+export async function requireAuth(context?: { location?: { href?: string } }) {
   if (!isSupabaseConfigured) return;
 
   const user = await getCurrentUser();
   if (!user) {
+    const returnTo = context?.location?.href;
     const search = returnTo ? { redirect: returnTo } : undefined;
     throw redirect({ to: "/login", search });
   }

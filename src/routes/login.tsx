@@ -50,7 +50,9 @@ function LoginPage() {
       </div>
 
       <h1 className="font-display text-3xl font-bold tracking-tight">Welcome back</h1>
-      <p className="mt-2 text-sm text-muted-foreground">Sign in to continue contributing to your circles.</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Sign in to continue contributing to your circles.
+      </p>
 
       <form className="mt-8 flex flex-col gap-4" onSubmit={handleSubmit}>
         <Field
@@ -74,7 +76,11 @@ function LoginPage() {
               placeholder="Enter your password"
               className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
-            <button type="button" onClick={() => setShow((s) => !s)} className="text-muted-foreground">
+            <button
+              type="button"
+              onClick={() => setShow((s) => !s)}
+              className="text-muted-foreground"
+            >
               {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
@@ -82,7 +88,11 @@ function LoginPage() {
 
         <div className="flex items-center justify-between text-xs">
           <label className="flex items-center gap-2 text-muted-foreground">
-            <input type="checkbox" className="h-4 w-4 rounded border-input accent-[color:var(--primary)]" defaultChecked />
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-input accent-[color:var(--primary)]"
+              defaultChecked
+            />
             Remember me
           </label>
           <Link to="/login" className="font-medium text-primary">
@@ -101,18 +111,11 @@ function LoginPage() {
         </button>
       </form>
 
-      <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
-        <span className="h-px flex-1 bg-border" /> or continue with <span className="h-px flex-1 bg-border" />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <button className="rounded-2xl border border-border bg-background py-3 text-sm font-medium">Google</button>
-        <button className="rounded-2xl border border-border bg-background py-3 text-sm font-medium">Apple</button>
-      </div>
-
       <p className="mt-auto pt-8 text-center text-sm text-muted-foreground">
         New to SikaCircle?{" "}
-        <Link to="/register" className="font-semibold text-primary">Create an account</Link>
+        <Link to="/register" className="font-semibold text-primary">
+          Create an account
+        </Link>
       </p>
     </div>
   );

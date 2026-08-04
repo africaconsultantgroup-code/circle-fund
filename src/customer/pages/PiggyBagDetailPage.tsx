@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { CalendarDays, CheckCircle2, Loader2, LockKeyhole, PiggyBank, ShieldAlert, Wallet } from "lucide-react";
 import { PaymentPreparationModal } from "@/components/payment-preparation-modal";
+import { PaymentAutomationCard } from "@/components/payment-automation-card";
+import { ProtectedFundsCard } from "@/components/protected-funds-card";
+import { PayoutStatusCard } from "@/components/payout-status-card";
 import { PageHeader } from "@/components/page-header";
 import { initiateHubtelPayment, payFromWallet, type PaymentTransaction } from "@/lib/db";
 import { formatGHS } from "@/lib/mock-data";
@@ -149,6 +152,24 @@ export function PiggyBagDetailPage({ planId }: { planId: string }) {
             <BalanceTile icon={<CalendarDays className="h-4 w-4" />} label="Next payment" value={details.metrics.nextPaymentDate ? formatDate(details.metrics.nextPaymentDate) : "Complete"} />
             <BalanceTile icon={<PiggyBank className="h-4 w-4" />} label="Per period" value={formatGHS(details.metrics.expectedContributionPerPeriod)} />
           </section>
+
+          <PaymentAutomationCard
+            automationType="piggy_autosave"
+            targetId={details.plan.id}
+            targetName={details.plan.name}
+            amount={details.metrics.expectedContributionPerPeriod || details.metrics.remainingBalance}
+            frequency={details.plan.frequency}
+            nextCollectionDate={details.metrics.nextPaymentDate ?? new Date().toISOString().slice(0, 10)}
+            maturityDate={details.plan.locked_until}
+          />
+
+          <ProtectedFundsCard
+            scope="piggy"
+            piggyId={details.plan.id}
+            maturityDate={details.plan.locked_until}
+          />
+
+          <PayoutStatusCard piggyId={details.plan.id} />
 
           <section className="rounded-3xl border border-border bg-card p-4 shadow-card">
             <div className="flex items-start gap-3">

@@ -176,17 +176,7 @@ function reviewStatusAllowsEligibility(status: VerificationStatus | null | undef
 }
 
 export function isUserFullyVerified(profile: Profile | null, verification: UserVerification | null) {
-  if (verification?.verification_status === "verified") return true;
-
-  return Boolean(
-    profile?.profile_completed &&
-    profile.account_status === "active" &&
-    verification?.phone_verified &&
-    verification.otp_status === "verified" &&
-    verification.ghana_card_verified &&
-    verification.face_verified &&
-    verification.verification_status === "verified",
-  );
+  return verification?.verification_status === "verified";
 }
 
 function phoneStatus(hasPhoneSubmission: boolean, verification: UserVerification | null): VerificationStatus {

@@ -1,8 +1,25 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
-import { Users, Repeat, Calendar, FileText, ShieldCheck, ShieldAlert, CheckCircle2, Loader2, Copy, MessageCircle } from "lucide-react";
-import { createCircleWithCreator, generateInviteToken, getProfileByUserId } from "@/lib/db";
+import {
+  Users,
+  Repeat,
+  Calendar,
+  FileText,
+  ShieldCheck,
+  ShieldAlert,
+  CheckCircle2,
+  Loader2,
+  Copy,
+  MessageCircle,
+  Target,
+} from "lucide-react";
+import {
+  createCircleWithCreator,
+  createGoalSusu,
+  generateInviteToken,
+  getProfileByUserId,
+} from "@/lib/db";
 import { getCircleEligibility, type CircleEligibility } from "@/lib/onboarding";
 import { canCreateCircle, type CreateCircleLimitResult } from "@/lib/circle-limits";
 import { currencyOptions, formatCurrency } from "@/lib/diaspora";
@@ -10,6 +27,7 @@ import type { CurrencyCode } from "@/lib/supabase-types";
 
 export function CreateCirclePage() {
   const navigate = useNavigate();
+  const [circleType, setCircleType] = useState<"rotational" | "goal">("rotational");
   const [name, setName] = useState("My New Circle");
   const [description, setDescription] = useState("Monthly contributions with close friends.");
   const [category, setCategory] = useState("Family");
@@ -17,7 +35,21 @@ export function CreateCirclePage() {
   const [amount, setAmount] = useState(150);
   const [baseCurrency, setBaseCurrency] = useState<CurrencyCode>("GHS");
   const [frequency, setFrequency] = useState<"weekly" | "biweekly" | "monthly">("monthly");
+  const [payoutFrequency, setPayoutFrequency] = useState<
+    "one_time" | "weekly" | "every_14_days" | "twice_monthly" | "monthly"
+  >("one_time");
   const [startDate, setStartDate] = useState("2026-06-15");
+  const [maturityDate, setMaturityDate] = useState("2026-08-30");
+  const [twiceMonthlyDayOne, setTwiceMonthlyDayOne] = useState(1);
+  const [twiceMonthlyDayTwo, setTwiceMonthlyDayTwo] = useState(15);
+  const [targetAmount, setTargetAmount] = useState(3000);
+  const [beneficiaryType, setBeneficiaryType] = useState<"sikacircle_user" | "external">(
+    "external",
+  );
+  const [beneficiaryName, setBeneficiaryName] = useState("");
+  const [beneficiaryPhone, setBeneficiaryPhone] = useState("");
+  const [beneficiaryNetwork, setBeneficiaryNetwork] = useState("MTN");
+  const [beneficiaryPurpose, setBeneficiaryPurpose] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState("");
   const [success, setSuccess] = useState("");
@@ -29,6 +61,14 @@ export function CreateCirclePage() {
   const [isCheckingEligibility, setIsCheckingEligibility] = useState(true);
   const eligible = Boolean(eligibility?.isEligible && createLimit?.canCreate);
   const blocked = isCheckingEligibility || !eligible;
+  const goalContributionPlan = calculateGoalContribution({
+    targetAmount,
+    members,
+    frequency,
+    startDate,
+    endDate: maturityDate,
+  });
+  const effectiveContributionAmount = circleType === "goal" ? goalContributionPlan.amount : amount;
 
   useEffect(() => {
     let isMounted = true;
@@ -55,10 +95,30 @@ export function CreateCirclePage() {
     const allowedFrequencies = ["weekly", "biweekly", "monthly"];
 
     if (!name.trim()) nextErrors.name = "Enter a circle name.";
-    if (!Number.isFinite(amount) || amount <= 0) nextErrors.amount = "Enter a contribution amount greater than 0.";
-    if (!allowedFrequencies.includes(frequency)) nextErrors.frequency = "Choose weekly, biweekly, or monthly.";
-    if (!Number.isInteger(members) || members < 2 || members > 15) nextErrors.members = "Maximum members must be between 2 and 15.";
+    if (!Number.isFinite(effectiveContributionAmount) || effectiveContributionAmount <= 0)
+      nextErrors.amount = "Enter a contribution amount greater than 0.";
+    if (!allowedFrequencies.includes(frequency))
+      nextErrors.frequency = "Choose weekly, biweekly, or monthly.";
+    if (!Number.isInteger(members) || members < 2 || members > 15)
+      nextErrors.members = "Maximum members must be between 2 and 15.";
     if (!startDate) nextErrors.startDate = "Choose a start date.";
+    if (circleType === "goal") {
+      if (!Number.isFinite(targetAmount) || targetAmount <= 0)
+        nextErrors.targetAmount = "Enter a target greater than 0.";
+      if (!maturityDate || maturityDate <= startDate)
+        nextErrors.maturityDate = "Choose an overall end date after the start date.";
+      if (
+        payoutFrequency === "twice_monthly" &&
+        (twiceMonthlyDayOne < 1 ||
+          twiceMonthlyDayTwo > 28 ||
+          twiceMonthlyDayOne >= twiceMonthlyDayTwo)
+      )
+        nextErrors.payoutDays = "Choose two different calendar days between 1 and 28.";
+      if (!beneficiaryName.trim())
+        nextErrors.beneficiaryName = "Enter the agreed beneficiary name.";
+      if (beneficiaryPhone.replace(/\D/g, "").length < 10)
+        nextErrors.beneficiaryPhone = "Enter a valid Mobile Money number.";
+    }
 
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -83,7 +143,7 @@ export function CreateCirclePage() {
 
     setIsSaving(true);
     try {
-      const currentEligibility = eligibility ?? await getCircleEligibility();
+      const currentEligibility = eligibility ?? (await getCircleEligibility());
       if (!currentEligibility.isEligible || !currentEligibility.userId) {
         setEligibility(currentEligibility);
         setSubmitError(currentEligibility.message || "Please sign in before creating a circle.");
@@ -98,23 +158,50 @@ export function CreateCirclePage() {
       }
 
       const inviteToken = generateInviteToken();
-      const { data, error } = await createCircleWithCreator(
-        {
-          owner_id: currentEligibility.userId,
-          name: name.trim(),
-          description: description.trim() ? `${description.trim()} Category: ${category}` : `Category: ${category}`,
-          contribution_amount: amount,
-          base_currency: baseCurrency,
-          goal_amount: amount * members,
-          frequency,
-          max_members: members,
-          invite_token: inviteToken,
-          invite_code: inviteToken,
-          start_date: new Date(`${startDate}T00:00:00`).toISOString(),
-          status: "active",
-        },
-        currentEligibility.userId,
-      );
+      const { data, error } =
+        circleType === "goal"
+          ? await createGoalSusu({
+              goalName: name.trim(),
+              description: description.trim(),
+              targetAmount,
+              contributionAmount: effectiveContributionAmount,
+              frequency,
+              payoutFrequency,
+              startDate,
+              endDate: maturityDate,
+              twiceMonthlyDayOne: payoutFrequency === "twice_monthly" ? twiceMonthlyDayOne : null,
+              twiceMonthlyDayTwo: payoutFrequency === "twice_monthly" ? twiceMonthlyDayTwo : null,
+              maximumMembers: members,
+              currency: baseCurrency,
+              inviteValue: inviteToken,
+              beneficiaryType,
+              beneficiaryUserId:
+                beneficiaryType === "sikacircle_user" ? currentEligibility.userId : null,
+              beneficiaryName: beneficiaryName.trim(),
+              destinationReference: beneficiaryPhone.trim(),
+              mobileMoneyNetwork: beneficiaryNetwork,
+              relationshipOrPurpose: beneficiaryPurpose.trim(),
+            })
+          : await createCircleWithCreator(
+              {
+                owner_id: currentEligibility.userId,
+                name: name.trim(),
+                description: description.trim()
+                  ? `${description.trim()} Category: ${category}`
+                  : `Category: ${category}`,
+                contribution_amount: effectiveContributionAmount,
+                base_currency: baseCurrency,
+                goal_amount: effectiveContributionAmount * members,
+                frequency,
+                max_members: members,
+                invite_token: inviteToken,
+                invite_code: inviteToken,
+                start_date: new Date(`${startDate}T00:00:00`).toISOString(),
+                status: "active",
+                circle_type: "rotational",
+              },
+              currentEligibility.userId,
+            );
 
       if (error || !data) {
         setSubmitError(error?.message ?? "We could not create this circle. Please try again.");
@@ -126,7 +213,11 @@ export function CreateCirclePage() {
       setCreatedCircleName(data.name);
       setSuccess("Circle created successfully. You have been added as admin/creator.");
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "We could not create this circle. Please try again.");
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : "We could not create this circle. Please try again.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -153,43 +244,228 @@ export function CreateCirclePage() {
           </div>
         )}
         {!isCheckingEligibility && !eligibility?.isEligible && (
-          <Link to={eligibility?.issues[0]?.to ?? "/verify"} className="flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-destructive">
+          <Link
+            to={eligibility?.issues[0]?.to ?? "/verify"}
+            className="flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-destructive"
+          >
             <ShieldAlert className="h-5 w-5" />
             <div className="flex-1">
               <p className="font-display text-sm font-semibold">Sign in required</p>
-              <p className="text-[11px] opacity-80">{eligibility?.issues[0]?.message ?? "Please sign in to create a circle."}</p>
-              <p className="mt-1 text-[11px] font-semibold">{eligibility?.issues[0]?.actionLabel ?? "Sign in"}</p>
+              <p className="text-[11px] opacity-80">
+                {eligibility?.issues[0]?.message ?? "Please sign in to create a circle."}
+              </p>
+              <p className="mt-1 text-[11px] font-semibold">
+                {eligibility?.issues[0]?.actionLabel ?? "Sign in"}
+              </p>
             </div>
           </Link>
         )}
         {eligible && (
           <div className="flex items-center gap-2 rounded-2xl border border-gold/40 bg-gold/10 px-4 py-2.5 text-[color:var(--gold-foreground)]">
             <ShieldCheck className="h-4 w-4" />
-            <p className="text-[11px] font-medium">You can create a circle for testing. Verification may be required before contributions start.</p>
+            <p className="text-[11px] font-medium">
+              You can create a circle for testing. Verification may be required before contributions
+              start.
+            </p>
           </div>
         )}
 
-        <Section icon={<FileText className="h-4 w-4" />} title="Circle info">
-          <Input label="Circle name" placeholder="e.g. Family Savers" value={name} onChange={setName} error={errors.name} />
-          <Input label="Description" placeholder="Why this circle exists" value={description} onChange={setDescription} />
-          <Select label="Category" options={["Family", "Friends", "Work", "Church", "Association"]} value={category} onChange={setCategory} />
+        <Section
+          icon={<Repeat className="h-4 w-4" />}
+          title="What type of Susu do you want to create?"
+        >
+          <div className="grid gap-3">
+            <CircleTypeOption
+              active={circleType === "rotational"}
+              title="Rotational Susu"
+              description="Members contribute together and receive the susu pot in turns according to the agreed payout order."
+              onClick={() => setCircleType("rotational")}
+            />
+            <CircleTypeOption
+              active={circleType === "goal"}
+              title="Goal Susu"
+              description="Members contribute together toward one agreed goal and the final susu pot is paid to the agreed beneficiary."
+              onClick={() => setCircleType("goal")}
+            />
+          </div>
         </Section>
 
+        <Section icon={<FileText className="h-4 w-4" />} title="Circle info">
+          <Input
+            label={circleType === "goal" ? "Goal name" : "Circle name"}
+            placeholder={circleType === "goal" ? "e.g. Family Water Supply" : "e.g. Family Savers"}
+            value={name}
+            onChange={setName}
+            error={errors.name}
+          />
+          <Input
+            label="Description"
+            placeholder="Why this circle exists"
+            value={description}
+            onChange={setDescription}
+          />
+          <Select
+            label="Category"
+            options={["Family", "Friends", "Work", "Church", "Association"]}
+            value={category}
+            onChange={setCategory}
+          />
+        </Section>
+
+        {circleType === "goal" && (
+          <Section icon={<Target className="h-4 w-4" />} title="Goal and beneficiary">
+            <NumberInput
+              label={`Overall planning target (${baseCurrency})`}
+              value={targetAmount}
+              onChange={setTargetAmount}
+              error={errors.targetAmount}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              For recurring payouts, the final overall target is calculated from the independent
+              payout cycles.
+            </p>
+            <Select
+              label="Payout frequency"
+              options={["one_time", "weekly", "every_14_days", "twice_monthly", "monthly"]}
+              value={payoutFrequency}
+              onChange={(value) =>
+                setPayoutFrequency(
+                  value as "one_time" | "weekly" | "every_14_days" | "twice_monthly" | "monthly",
+                )
+              }
+              optionLabel={(value) =>
+                ({
+                  one_time: "One time",
+                  weekly: "Weekly",
+                  every_14_days: "Every 14 days",
+                  twice_monthly: "Twice monthly",
+                  monthly: "Monthly",
+                })[value] ?? value
+              }
+            />
+            {payoutFrequency === "twice_monthly" && (
+              <div>
+                <div className="grid grid-cols-2 gap-2">
+                  <NumberInput
+                    label="First payout day"
+                    value={twiceMonthlyDayOne}
+                    onChange={setTwiceMonthlyDayOne}
+                  />
+                  <NumberInput
+                    label="Second payout day"
+                    value={twiceMonthlyDayTwo}
+                    onChange={setTwiceMonthlyDayTwo}
+                  />
+                </div>
+                {errors.payoutDays && (
+                  <p className="mt-1 text-[11px] font-medium text-destructive">
+                    {errors.payoutDays}
+                  </p>
+                )}
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  These are fixed calendar dates. This is different from a payout every 14 days.
+                </p>
+              </div>
+            )}
+            <Input
+              label="Overall end date"
+              type="date"
+              value={maturityDate}
+              onChange={setMaturityDate}
+              error={errors.maturityDate}
+            />
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Beneficiary</label>
+              <div className="mt-1.5 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBeneficiaryType("sikacircle_user")}
+                  className={`rounded-2xl border p-3 text-xs font-semibold ${beneficiaryType === "sikacircle_user" ? "border-primary bg-secondary text-primary" : "border-border"}`}
+                >
+                  My SikaCircle account
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBeneficiaryType("external")}
+                  className={`rounded-2xl border p-3 text-xs font-semibold ${beneficiaryType === "external" ? "border-primary bg-secondary text-primary" : "border-border"}`}
+                >
+                  Someone outside
+                </button>
+              </div>
+            </div>
+            <Input
+              label="Beneficiary name"
+              placeholder="e.g. Kojo Mensah"
+              value={beneficiaryName}
+              onChange={setBeneficiaryName}
+              error={errors.beneficiaryName}
+            />
+            <Input
+              label="Mobile Money number"
+              placeholder="024 XXX XXXX"
+              value={beneficiaryPhone}
+              onChange={setBeneficiaryPhone}
+              error={errors.beneficiaryPhone}
+            />
+            <Select
+              label="Mobile Money network"
+              options={["MTN", "Telecel", "AT Money"]}
+              value={beneficiaryNetwork}
+              onChange={setBeneficiaryNetwork}
+            />
+            <Input
+              label="Relationship / purpose (optional)"
+              placeholder="e.g. Family representative"
+              value={beneficiaryPurpose}
+              onChange={setBeneficiaryPurpose}
+            />
+            <p className="rounded-xl bg-gold/10 px-3 py-2 text-[11px] text-[color:var(--gold-foreground)]">
+              The destination starts as pending verification. Goal Susu cannot become
+              payout-eligible until it is independently verified.
+            </p>
+          </Section>
+        )}
+
         <Section icon={<Repeat className="h-4 w-4" />} title="Contribution">
-          <Select label="Base currency" options={currencyOptions} value={baseCurrency} onChange={(value) => setBaseCurrency(value as CurrencyCode)} />
+          <Select
+            label="Base currency"
+            options={currencyOptions}
+            value={baseCurrency}
+            onChange={(value) => setBaseCurrency(value as CurrencyCode)}
+          />
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Amount ({baseCurrency})</label>
+            <label className="text-xs font-medium text-muted-foreground">
+              {circleType === "goal"
+                ? `Automatically calculated per member (${baseCurrency})`
+                : `Amount (${baseCurrency})`}
+            </label>
             <div className="mt-1.5 flex items-center gap-2 rounded-2xl border border-input bg-muted/40 px-4 py-3.5">
               <span className="text-sm font-semibold text-muted-foreground">{baseCurrency}</span>
               <input
                 type="number"
                 min={1}
-                value={amount}
+                value={effectiveContributionAmount}
                 onChange={(e) => setAmount(Number(e.target.value))}
+                readOnly={circleType === "goal"}
                 className="flex-1 bg-transparent text-sm outline-none"
               />
             </div>
-            {errors.amount && <p className="mt-1 text-[11px] font-medium text-destructive">{errors.amount}</p>}
+            {circleType === "goal" && goalContributionPlan.occurrences > 0 && (
+              <div className="mt-2 rounded-xl bg-secondary px-3 py-2 text-[11px] text-primary">
+                <p className="font-semibold">
+                  {formatCurrency(effectiveContributionAmount, baseCurrency)} per member,{" "}
+                  {frequencyLabel(frequency)}
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  {formatCurrency(targetAmount, baseCurrency)} target ÷ {members} members ÷{" "}
+                  {goalContributionPlan.occurrences} contribution dates. The amount is rounded up to
+                  avoid a shortfall.
+                </p>
+              </div>
+            )}
+            {errors.amount && (
+              <p className="mt-1 text-[11px] font-medium text-destructive">{errors.amount}</p>
+            )}
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">Frequency</label>
@@ -200,14 +476,18 @@ export function CreateCirclePage() {
                   type="button"
                   onClick={() => setFrequency(f)}
                   className={`rounded-2xl border px-3 py-3 text-sm font-medium capitalize transition-colors ${
-                    frequency === f ? "border-primary bg-gradient-primary text-primary-foreground" : "border-border bg-card text-foreground"
+                    frequency === f
+                      ? "border-primary bg-gradient-primary text-primary-foreground"
+                      : "border-border bg-card text-foreground"
                   }`}
                 >
                   {f}
                 </button>
               ))}
             </div>
-            {errors.frequency && <p className="mt-1 text-[11px] font-medium text-destructive">{errors.frequency}</p>}
+            {errors.frequency && (
+              <p className="mt-1 text-[11px] font-medium text-destructive">{errors.frequency}</p>
+            )}
           </div>
         </Section>
 
@@ -225,18 +505,34 @@ export function CreateCirclePage() {
               onChange={(e) => setMembers(Number(e.target.value))}
               className="mt-3 w-full accent-[color:var(--primary)]"
             />
-            {errors.members && <p className="mt-1 text-[11px] font-medium text-destructive">{errors.members}</p>}
+            {errors.members && (
+              <p className="mt-1 text-[11px] font-medium text-destructive">{errors.members}</p>
+            )}
           </div>
         </Section>
 
         <Section icon={<Calendar className="h-4 w-4" />} title="Start date">
-          <Input label="First contribution" type="date" value={startDate} onChange={setStartDate} error={errors.startDate} />
+          <Input
+            label="First contribution"
+            type="date"
+            value={startDate}
+            onChange={setStartDate}
+            error={errors.startDate}
+          />
         </Section>
 
         <div className="rounded-3xl bg-secondary p-4">
-          <p className="text-xs uppercase tracking-wide text-primary">Estimated pool per cycle</p>
-          <p className="mt-1 font-display text-2xl font-bold text-primary">{formatCurrency(amount * members, baseCurrency)}</p>
-          <p className="text-[11px] text-muted-foreground">Each member receives one payout over {members} {frequency === "weekly" ? "weeks" : frequency === "biweekly" ? "fortnights" : "months"}.</p>
+          <p className="text-xs uppercase tracking-wide text-primary">
+            {circleType === "goal" ? "Goal target" : "Estimated pool per cycle"}
+          </p>
+          <p className="mt-1 font-display text-2xl font-bold text-primary">
+            {formatCurrency(circleType === "goal" ? targetAmount : amount * members, baseCurrency)}
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            {circleType === "goal"
+              ? "The protected pot goes to the agreed beneficiary at maturity when all conditions are met."
+              : `Each member receives one payout over ${members} ${frequency === "weekly" ? "weeks" : frequency === "biweekly" ? "fortnights" : "months"}.`}
+          </p>
         </div>
 
         {success && (
@@ -249,7 +545,9 @@ export function CreateCirclePage() {
               <div className="mt-3 rounded-xl bg-background/70 p-3 text-foreground">
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Circle</p>
                 <p className="mt-1 font-display text-sm font-semibold">{createdCircleName}</p>
-                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Invite link</p>
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Invite link
+                </p>
                 <p className="mt-1 break-all font-mono text-[11px]">{inviteLink}</p>
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   <button
@@ -295,18 +593,32 @@ export function CreateCirclePage() {
             <span className="flex items-center justify-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" /> Saving
             </span>
-          ) : blocked ? "Locked" : "Create Circle"}
+          ) : blocked ? (
+            "Locked"
+          ) : (
+            "Create Circle"
+          )}
         </button>
       </div>
     </div>
   );
 }
 
-function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+function Section({
+  icon,
+  title,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="rounded-3xl border border-border bg-card p-4 shadow-card">
       <div className="mb-3 flex items-center gap-2 text-primary">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-secondary">{icon}</span>
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-secondary">
+          {icon}
+        </span>
         <p className="font-display text-sm font-semibold">{title}</p>
       </div>
       <div className="flex flex-col gap-3">{children}</div>
@@ -314,7 +626,21 @@ function Section({ icon, title, children }: { icon: React.ReactNode; title: stri
   );
 }
 
-function Input({ label, type = "text", placeholder, value, onChange, error }: { label: string; type?: string; placeholder?: string; value: string; onChange: (value: string) => void; error?: string }) {
+function Input({
+  label,
+  type = "text",
+  placeholder,
+  value,
+  onChange,
+  error,
+}: {
+  label: string;
+  type?: string;
+  placeholder?: string;
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+}) {
   return (
     <div>
       <label className="text-xs font-medium text-muted-foreground">{label}</label>
@@ -330,13 +656,161 @@ function Input({ label, type = "text", placeholder, value, onChange, error }: { 
   );
 }
 
-function Select({ label, options, value, onChange }: { label: string; options: string[]; value: string; onChange: (value: string) => void }) {
+function Select({
+  label,
+  options,
+  value,
+  onChange,
+  optionLabel,
+}: {
+  label: string;
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
+  optionLabel?: (value: string) => string;
+}) {
   return (
     <div>
       <label className="text-xs font-medium text-muted-foreground">{label}</label>
-      <select value={value} onChange={(event) => onChange(event.target.value)} className="mt-1.5 w-full appearance-none rounded-2xl border border-input bg-muted/40 px-4 py-3.5 text-sm outline-none">
-        {options.map((o) => <option key={o}>{o}</option>)}
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1.5 w-full appearance-none rounded-2xl border border-input bg-muted/40 px-4 py-3.5 text-sm outline-none"
+      >
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {optionLabel?.(o) ?? o}
+          </option>
+        ))}
       </select>
     </div>
   );
+}
+
+function NumberInput({
+  label,
+  value,
+  onChange,
+  error,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  error?: string;
+}) {
+  return (
+    <div>
+      <label className="text-xs font-medium text-muted-foreground">{label}</label>
+      <input
+        type="number"
+        min={1}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="mt-1.5 w-full rounded-2xl border border-input bg-muted/40 px-4 py-3.5 text-sm outline-none"
+      />
+      {error && <p className="mt-1 text-[11px] font-medium text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+function CircleTypeOption({
+  active,
+  title,
+  description,
+  onClick,
+}: {
+  active: boolean;
+  title: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-2xl border p-4 text-left transition-colors ${active ? "border-primary bg-secondary" : "border-border bg-card"}`}
+    >
+      <p className="font-display text-sm font-semibold">{title}</p>
+      <p className="mt-1 text-[11px] text-muted-foreground">{description}</p>
+    </button>
+  );
+}
+
+function calculateGoalContribution({
+  targetAmount,
+  members,
+  frequency,
+  startDate,
+  endDate,
+}: {
+  targetAmount: number;
+  members: number;
+  frequency: "weekly" | "biweekly" | "monthly";
+  startDate: string;
+  endDate: string;
+}) {
+  const occurrences = countContributionDates(startDate, endDate, frequency);
+  if (
+    !Number.isFinite(targetAmount) ||
+    targetAmount <= 0 ||
+    !Number.isInteger(members) ||
+    members < 2 ||
+    occurrences < 1
+  ) {
+    return { amount: 0, occurrences: 0 };
+  }
+
+  return {
+    amount: Math.ceil((targetAmount * 100) / (members * occurrences)) / 100,
+    occurrences,
+  };
+}
+
+function countContributionDates(
+  startDate: string,
+  endDate: string,
+  frequency: "weekly" | "biweekly" | "monthly",
+) {
+  const start = parseDateOnly(startDate);
+  const end = parseDateOnly(endDate);
+  if (!start || !end || end.getTime() <= start.getTime()) return 0;
+
+  let occurrence = start;
+  let count = 0;
+  while (occurrence.getTime() <= end.getTime() && count < 1000) {
+    count += 1;
+    occurrence =
+      frequency === "weekly"
+        ? addDays(occurrence, 7)
+        : frequency === "biweekly"
+          ? addDays(occurrence, 14)
+          : addMonthClamped(occurrence);
+  }
+  return count;
+}
+
+function parseDateOnly(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function addDays(value: Date, days: number) {
+  const result = new Date(value);
+  result.setUTCDate(result.getUTCDate() + days);
+  return result;
+}
+
+function addMonthClamped(value: Date) {
+  const year = value.getUTCFullYear();
+  const month = value.getUTCMonth();
+  const day = value.getUTCDate();
+  const lastDay = new Date(Date.UTC(year, month + 2, 0)).getUTCDate();
+  return new Date(Date.UTC(year, month + 1, Math.min(day, lastDay)));
+}
+
+function frequencyLabel(value: "weekly" | "biweekly" | "monthly") {
+  if (value === "biweekly") return "every 14 days";
+  return value;
 }
