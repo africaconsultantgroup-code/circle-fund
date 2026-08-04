@@ -1072,6 +1072,78 @@ export interface Database {
         Insert: never;
         Update: never;
       };
+      circle_chat_rooms: {
+        Row: {
+          id: string;
+          circle_id: string;
+          circle_type: "rotational" | "goal";
+          status: "active" | "read_only" | "closed";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: never;
+        Update: never;
+      };
+      circle_chat_messages: {
+        Row: {
+          id: string;
+          room_id: string;
+          circle_id: string;
+          sender_user_id: string | null;
+          message_type:
+            | "text"
+            | "system"
+            | "contribution_thread"
+            | "governance_event"
+            | "attachment"
+            | "announcement";
+          body: string;
+          reply_to_message_id: string | null;
+          contribution_id: string | null;
+          governance_event_id: string | null;
+          governance_request_id: string | null;
+          dispute_id: string | null;
+          mentioned_user_ids: string[];
+          event_key: string | null;
+          edited_at: string | null;
+          edit_count: number;
+          deleted_at: string | null;
+          deleted_by: string | null;
+          deletion_reason: string | null;
+          moderation_status: "visible" | "reported" | "under_review" | "hidden" | "preserved";
+          evidence_locked: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: never;
+        Update: never;
+      };
+      circle_chat_reads: {
+        Row: {
+          room_id: string;
+          user_id: string;
+          last_read_message_id: string | null;
+          last_read_at: string;
+        };
+        Insert: never;
+        Update: never;
+      };
+      circle_message_reports: {
+        Row: {
+          id: string;
+          message_id: string;
+          reported_by: string;
+          reason: string;
+          details: string | null;
+          status: "open" | "under_review" | "resolved" | "dismissed";
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          resolution: string | null;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+      };
       admin_bootstrap_emails: {
         Row: {
           email: string;
@@ -1093,6 +1165,37 @@ export interface Database {
       };
     };
     Functions: {
+      send_circle_chat_message: {
+        Args: {
+          check_room_id: string;
+          requested_body: string;
+          requested_type?: string;
+          requested_reply_to?: string | null;
+          requested_contribution_id?: string | null;
+          requested_mentions?: string[];
+        };
+        Returns: Database["public"]["Tables"]["circle_chat_messages"]["Row"];
+      };
+      edit_circle_chat_message: {
+        Args: { check_message_id: string; requested_body: string };
+        Returns: Database["public"]["Tables"]["circle_chat_messages"]["Row"];
+      };
+      delete_circle_chat_message: {
+        Args: { check_message_id: string; requested_reason: string };
+        Returns: Database["public"]["Tables"]["circle_chat_messages"]["Row"];
+      };
+      report_circle_chat_message: {
+        Args: {
+          check_message_id: string;
+          requested_reason: string;
+          requested_details?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["circle_message_reports"]["Row"];
+      };
+      mark_circle_chat_read: {
+        Args: { check_room_id: string; check_message_id?: string | null };
+        Returns: undefined;
+      };
       create_goal_susu: {
         Args: {
           goal_name: string;

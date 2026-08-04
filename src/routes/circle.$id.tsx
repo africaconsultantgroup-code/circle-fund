@@ -5,6 +5,7 @@ import { PaymentAutomationCard } from "@/components/payment-automation-card";
 import { ProtectedFundsCard } from "@/components/protected-funds-card";
 import { PayoutStatusCard } from "@/components/payout-status-card";
 import { GoalSusuDashboard } from "@/components/goal-susu-dashboard";
+import { CircleChat } from "@/components/circle-chat";
 import { PageHeader } from "@/components/page-header";
 import { SavingsPlanner } from "@/components/savings-planner";
 import {
@@ -15,6 +16,7 @@ import {
   HeartPulse,
   Loader2,
   LockKeyhole,
+  MessageCircle,
   RefreshCw,
   Settings,
   Share2,
@@ -89,7 +91,7 @@ export const Route = createFileRoute("/circle/$id")({
   ),
 });
 
-type Tab = "overview" | "members" | "contributions" | "rotation" | "settings";
+type Tab = "overview" | "members" | "contributions" | "chat" | "rotation" | "settings";
 
 function CircleDetails() {
   const { circleId, mockCircle } = Route.useLoaderData() as {
@@ -108,6 +110,7 @@ export function CircleDetailsContent({
 }) {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("overview");
+  const [chatContributionId, setChatContributionId] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [circle, setCircle] = useState<Circle | null>(null);
   const [members, setMembers] = useState<CircleMemberDetails[]>([]);
@@ -707,7 +710,7 @@ export function CircleDetailsContent({
           {message && <Notice tone="success" text={message} />}
           {paymentNotice && <Notice tone="success" text={paymentNotice} />}
 
-          <div className="grid grid-cols-5 gap-2 px-5 pt-4">
+          <div className="grid grid-cols-6 gap-2 px-5 pt-4">
             <TabButton
               active={tab === "overview"}
               icon={<WalletCards className="h-4 w-4" />}
@@ -725,6 +728,15 @@ export function CircleDetailsContent({
               icon={<Calendar className="h-4 w-4" />}
               label="Contrib."
               onClick={() => setTab("contributions")}
+            />
+            <TabButton
+              active={tab === "chat"}
+              icon={<MessageCircle className="h-4 w-4" />}
+              label="Chat"
+              onClick={() => {
+                setChatContributionId(null);
+                setTab("chat");
+              }}
             />
             {!isGoalSusu && (
               <TabButton
@@ -969,6 +981,17 @@ export function CircleDetailsContent({
                           wide
                         />
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChatContributionId(contribution.contribution_id);
+                          setTab("chat");
+                        }}
+                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border py-2 text-[11px] font-semibold text-primary"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        Discuss contribution
+                      </button>
                       {!isArchived &&
                         user?.id === contribution.user_id &&
                         ["unpaid", "overdue", "pending", "failed"].includes(
@@ -1005,6 +1028,27 @@ export function CircleDetailsContent({
               )}
             </section>
           )}
+
+          {tab === "chat" &&
+            circle &&
+            user &&
+            (currentMember?.status === "approved" || isAdmin) && (
+              <section className="p-5">
+                <CircleChat
+                  circleId={circle.id}
+                  circleName={circle.name}
+                  circleType={isGoalSusu ? "goal" : "rotational"}
+                  currentUserId={user.id}
+                  memberNames={Object.fromEntries(
+                    members.map((member) => [member.user_id, displayMemberName(member.full_name)]),
+                  )}
+                  isAdmin={isAdmin}
+                  isArchived={isArchived}
+                  contributionId={chatContributionId}
+                  onCloseContributionThread={() => setChatContributionId(null)}
+                />
+              </section>
+            )}
 
           {tab === "rotation" && (
             <section className="flex flex-col gap-4 p-5">{renderPayoutRotationSection()}</section>
